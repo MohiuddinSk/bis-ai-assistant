@@ -1,0 +1,122 @@
+[
+  {
+    "source_id": "162srZH_9S2uy2j2nSKJb-MbgI8FThE9D",
+    "title": "PM-9873-Feb-2023.pdf",
+    "url": "https://drive.google.com/file/d/162srZH_9S2uy2j2nSKJb-MbgI8FThE9D/view?usp=drivesdk",
+    "status": "historical",
+    "default_retrieval": false,
+    "text_sha256": "ecec445798fcacc3063cfab0afb7b1e047fccdd3324680a43b5d11f46e30be42",
+    "duplicate_of": "",
+    "content_chars": 79445
+  },
+  {
+    "source_id": "1O4xwMsFFB_pPh2S6FaG4Gwec43T-09_2",
+    "title": "Toys-Quality-Control-Second-Amendment-Order-2020.pdf",
+    "url": "https://drive.google.com/file/d/1O4xwMsFFB_pPh2S6FaG4Gwec43T-09_2/view?usp=drivesdk",
+    "status": "legal_rule_source_versioned",
+    "default_retrieval": true,
+    "text_sha256": "fb87c9ac0eea519b836ef680e1a2f8956f2381e577f5842135e5437e26b6152d",
+    "duplicate_of": "",
+    "content_chars": 4085
+  },
+  {
+    "source_id": "1PSjoz9Dn5lRmJc6vaxiNUgLfHSR5BJwy",
+    "title": "PM-9873-Oct-2023.pdf",
+    "url": "https://drive.google.com/file/d/1PSjoz9Dn5lRmJc6vaxiNUgLfHSR5BJwy/view?usp=drivesdk",
+    "status": "historical_reference_newer_copy_found",
+    "default_retrieval": false,
+    "text_sha256": "6ed345499e06ffd7450ac3820222aac0e0cea6bcb7832dfa3fe5da95ebac4bc2",
+    "duplicate_of": "",
+    "content_chars": 79750
+  },
+  {
+    "source_id": "1RDeRtA29KTpVzOHWNGlelLC33sVb5wtX",
+    "title": "Safety_of_toys.pdf",
+    "url": "https://drive.google.com/file/d/1RDeRtA29KTpVzOHWNGlelLC33sVb5wtX/view?usp=drivesdk",
+    "status": "historical_overview",
+    "default_retrieval": false,
+    "text_sha256": "fd38515786cea278fb1e013286584839b603905446fd66b610d198a2688466db",
+    "duplicate_of": "",
+    "content_chars": 1947
+  },
+  {
+    "source_id": "1bX7yRNclletXiM_CjVMPuIETFma2l_bF",
+    "title": "Transition_2026_Transition Control.pdf",
+    "url": "https://drive.google.com/file/d/1bX7yRNclletXiM_CjVMPuIETFma2l_bF/view?usp=drivesdk",
+    "status": "official_source_inspected_scope_needs_circular_chain",
+    "default_retrieval": true,
+    "text_sha256": "3c932239d5e12f2cece95c8bbd6fa0e73d3845fb310d775aca3a06ba20d6f560",
+    "duplicate_of": "",
+    "content_chars": 15297
+  },
+  {
+    "source_id": "1d6eeKBbR6Gg-w0LDZISKj9Et3jIhJHD_",
+    "title": "Toys-QCO-2024.pdf",
+    "url": "https://drive.google.com/file/d/1d6eeKBbR6Gg-w0LDZISKj9Et3jIhJHD_/view?usp=drivesdk",
+    "status": "legal_rule_source_versioned",
+    "default_retrieval": true,
+    "text_sha256": "13a7deac0220ad5b9f91d6cf46b950aae74b6fa0c1f3d9aec2029c9e79531f66",
+    "duplicate_of": "",
+    "content_chars": 4329
+  },
+  {
+    "source_id": "1dVZ6obmnpgEjRoALRSVMSde9fpxT9Ot6",
+    "title": "toys product manual declaration format.pdf",
+    "url": "https://drive.google.com/file/d/1dVZ6obmnpgEjRoALRSVMSde9fpxT9Ot6/view?usp=drivesdk",
+    "status": "historical",
+    "default_retrieval": false,
+    "text_sha256": "cc82b4647662c5a48dc4da40e689b8602417ccfc5c7d79c82451193e02809850",
+    "duplicate_of": "",
+    "content_chars": 72571
+  },
+  {
+    "source_id": "1ebEmYi4QOjTG1ZGfetpLkODqxGSS3gd4",
+    "title": "10-steps-for-BIS-toy-certification.pdf",
+    "url": "https://drive.google.com/file/d/1ebEmYi4QOjTG1ZGfetpLkODqxGSS3gd4/view?usp=drivesdk",
+    "status": "guidance_needs_current_check",
+    "default_retrieval": false,
+    "text_sha256": "f748b97b4a887a15eee82601a18da323db045ebaed347054d437c927d6db842f",
+    "duplicate_of": "",
+    "content_chars": 18393
+  },
+  {
+    "source_id": "1oeoC3bcz984jiS86Sm2DRW2NAvD3L1_B",
+    "title": "Toys-Extension.pdf",
+    "url": "https://drive.google.com/file/d/1oeoC3bcz984jiS86Sm2DRW2NAvD3L1_B/view?usp=drivesdk",
+    "status": "legal_rule_source_versioned",
+    "default_retrieval": true,
+    "text_sha256": "4a36686b42613f6dad2afcf4c22fedf593f3e047aad5ba64444baadad7210d4a",
+    "duplicate_of": "",
+    "content_chars": 2836
+  },
+  {
+    "source_id": "1pS1i87tB-C9Sj6lyikZxf0WaZLgXhbmJ",
+    "title": "toys-faqs.pdf",
+    "url": "https://drive.google.com/file/d/1pS1i87tB-C9Sj6lyikZxf0WaZLgXhbmJ/view?usp=drivesdk",
+    "status": "guidance_needs_current_check",
+    "default_retrieval": false,
+    "text_sha256": "1f86b017ae9e56d44fe4186d812232972d2d244d3a9e8442035871a0fba49658",
+    "duplicate_of": "",
+    "content_chars": 7692
+  },
+  {
+    "source_id": "1sKEx7-q_za8kknzEMUNxefCeRGC_R5vS",
+    "title": "Toy_QC_order.pdf",
+    "url": "https://drive.google.com/file/d/1sKEx7-q_za8kknzEMUNxefCeRGC_R5vS/view?usp=drivesdk",
+    "status": "legal_rule_source_versioned",
+    "default_retrieval": true,
+    "text_sha256": "676a030984e054ba3e8b79cd643355c16a8ddcdd915ead24d84d6138584960a1",
+    "duplicate_of": "",
+    "content_chars": 3314
+  },
+  {
+    "source_id": "1edZ8S_sWE6UVZVtiRASt9EPiH8nB6vhC",
+    "status": "duplicate",
+    "duplicate_of": "1PSjoz9Dn5lRmJc6vaxiNUgLfHSR5BJwy"
+  },
+  {
+    "source_id": "1i6pTUL9kGZizg58LtwMROzLBmQ74CVWz",
+    "status": "duplicate",
+    "duplicate_of": "1PSjoz9Dn5lRmJc6vaxiNUgLfHSR5BJwy"
+  }
+]

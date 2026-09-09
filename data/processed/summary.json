@@ -1,0 +1,32 @@
+{
+  "total_chunks": 530,
+  "document_text_chunks": 317,
+  "structured_fact_chunks": 213,
+  "default_retrieval_chunks": 237,
+  "source_files_seen": 13,
+  "canonical_sources": 11,
+  "duplicate_sources": 2,
+  "duplicate_chunks_removed": 8,
+  "chunk_size_target_chars": 1100,
+  "chunk_overlap_target_chars": 180,
+  "metadata_keys": [
+    "block_end",
+    "block_start",
+    "char_count",
+    "chunk_type",
+    "contains_table_like_text",
+    "default_retrieval",
+    "duplicate_of",
+    "language",
+    "printed_page",
+    "record_id",
+    "review_status",
+    "source_id",
+    "source_section",
+    "source_status",
+    "source_title",
+    "source_url",
+    "text_sha256",
+    "token_estimate"
+  ]
+}
