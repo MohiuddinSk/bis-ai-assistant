@@ -1,0 +1,15 @@
+{
+  "model_name": "intfloat/multilingual-e5-small",
+  "embedding_type": "cosine_similarity",
+  "document_prefix": "passage:",
+  "query_prefix": "query:",
+  "database_path": "data/chroma",
+  "collection_name": "bis_toys_v2",
+  "batch_size": 128,
+  "generated_at": "2026-09-09T00:00:00Z",
+  "notes": [
+    "Embeddings are generated only after validation passes.",
+    "The model is configured for multilingual retrieval but legal status is not inferred solely from presence in the vector index.",
+    "Canonical sources and duplicates are tracked separately in duplicate_map.json."
+  ]
+}

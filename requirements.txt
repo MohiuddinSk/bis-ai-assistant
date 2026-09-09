@@ -1,8 +1,6 @@
-chromadb
+pypdf
+PyMuPDF
+chromadb==0.4.24
+numpy<2
 sentence-transformers
-fastapi
-uvicorn
-pydantic
-python-dotenv
-numpy
 scikit-learn
