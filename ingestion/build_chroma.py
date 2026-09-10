@@ -1,34 +1,38 @@
-from __future__ import annotations
-
-import json
 from pathlib import Path
-
-import chromadb
-from sentence_transformers import SentenceTransformer
-
+import json
+import sys
 ROOT = Path(__file__).resolve().parents[1]
-CHUNKS_FILE = ROOT / "data" / "processed" / "generated_v2" / "chunks.jsonl"
-CHROMA_DIR = ROOT / "data" / "chroma"
-COLLECTION_NAME = "bis_toys_v2"
+sys.path.insert(0, str(ROOT))
+from ingestion.validate_data import validate
+from retrieval.embeddings import encode, MODEL, REVISION
+DATA = ROOT / 'data/processed/generated_v3'
 
+def main():
+    import chromadb
+    from chromadb.config import Settings
+    validate(DATA)
+    manifest = json.loads((DATA / 'embedding_manifest.json').read_text(encoding='utf-8'))
+    if (manifest['model'], manifest['model_revision']) != (MODEL, REVISION):
+        raise ValueError('Embedding contract differs from manifest')
+    rows = [json.loads(line) for line in (DATA / 'chunks.jsonl').read_text(encoding='utf-8').splitlines()]
+    rows = [r for r in rows if r['metadata']['retrieval_enabled']]
+    expected = {r['id'] for r in rows}
+    client = chromadb.PersistentClient(path=str(ROOT / 'data/chroma'), settings=Settings(anonymized_telemetry=False))
+    collection = client.get_or_create_collection(manifest['collection_name'], embedding_function=None,
+        metadata={'hnsw:space': 'cosine', 'dataset_version': manifest['dataset_version'], 'model': MODEL, 'model_revision': REVISION})
+    for key in ('dataset_version', 'model', 'model_revision'):
+        if collection.metadata.get(key) != manifest[key]:
+            raise ValueError('Existing collection has incompatible metadata')
+    existing = set(collection.get(include=[])['ids'])
+    if existing - expected:
+        raise ValueError('Unexpected IDs in dataset collection; refusing to mutate it')
+    for start in range(0, len(rows), 64):
+        batch = rows[start:start + 64]
+        collection.upsert(ids=[r['id'] for r in batch], documents=[r['document'] for r in batch],
+            metadatas=[r['metadata'] for r in batch], embeddings=encode([r['document'] for r in batch], 'passage'))
+    if set(collection.get(include=[])['ids']) != expected:
+        raise ValueError('Indexed IDs do not match dataset')
+    print(json.dumps({'collection': collection.name, 'count': collection.count(), 'membership_verified': True}))
 
-def main() -> None:
-    rows = [json.loads(line) for line in CHUNKS_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
-    chunks = [row for row in rows if row["metadata"].get("retrieval_enabled") is True]
-    print("Embedding model: intfloat/multilingual-e5-small")
-    model = SentenceTransformer("intfloat/multilingual-e5-small")
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    collection = client.get_or_create_collection(COLLECTION_NAME, metadata={"hnsw:space": "cosine"})
-    for start in range(0, len(chunks), 128):
-        batch = chunks[start:start + 128]
-        embeddings = model.encode([row["document"] for row in batch], normalize_embeddings=True, convert_to_numpy=True).tolist()
-        collection.upsert(ids=[row["id"] for row in batch], documents=[row["document"] for row in batch], metadatas=[row["metadata"] for row in batch], embeddings=embeddings)
-    print(f"Chunks selected: {len(chunks)}")
-    print(f"Chunks inserted: {len(chunks)}")
-    print(f"Collection: {COLLECTION_NAME}")
-    print(f"Chroma path: {CHROMA_DIR}")
-    print(f"Final collection count: {collection.count()}")
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -1,3 +1,13 @@
+# BIS Toys RAG data pipeline
+
+The active dataset is `data/processed/generated_v3`. Read [the operating guide](docs/DATA_WORKFLOW.md) before building the index.
+
+The packages in `data/processed/`, `generated/`, and `generated_v2/` are retained as historical outputs. Their older hardcoded facts and retrieval scripts are superseded by v3. Do not combine these packages in a single collection.
+
+No backend, LLM answer generation, or frontend is implemented by this data repair.
+
+<details><summary>Previous team notes (historical commands; use the guide above)</summary>
+
 # BIS AI Assistant
 
 SIH PS26107: a document-grounded assistant for Indian Standards and BIS services.
@@ -124,3 +134,5 @@ The ingestion and retrieval-preparation phase is complete. Suitable follow-up wo
 - frontend, authentication, and deployment
 
 No LLM answer generation or user-facing chatbot behavior should be inferred from this phase alone.
+
+</details>

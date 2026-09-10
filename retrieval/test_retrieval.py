@@ -1,54 +1,28 @@
-from __future__ import annotations
-
+"""Persist retrieval results and fail on missing expected evidence."""
+import json
 import sys
+import time
 from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
+from retrieval.search import Retriever
+if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 
-import chromadb
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-
-ROOT = Path(__file__).resolve().parents[1]
-CHROMA_DIR = ROOT / "data" / "chroma"
-QUESTIONS = [
-    "Which standard applies to a non-electric plastic rattle?",
-    "Which standard applies to a battery-operated toy?",
-    "Can acoustic testing be subcontracted?",
-    "What was the QCO commencement date?",
-    "What documents are required for a new toy series?",
-    "Can I import R&D toy samples?",
-    "Are all handmade toys exempt?",
-    "What does the 2026 transition order do?",
-    "What is the latest product manual available?",
-    "What information is needed before identifying applicable standards?",
-]
-
-
-def main() -> None:
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    collection = client.get_collection(name="bis_toys_v2")
-    print(f"COLLECTION_COUNT: {collection.count()}")
-    for question in QUESTIONS:
-        results = collection.query(query_texts=[f"query: {question}"], n_results=5)
-        print(f"QUESTION: {question}")
-        ids = results.get("ids", [[]])[0]
-        if not ids:
-            print("NO_RESULTS")
-            print("------")
-            continue
-        for index, item_id in enumerate(ids):
-            metadata = results["metadatas"][0][index]
-            print({
-                "result_id": item_id,
-                "distance": results["distances"][0][index],
-                "source_filename": metadata.get("source_filename", ""),
-                "source_status": metadata.get("source_status", ""),
-                "page_range": f"{metadata.get('page_start', '')}-{metadata.get('page_end', '')}",
-                "chunk_type": metadata.get("chunk_type", ""),
-                "preview": results["documents"][0][index][:500],
-            })
-        print("------")
-
-
-if __name__ == "__main__":
-    main()
+def main():
+    cases=json.loads((ROOT/'evaluation/questions.json').read_text(encoding='utf-8'))
+    searcher=Retriever()
+    reports=[]
+    for case in cases:
+        started=time.perf_counter()
+        result=searcher.search(case['question'],include_guidance=case.get('include_guidance',False))
+        hits=[{'id':i,'document':d,'metadata':m,'distance':s} for i,d,m,s in zip(result['ids'][0],result['documents'][0],result['metadatas'][0],result['distances'][0])]
+        matched=any(any(h['metadata']['source_filename']==e['source'] and (not e.get('pages') or h['metadata']['page_start'] in e['pages']) for e in case['expected_evidence']) for h in hits)
+        reports.append({'id':case['id'],'question':case['question'],'evidence_hit_at_5':matched,
+            'elapsed_ms':round((time.perf_counter()-started)*1000,2),'hits':hits,
+            'human_relevance':'pending','notes':'Evidence-location check does not validate a legal conclusion.'})
+        print(f"{case['id']}: {'PASS' if matched else 'FAIL'} ({len(hits)} hits)")
+    out=ROOT/'evaluation/retrieval_results.json'
+    out.write_text(json.dumps(reports,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    print(f'Evidence hit rate: {sum(r["evidence_hit_at_5"] for r in reports)}/{len(reports)}')
+    if not all(r['evidence_hit_at_5'] for r in reports): raise SystemExit(1)
+if __name__=='__main__': main()

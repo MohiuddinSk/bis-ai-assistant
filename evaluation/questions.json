@@ -1,0 +1,146 @@
+[
+  {
+    "id": "rattle",
+    "question": "Which standard applies to a non-electric plastic rattle?",
+    "expected_evidence": [
+      {
+        "source": "product_manual_2026.pdf",
+        "pages": [
+          54,
+          58
+        ]
+      }
+    ]
+  },
+  {
+    "id": "electric",
+    "question": "Which standard applies to a battery-operated toy?",
+    "expected_evidence": [
+      {
+        "source": "product_manual_2026.pdf",
+        "pages": [
+          1,
+          4,
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "id": "acoustic",
+    "question": "Can acoustic testing be subcontracted?",
+    "expected_evidence": [
+      {
+        "source": "product_manual_2026.pdf",
+        "pages": [
+          10,
+          28,
+          29,
+          30
+        ]
+      }
+    ]
+  },
+  {
+    "id": "commencement",
+    "question": "What was the QCO commencement date?",
+    "expected_evidence": [
+      {
+        "source": "Toys-Extension.pdf",
+        "pages": [
+          1,
+          2
+        ]
+      }
+    ]
+  },
+  {
+    "id": "series",
+    "question": "What documents are required for a new toy series?",
+    "expected_evidence": [
+      {
+        "source": "product_manual_2026.pdf",
+        "pages": [
+          5,
+          58,
+          59,
+          60
+        ]
+      }
+    ]
+  },
+  {
+    "id": "rd",
+    "question": "Can I import R&D toy samples?",
+    "expected_evidence": [
+      {
+        "source": "Toys-QCO-2024.pdf",
+        "pages": [
+          1,
+          2
+        ]
+      }
+    ]
+  },
+  {
+    "id": "handmade",
+    "question": "Are all handmade toys exempt?",
+    "expected_evidence": [
+      {
+        "source": "Toys-Quality-Control-Second-Amendment-Order-2020.pdf",
+        "pages": [
+          1,
+          2
+        ]
+      }
+    ]
+  },
+  {
+    "id": "transition",
+    "question": "What does the 2026 transition order do?",
+    "expected_evidence": [
+      {
+        "source": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    ]
+  },
+  {
+    "id": "manual",
+    "question": "What is the latest product manual available in the uploaded dataset?",
+    "expected_evidence": [
+      {
+        "source": "product_manual_2026.pdf",
+        "pages": [
+          1
+        ]
+      }
+    ]
+  },
+  {
+    "id": "identification",
+    "question": "What information is needed before identifying applicable toy standards?",
+    "expected_evidence": [
+      {
+        "source": "product_manual_2026.pdf",
+        "pages": [
+          4,
+          5,
+          54,
+          55,
+          56,
+          58,
+          59,
+          60
+        ]
+      }
+    ]
+  }
+]

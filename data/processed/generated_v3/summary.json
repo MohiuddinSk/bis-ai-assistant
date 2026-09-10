@@ -1,0 +1,27 @@
+{
+  "pdf_count": 8,
+  "page_count": 89,
+  "chunk_count": 917,
+  "review_pages": [
+    {
+      "source": "product_manual_2026.pdf",
+      "page": 57,
+      "status": "reviewed_blank_form"
+    },
+    {
+      "source": "product_manual_2026.pdf",
+      "page": 61,
+      "status": "reviewed_blank_form"
+    }
+  ],
+  "chunks_by_source": {
+    "10-steps-for-BIS-toy-certification.pdf": 63,
+    "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf": 48,
+    "Toy_QC_order.pdf": 17,
+    "Toys-Extension.pdf": 5,
+    "Toys-QCO-2024.pdf": 8,
+    "Toys-Quality-Control-Second-Amendment-Order-2020.pdf": 7,
+    "product_manual_2026.pdf": 756,
+    "toys-faqs.pdf": 13
+  }
+}
