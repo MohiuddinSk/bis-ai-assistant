@@ -1,8 +1,8 @@
-chromadb
-sentence-transformers
-fastapi
-uvicorn
-pydantic
-python-dotenv
-numpy
-scikit-learn
+pypdf==6.10.0
+PyMuPDF==1.26.6
+chromadb==0.4.24
+numpy==1.26.4
+sentence-transformers==6.0.1
+transformers==5.17.0
+posthog==3.25.0
+torch==2.14.0

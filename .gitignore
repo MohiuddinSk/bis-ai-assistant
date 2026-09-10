@@ -1,9 +1,11 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
 .env
 .env.*
 data/chroma/
+data/chroma_test/
 *.db
 *.sqlite-wal
 *.sqlite-shm
