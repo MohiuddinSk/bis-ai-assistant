@@ -9,7 +9,7 @@
   "query_prefix": "query: ",
   "passage_prefix": "passage: ",
   "max_tokens": 480,
-  "collection_name": "bis_toys_v3_e73aab14a72f7908_833f6dcee44c",
-  "chunks_sha256": "833f6dcee44c6ee47c48eefcba0dbaca7b9bfca3abce208ed06dc5eec308e9a6",
+  "collection_name": "bis_toys_v3_e73aab14a72f7908_39b347ab687e",
+  "chunks_sha256": "39b347ab687eac8f3e5de0e3fbd5215ebdd6bb63f497a72afdeac3bddb147f59",
   "retrieval_chunk_count": 917
 }

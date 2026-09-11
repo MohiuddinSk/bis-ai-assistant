@@ -36,6 +36,23 @@
     ]
   },
   {
+    "source_id": "product_manual_2026",
+    "source_filename": "product_manual_2026.pdf",
+    "source_path": "data/raw/product_manual_2026.pdf",
+    "source_sha256": "78bce7bfca35049c99f7491af52501c5a235494aa7107c5e504a4aea25fffa6a",
+    "page_count": 62,
+    "source_type": "manual",
+    "source_url": "https://github.com/MohiuddinSk/bis-ai-assistant/blob/ba16e5351e9229626997761038064e37615eecc9/data/raw/product_manual_2026.pdf",
+    "official_url": "",
+    "authority_status": "unverified",
+    "document_revision": "PM/9873/14",
+    "publication_date": "May 2026",
+    "date_precision": "month",
+    "dataset_version": "e73aab14a72f7908",
+    "canonical_source_id": "product_manual_2026",
+    "cited_notifications": []
+  },
+  {
     "source_id": "Toy_QC_order",
     "source_filename": "Toy_QC_order.pdf",
     "source_path": "data/raw/Toy_QC_order.pdf",
@@ -73,6 +90,23 @@
       "S.O. 3146(E)",
       "S.O. 853(E)"
     ]
+  },
+  {
+    "source_id": "toys_faqs",
+    "source_filename": "toys-faqs.pdf",
+    "source_path": "data/raw/toys-faqs.pdf",
+    "source_sha256": "d32e2ffa87a713c276820dfcae3a1a10fb6a431e8e07f2a6b1b6aadbc97c9c1e",
+    "page_count": 3,
+    "source_type": "faq",
+    "source_url": "https://github.com/MohiuddinSk/bis-ai-assistant/blob/ba16e5351e9229626997761038064e37615eecc9/data/raw/toys-faqs.pdf",
+    "official_url": "",
+    "authority_status": "unverified",
+    "document_revision": "",
+    "publication_date": "",
+    "date_precision": "unknown",
+    "dataset_version": "e73aab14a72f7908",
+    "canonical_source_id": "toys_faqs",
+    "cited_notifications": []
   },
   {
     "source_id": "Toys_QCO_2024",
@@ -116,39 +150,5 @@
       "S.O. 4514(E)",
       "S.O. 853(E)"
     ]
-  },
-  {
-    "source_id": "product_manual_2026",
-    "source_filename": "product_manual_2026.pdf",
-    "source_path": "data/raw/product_manual_2026.pdf",
-    "source_sha256": "78bce7bfca35049c99f7491af52501c5a235494aa7107c5e504a4aea25fffa6a",
-    "page_count": 62,
-    "source_type": "manual",
-    "source_url": "https://github.com/MohiuddinSk/bis-ai-assistant/blob/ba16e5351e9229626997761038064e37615eecc9/data/raw/product_manual_2026.pdf",
-    "official_url": "",
-    "authority_status": "unverified",
-    "document_revision": "PM/9873/14",
-    "publication_date": "May 2026",
-    "date_precision": "month",
-    "dataset_version": "e73aab14a72f7908",
-    "canonical_source_id": "product_manual_2026",
-    "cited_notifications": []
-  },
-  {
-    "source_id": "toys_faqs",
-    "source_filename": "toys-faqs.pdf",
-    "source_path": "data/raw/toys-faqs.pdf",
-    "source_sha256": "d32e2ffa87a713c276820dfcae3a1a10fb6a431e8e07f2a6b1b6aadbc97c9c1e",
-    "page_count": 3,
-    "source_type": "faq",
-    "source_url": "https://github.com/MohiuddinSk/bis-ai-assistant/blob/ba16e5351e9229626997761038064e37615eecc9/data/raw/toys-faqs.pdf",
-    "official_url": "",
-    "authority_status": "unverified",
-    "document_revision": "",
-    "publication_date": "",
-    "date_precision": "unknown",
-    "dataset_version": "e73aab14a72f7908",
-    "canonical_source_id": "toys_faqs",
-    "cited_notifications": []
   }
 ]
