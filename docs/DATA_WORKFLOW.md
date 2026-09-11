@@ -1,55 +1,55 @@
 # Data workflow (v3)
 
-Use Python 3.12 in a virtual environment. Work from the repository root on the repair branch until it is merged. Raw PDFs are immutable inputs; generated v3 is the only active package. Old packages and Chroma collections are preserved for comparison.
+`data/processed/generated_v3` is the active data package. The repair branch has already been merged into `main`; work from the repository root on the default branch and do not use a separate repair branch.
+
+Raw PDFs are immutable inputs. Older generated packages and old Chroma collections are retained only for comparison and must not be mixed with v3.
 
 ## Windows PowerShell
 
+Use Python 3.11 and the `venv311` virtual environment. Run the verified sequence from the repository root:
+
 ```powershell
-git fetch origin
-git switch fix/rag-data-integrity
-py -3.12 -m venv venv
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
+py -3.11 -m venv venv311
+.\venv311\Scripts\python.exe -m pip install -r requirements.txt
 $env:PYTHONUTF8 = "1"
-.\venv\Scripts\python.exe ingestion/extract_and_chunk.py
-.\venv\Scripts\python.exe ingestion/validate_data.py
-.\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe ingestion/build_chroma.py
-.\venv\Scripts\python.exe retrieval/test_retrieval.py
+.\venv311\Scripts\python.exe ingestion\extract_and_chunk.py
+.\venv311\Scripts\python.exe ingestion\validate_data.py
+.\venv311\Scripts\python.exe -m unittest discover -s tests -v
+.\venv311\Scripts\python.exe ingestion\build_chroma.py
+.\venv311\Scripts\python.exe retrieval\test_retrieval.py
 ```
 
-Each command must exit successfully before proceeding. Do not use Bash heredocs in PowerShell. On Linux/macOS use the virtual environment's Python with the same script paths. Linux building Chroma 0.4.24 from source may require a C++ compiler.
+Each command must exit successfully before proceeding. Do not use Bash heredocs in PowerShell.
 
-The first run downloads the pinned E5 model/tokenizer; later runs use the local model cache. Both indexing and retrieval explicitly use the same model revision, normalized vectors, and `passage: `/`query: ` prefixes. Reuse one `Retriever` instance per application process to avoid reloading the model and checking index membership on each request.
+The pinned dependencies are `chromadb==0.5.23`, `sentence-transformers==3.4.1`, `transformers==4.46.3`, `torch==2.5.1`, `tokenizers==0.20.3`, and `numpy==1.26.4`.
 
 ## What gets generated
 
-- `pages.jsonl`: every PDF page, selected raw extraction, cleaned text, extractor and errors, and chunk IDs.
-- `chunks.jsonl`: document excerpts and table rows with scalar Chroma metadata and exact tokenizer counts (480-token ceiling).
-- `source_registry.json`: source hashes, physical page counts, source type, and observed revision where supported by text.
-- `duplicate_map.json`: exact-file canonicalization, repeated text with retained page provenance, and near-document candidates retained for review.
-- `embedding_manifest.json`: pinned model revision, prefixes, distance metric, chunk-file hash, and collection name.
-- `summary.json`: counts and pages needing review.
+- `pages.jsonl`: every PDF page, selected raw extraction, cleaned text, extractor and errors, and chunk IDs
+- `chunks.jsonl`: document excerpts and table rows with scalar Chroma metadata and tokenizer counts
+- `source_registry.json`: source hashes, physical page counts, source type, and observed revision where supported by text
+- `duplicate_map.json`: exact-file canonicalization, repeated text with retained page provenance, and near-document candidates for review
+- `embedding_manifest.json`: model revision, prefixes, distance metric, chunk-file hash, and collection name
+- `summary.json`: counts and pages needing review
 
-Every new source inventory/pipeline version has a dataset ID. The collection name also includes the generated chunk-file hash. The builder validates input and requires exact collection membership; it never deletes old collections. Repeating a build is idempotent. Search refuses an incomplete or incompatible collection. Do not manually copy older chunks into it.
+The builder validates its input, requires exact collection membership, and does not delete old collections. Repeating a build is idempotent. Do not manually copy chunks from older generated packages into the v3 collection.
 
-## Source and extraction policy
+## Local Chroma and Git hygiene
 
-Hardcoded structured summaries from v2 have been removed from active retrieval. Source excerpts retain conditions and actual page references. Table rows preserve left-to-right cells without guessing continuation headers; consult the PDF for merged cells, continuation tables and ambiguous layouts. No text is deleted just because it repeats across pages. Oversized passages split at whitespace and never silently truncate inside the encoder.
+`data/chroma/` is local ChromaDB persistence and must not be committed. Each teammate rebuilds their own index with `ingestion/build_chroma.py`. Also keep virtual environments, credentials, and model caches out of Git.
 
-Page 57 and 61 of the uploaded May 2026 manual were visually checked and are blank model/photo forms. Both retain their own page/chunk references. Other short pages are flagged and excluded until reviewed. FAQ/procedural guidance is available through `include_guidance=True`, but excluded from default retrieval. Unknown new files are extracted but not enabled until their source classification is added and reviewed.
+`.gitattributes` enforces LF line endings for JSONL files (`*.jsonl text eol=lf`). Preserve LF when generating or editing JSONL output.
 
-Repository URLs locate the audited files; they are **not official publication verification**. `official_url` is empty when unknown, authority is unverified, and no source is asserted to be the latest legally effective version. `document_revision` and `publication_date` record observed text, not filename assumptions. Blank section/clause fields mean no literal local label was found; labels are never invented. Form-page review is tied to the exact audited source hash.
+## Source and retrieval policy
 
-Use `Retriever.page_context(hit_metadata)` to recover the full cited page when conditions span chunks.
+Hardcoded structured summaries from v2 are not part of active retrieval. Source excerpts retain conditions and actual page references. Table rows preserve left-to-right cells without guessing continuation headers; consult the PDF for merged cells, continuation tables, and ambiguous layouts. No text is deleted merely because it repeats across pages. Oversized passages split at whitespace and do not silently truncate inside the encoder.
 
-Do not infer an exemption, current commencement date, or complete applicable standards list from one fragment. Retrieve and inspect the relevant order/amendment chain. The uploaded manual identifies PM/9873/14, May 2026. Later official publications may exist outside this dataset.
+Repository URLs locate audited files; they are not official-publication verification. `official_url` is empty when unknown, authority is unverified, and no source is asserted to be the latest legally effective version. `document_revision` and `publication_date` record observed text rather than filename assumptions. Blank section/clause fields mean no literal local label was found; labels are never invented.
+
+Use `Retriever.page_context(hit_metadata)` to recover the cited page when conditions span chunks. Do not infer an exemption, current commencement date, or complete applicable standards list from one fragment; retrieve and inspect the applicable order and amendment chain.
 
 ## Retrieval quality gate
 
-`evaluation/questions.json` contains ten evidence-location checks. `retrieval/test_retrieval.py` writes full passages, distances and timings to `evaluation/retrieval_results.json`, and exits nonzero for a missing expected source/page. An evidence hit is not proof that every condition needed for an answer is present. Review each saved result for complete conditions, authoritative source, correct citation and conflicting amendments. Add reviewer judgments before enabling automatic compliance answers.
+`evaluation/questions.json` contains ten evidence-location checks. `retrieval/test_retrieval.py` writes passages, distances, and timings to `evaluation/retrieval_results.json` and exits nonzero for a missing expected source or page. An evidence hit is not proof that every condition needed for an answer is present. Review each saved result for complete conditions, authoritative source, correct citation, and conflicting amendments.
 
-The first query includes model startup time; subsequent query timings are warm. These results are a small diagnostic set, not a production performance benchmark. Do not loosen expected pages simply to make tests pass.
-
-## Team handoff
-
-Commit regenerated outputs and validation/evaluation reports together with pipeline changes. Do not commit `venv`, credentials, model caches or `data/chroma`. Each teammate rebuilds their own local index. Merge the reviewed repair branch into `main` so default clones receive the active pipeline; old `data` branch commands remain historical until updated.
+The first query includes model startup time; later timings are warm. These checks are diagnostic, not a production performance benchmark. Do not loosen expected pages solely to make tests pass.
