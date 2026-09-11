@@ -1,5 +1,28 @@
 # Grounded Chat API Implementation Log
 
+## 2026-09-11 — Role-based answer composition
+
+- Baseline review found the confusing battery wording was an answer-composition issue, not missing evidence: separate IS 15644 primary and IS 9873 secondary passages were already selected, but raw table serialization could leak into the answer.
+- A complete standards or artisan evidence-role plan now produces deterministic, readable user-facing composition. Citation excerpts remain backend-controlled and verbatim; table coordinates stay out of the answer.
+- The battery path is activated by evidence roles for electric/battery questions, not an exact question match. It labels IS 15644 primary and IS 9873 secondary/additional only when both roles are present.
+- Read-only `retrieval/test_retrieval.py` reports 10/10 evidence-location hits. No corpus, embeddings, or Chroma collection was rebuilt.
+
+## 2026-09-12 — Deterministic role plans for former abstentions
+
+- Root cause of the new-series, commencement, and transition abstentions: retrieval returned passages, but no deterministic composer existed. Invalid/incomplete model candidates then used the two-call validation/repair path and safely abstained.
+- Added complete trusted role plans for new-series declaration/details/fee, legal commencement clauses, and transition operative scope/permission. Complete plans bypass Groq before generation and retain backend citation mapping and disclaimer.
+- The new real-index tests assert `extractive_fallback`, grounded status, trusted citations, and zero fake-provider calls for all three paths.
+
+## 2026-09-12 — Citation sufficiency safeguards
+
+- Deterministic claim roles now reject form headings/date fields and transition headings as support for material claims.
+- New-series output is explicitly partial; ambiguous QCO commencement returns a cited limitation rather than silently selecting an exact date; transition permission requires operative eligibility and risk-assessment text.
+
+## 2026-09-12 — Deterministic fragment spacing
+
+- Replaced implicit adjacent string concatenation in checklist and transition composition with a shared fragment joiner. It normalizes each fragment and inserts exactly one boundary space.
+- Regression coverage rejects `bedeclared`, `permission maybe granted`, accidental joined words, and double spaces while preserving roles, citations, and provider bypass.
+
 ## Objective
 
 Implement and verify a grounded `POST /api/chat` endpoint using the existing singleton BIS Toys Retriever and Groq.

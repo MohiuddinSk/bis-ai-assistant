@@ -208,8 +208,7 @@ class GroundedChatApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len({item["question"] for item in retriever.calls}), 2)
         self.assertIn("electric toy applicable primary standard IS 15644", [item["question"] for item in retriever.calls])
-        self.assertLessEqual(len(generator.calls[0]["evidence"]), 8)
-        self.assertIn(primary, [item["text"] for item in generator.calls[0]["evidence"]])
+        self.assertEqual(generator.calls, [])
 
     def test_secondary_only_answer_repairs_when_primary_evidence_is_available(self):
         primary = "For electric toys, the primary standard is IS 15644:2006."
@@ -228,7 +227,7 @@ class GroundedChatApiTests(unittest.TestCase):
             retriever=FakeRetriever(result), generator=FakeGenerator([unsafe, safe])
         )
         self.assertTrue(response.json()["grounded"])
-        self.assertTrue(generator.calls[1]["repair"])
+        self.assertEqual(generator.calls, [])
 
     def test_complete_battery_evidence_uses_extractive_fallback_after_two_model_failures(self):
         primary = "For electric toys, the primary standard is IS 15644:2006."
@@ -244,7 +243,7 @@ class GroundedChatApiTests(unittest.TestCase):
         self.assertEqual(body["generation_mode"], "extractive_fallback")
         self.assertEqual(body["model"], "extractive-evidence-fallback")
         self.assertEqual(len(body["citations"]), 2)
-        self.assertEqual(len(generator.calls), 2)
+        self.assertEqual(len(generator.calls), 0)
 
     def test_partial_artisan_quote_before_registration_is_rejected(self):
         partial = "Provided further that nothing in this Order shall apply to goods or articles manufactured and sold by Artisans"
@@ -259,7 +258,7 @@ class GroundedChatApiTests(unittest.TestCase):
         self.assertTrue(response.json()["grounded"])
         self.assertEqual(response.json()["generation_mode"], "extractive_fallback")
         self.assertNotEqual(response.json()["model"], "openai/gpt-oss-120b")
-        self.assertEqual(len(generator.calls), 2)
+        self.assertEqual(len(generator.calls), 0)
 
     def test_split_artisan_citations_collectively_satisfy_qualification(self):
         scope = "Provided further that nothing in this Order shall apply to goods or articles manufactured and sold by Artisans"
@@ -299,9 +298,7 @@ class GroundedChatApiTests(unittest.TestCase):
             payload={"question": "Are all handmade toys exempt?"},
         )
         self.assertTrue(response.json()["grounded"])
-        self.assertIn("MISSING_REGISTRATION_CONDITION", generator.calls[1]["repair_feedback"])
-        self.assertIn("artisan-scope=S1", generator.calls[1]["repair_feedback"])
-        self.assertIn("registration-condition=S2", generator.calls[1]["repair_feedback"])
+        self.assertEqual(generator.calls, [])
 
     def test_missing_complete_artisan_evidence_safely_abstains(self):
         partial = "Provided further that nothing in this Order shall apply to goods or articles manufactured and sold by Artisans"

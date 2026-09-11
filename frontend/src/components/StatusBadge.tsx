@@ -1,0 +1,1 @@
+export function StatusBadge({status}:{status:'ready'|'degraded'|'unavailable'}){const label=status==='ready'?'Backend ready':status==='degraded'?'Backend degraded':'Backend unavailable'; return <span className={`status ${status}`} role="status">{label}</span>}
