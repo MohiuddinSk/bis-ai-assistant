@@ -1,4 +1,4 @@
-import type { ChatResponse, HealthResponse } from '../types/chat';
+import type { Audience, ChatResponse, HealthResponse } from '../types/chat';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 export const HEALTH_TIMEOUT_MS = 8_000;
@@ -65,8 +65,8 @@ async function request<T>(path: string, timeout: number, init: RequestInit = {})
 }
 
 export const getHealth = (signal?: AbortSignal) => request<HealthResponse>('/health', HEALTH_TIMEOUT_MS, { signal });
-export const askQuestion = (question: string) =>
+export const askQuestion = (question: string, audience: Audience = 'general') =>
   request<ChatResponse>('/api/chat', chatTimeoutMs, {
     method: 'POST',
-    body: JSON.stringify({ question, top_k: 8, include_guidance: false }),
+    body: JSON.stringify({ question, top_k: 8, include_guidance: false, audience }),
   });

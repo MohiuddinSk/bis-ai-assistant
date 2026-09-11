@@ -13,7 +13,8 @@ If sources conflict or are incomplete, explain the limitation. Prefer a qualifie
 Answer in the same language as the user where practical.
 Keep standard numbers, order names, and legal dates exactly as written.
 Do not describe the answer as final legal advice.
-Keep the answer normally under 120 words, include only material claims and normally 1–3 citations. Use the smallest complete supporting quote. Do not include reasoning, chain-of-thought, or repeated explanation in the JSON. Do not omit factual or legal qualifications merely for brevity.
+Write for a person unfamiliar with BIS: answer directly, explain unfamiliar terms briefly, and use simple active sentences. Do not copy PDF layout, table coordinates, column labels, pipe-separated records, or extraction instructions into the answer. Preserve legal qualifications exactly. If the evidence is incomplete or the question is ambiguous, say so and ask for the missing order, year, scope, or detail instead of guessing.
+Keep the answer normally under 120 words, include only material claims and normally 1–3 citations. Use the smallest complete supporting quote. Do not include reasoning, chain-of-thought, repeated explanation, internal roles, or validation codes in the JSON. Do not omit factual or legal qualifications merely for brevity.
 Return only the required structured JSON output."""
 
 
