@@ -183,3 +183,7 @@ Validate the generated package before building Chroma. Do not manually copy chun
 Retrieval results are evidence candidates, not proof that a legal rule is current or complete. Check the cited source, page context, applicable amendments, and conditions before relying on a result.
 
 For fuller operational detail, see [docs/DATA_WORKFLOW.md](docs/DATA_WORKFLOW.md).
+
+## Manufacturer Compliance Wizard
+
+Start the API with `./venv311/Scripts/python.exe -m uvicorn backend.main:app --reload`, then start the frontend with `npm run dev` from `frontend/`. Choose **Compliance Wizard** to build a product profile without needing BIS terminology. The wizard calls `POST /api/compliance/guide`; selections guide retrieval but never count as legal evidence. The existing free-form chat remains available.

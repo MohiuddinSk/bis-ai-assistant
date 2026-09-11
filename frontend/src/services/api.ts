@@ -1,4 +1,5 @@
 import type { Audience, ChatResponse, HealthResponse } from '../types/chat';
+import type { ComplianceGuideResponse, ComplianceProfile } from '../types/compliance';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 export const HEALTH_TIMEOUT_MS = 8_000;
@@ -69,4 +70,8 @@ export const askQuestion = (question: string, audience: Audience = 'general') =>
   request<ChatResponse>('/api/chat', chatTimeoutMs, {
     method: 'POST',
     body: JSON.stringify({ question, top_k: 8, include_guidance: false, audience }),
+  });
+export const getComplianceGuide = (profile: ComplianceProfile, signal?: AbortSignal) =>
+  request<ComplianceGuideResponse>('/api/compliance/guide', chatTimeoutMs, {
+    method: 'POST', body: JSON.stringify(profile), signal,
   });

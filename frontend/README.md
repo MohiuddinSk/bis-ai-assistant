@@ -4,3 +4,7 @@
 # Source PDFs
 
 Citation links use `${VITE_API_BASE_URL}/api/documents/<encoded filename>#page=<page>`. The page fragment is handled by the browser PDF viewer and is never sent as a server path.
+
+## Compliance Wizard
+
+Choose **Compliance Wizard** beside **Ask a question**. Complete seven steps, review the profile, and generate grounded guidance. Responses are not stored in browser storage. The API origin and 90-second chat deadline use the existing `VITE_API_BASE_URL` and `VITE_CHAT_TIMEOUT_MS` settings.

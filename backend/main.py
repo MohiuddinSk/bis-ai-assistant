@@ -25,6 +25,8 @@ from backend.generation import (
 from backend.schemas import (
     ChatRequest,
     ChatResponse,
+    ComplianceGuideResponse,
+    ComplianceProfile,
     HealthResponse,
     RetrieveRequest,
     RetrieveResponse,
@@ -43,6 +45,28 @@ from retrieval.search import Retriever
 logger = logging.getLogger(__name__)
 RetrieverFactory = Callable[[], Any]
 GeneratorFactory = Callable[[], GenerationProvider]
+
+
+def compliance_query(profile: ComplianceProfile) -> str:
+    """Build neutral retrieval context; profile selections are never evidence."""
+    goal_terms = {
+        "identify_standards": "applicable standards",
+        "new_licence": "new licence certification process",
+        "add_new_series": "addition of new toy series documents",
+        "check_exemption": "exemption qualifications",
+        "understand_transition": "transition order conditions",
+        "not_sure": "compliance guidance",
+    }
+    context = " ".join((profile.additional_context or "").split())
+    product = " ".join(profile.product_description.split())
+    fields = (
+        f"product described as: {product}; power selection: {profile.power_type.replace('_', ' ')}; "
+        f"age-group selection: {profile.intended_age_group.replace('_', ' ')}; role selection: {profile.role.replace('_', ' ')}; "
+        f"application stage: {profile.application_stage.replace('_', ' ')}; guidance sought: {goal_terms[profile.goal]}"
+    )
+    if context:
+        fields += f"; additional user context: {context}"
+    return f"UNTRUSTED USER CONTEXT (retrieval context only, not legal evidence): {fields}. Establish every compliance claim from indexed evidence."
 
 
 def create_app(
@@ -264,6 +288,15 @@ def create_app(
             response.grounded,
         )
         return response
+
+    @application.post("/api/compliance/guide", response_model=ComplianceGuideResponse)
+    def compliance_guide(profile: ComplianceProfile, request: Request) -> ComplianceGuideResponse:
+        """Grounded manufacturer guide; submitted profile is untrusted query context."""
+        audience = "consumer" if profile.role == "consumer" else "manufacturer"
+        guidance = chat(ChatRequest(
+            question=compliance_query(profile), top_k=8, include_guidance=False, audience=audience,
+        ), request)
+        return ComplianceGuideResponse(profile=profile, guidance=guidance)
 
     return application
 
