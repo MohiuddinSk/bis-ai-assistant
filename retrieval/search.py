@@ -2,8 +2,10 @@ from pathlib import Path
 import json
 import hashlib
 import re
+import logging
 from retrieval.embeddings import encode, MODEL, REVISION
 ROOT = Path(__file__).resolve().parents[1]
+logger = logging.getLogger(__name__)
 
 class Retriever:
     def __init__(self):
@@ -24,6 +26,12 @@ class Retriever:
         if hashlib.sha256(raw).hexdigest() != manifest['chunks_sha256']:
             raise ValueError('Chunk-file integrity mismatch')
         rows = [json.loads(x) for x in raw.decode('utf-8').splitlines()]
+        self.chunks_by_id = {row['id']: row for row in rows}
+        self.page_chunk_ids = {}
+        for row in rows:
+            metadata = row['metadata']
+            key = (metadata.get('source_id'), metadata.get('page_start'))
+            self.page_chunk_ids.setdefault(key, []).append(row['id'])
         expected = {r['id'] for r in rows if r['metadata']['retrieval_enabled']}
         if set(self.collection.get(include=[])['ids']) != expected:
             raise ValueError('Incomplete or contaminated collection; rebuild first')
@@ -37,10 +45,26 @@ class Retriever:
             include=['documents', 'metadatas', 'distances'])
         stop = {'which','what','does','the','a','an','is','are','can','for','of','to','and','in','on','i','do','all','latest','available'}
         terms = {x for x in re.findall(r'[a-z0-9]+', question.lower()) if len(x)>2 and x not in stop}
-        synonyms = {'handmade': {'artisan','artisans','handicraft'}, 'exempt': {'apply','excludes','exclusion'},
-                    'rattle': {'rattle'}, 'commencement': {'force','effective','january'}}
+        # Chat retrieval uses lexical coverage as a tie-breaker so qualifications and
+        # standards named in a question survive vector-only ranking.  This does not
+        # alter the generated_v3 data or the embedding collection.
+        synonyms = {
+            'electric': {'battery', 'operated', 'electrical'},
+            'battery': {'electric', 'electrical'},
+            'operated': {'electric', 'battery'},
+            'handmade': {'artisan','artisans','handicraft'},
+            'artisan': {'artisans', 'handicraft', 'registered'},
+            'exempt': {'exemption', 'apply', 'excludes', 'exclusion'},
+            'exemption': {'exempt', 'apply', 'excludes', 'exclusion'},
+            'rattle': {'rattle'}, 'commencement': {'force','effective','january'},
+        }
         for term, expansions in synonyms.items():
             if term in terms: terms.update(expansions)
+        if any(term in question.lower() for term in ('electric toy', 'battery operated', 'is 15644', 'artisan', 'registered', 'handmade', 'exemption')):
+            logger.info(
+                'Chat retrieval lexical coverage enabled for grounding-sensitive terms; '
+                'reason=retain standards and legal qualifications in final evidence'
+            )
         scored=[]
         for i,(doc,meta,distance) in enumerate(zip(raw['documents'][0],raw['metadatas'][0],raw['distances'][0])):
             words=set(re.findall(r'[a-z0-9]+', doc.lower()))
@@ -65,3 +89,24 @@ class Retriever:
         page = self.pages[(metadata['source_id'], metadata['page_start'])]
         return {'source_filename': page['source_filename'], 'page_number': page['page_number'],
             'source_sha256': page['source_sha256'], 'text': page['clean_text']}
+
+    def adjacent_chunks(self, chunk_id, source_id, page_start):
+        """Return immediate same-page neighbours with stored provenance intact."""
+        ids = self.page_chunk_ids.get((source_id, page_start), [])
+        if chunk_id not in ids:
+            return []
+        index = ids.index(chunk_id)
+        neighbours = []
+        for neighbour_index in (index - 1, index + 1):
+            if not 0 <= neighbour_index < len(ids):
+                continue
+            row = self.chunks_by_id[ids[neighbour_index]]
+            metadata = row['metadata']
+            neighbours.append({
+                'chunk_id': row['id'], 'text': row['document'],
+                'source_id': metadata.get('source_id'),
+                'source_filename': metadata.get('source_filename'),
+                'page_start': metadata.get('page_start'), 'page_end': metadata.get('page_end'),
+                'chunk_type': metadata.get('chunk_type'),
+            })
+        return neighbours

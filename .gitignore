@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 .env
 .env.*
+!.env.example
 data/chroma/
 data/chroma_test/
 *.db
