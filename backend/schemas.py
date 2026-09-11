@@ -1,6 +1,6 @@
 """Typed request and response contracts for the retrieval API."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
     question: Question
     top_k: int = Field(default=8, ge=1, le=8)
     include_guidance: bool = False
+    audience: Literal["general", "manufacturer", "consumer"] = "general"
 
 
 class RetrievalResult(BaseModel):
@@ -82,6 +83,18 @@ class ChatCitation(BaseModel):
     excerpt: str
 
 
+class AnswerSection(BaseModel):
+    """Backend-composed, citation-bound guidance for a safe chat presentation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["direct_answer", "explanation", "next_steps", "important", "clarification"]
+    title: str
+    content: str | None = None
+    items: list[str] = Field(default_factory=list)
+    citation_ids: list[str] = Field(default_factory=list, max_length=8)
+
+
 class ChatResponse(BaseModel):
     answer: str
     grounded: bool
@@ -91,3 +104,4 @@ class ChatResponse(BaseModel):
     model: str | None
     generation_mode: str
     disclaimer: str
+    answer_sections: list[AnswerSection] = Field(default_factory=list)

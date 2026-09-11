@@ -18,3 +18,13 @@ it('renders a source heading, count, distinct citation cards, and page range', (
   expect(screen.getByText('Pages 5–6')).toBeInTheDocument();
   expect(screen.getByText('a very long trusted source filename.pdf')).toBeInTheDocument();
 });
+
+it('presents guided sections before the trusted sources', () => {
+  render(<ChatMessage role="assistant" text="Legacy answer" response={{ ...response, answer_sections: [
+    { type: 'direct_answer', title: 'Direct answer', content: 'IS 15644 is primary.', items: [], citation_ids: ['S1'] },
+    { type: 'next_steps', title: 'What you should do', content: null, items: ['Check the applicable standard.'], citation_ids: ['S1'] },
+  ] }} />);
+  expect(screen.getByRole('heading', { name: 'Direct answer' })).toBeInTheDocument();
+  expect(screen.getByText('Check the applicable standard.')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /sources 2/i })).toBeInTheDocument();
+});

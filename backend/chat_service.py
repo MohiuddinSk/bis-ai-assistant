@@ -14,6 +14,7 @@ from backend.generation import (
     ProviderUnavailableError,
 )
 from backend.schemas import (
+    AnswerSection,
     ChatCitation,
     ChatRequest,
     ChatResponse,
@@ -78,6 +79,27 @@ class EvidencePlan:
         return bool(required) and required <= set(self.roles)
 
 
+@dataclass(frozen=True)
+class TrustedFact:
+    """A backend-owned, evidence-bound fact passed to the language layer."""
+
+    fact_id: str
+    statement: str
+    qualifiers: tuple[str, ...]
+    evidence_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FactPlan:
+    intent: str
+    facts: tuple[TrustedFact, ...]
+    limitations: tuple[str, ...] = ()
+
+    @property
+    def complete(self) -> bool:
+        return bool(self.facts)
+
+
 class ChatService:
     def __init__(
         self,
@@ -119,7 +141,7 @@ class ChatService:
         # Complete trusted evidence plans bypass Groq: this removes avoidable
         # latency and cannot weaken citation or qualification controls.
         if plan.complete:
-            return self._fallback_or_abstain(evidence, plan)
+            return self._fallback_or_abstain(evidence, plan, request.audience)
         if self._generator is None:
             raise ProviderUnavailableError("Chat generation is unavailable")
 
@@ -149,7 +171,7 @@ class ChatService:
             except (ValidationError, ValueError) as validation_error:
                 if used_completion_retry:
                     self._log_abstention(validation_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan)
+                    return self._fallback_or_abstain(evidence, plan, request.audience)
                 try:
                     repaired_output = self._generator.generate(
                         request.question,
@@ -168,7 +190,7 @@ class ChatService:
                 except (ValidationError, ValueError) as repair_error:
                     # Invalid model evidence must never be surfaced as a grounded claim.
                     self._log_abstention(repair_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan)
+                    return self._fallback_or_abstain(evidence, plan, request.audience)
 
         if generated.insufficient_evidence:
             return self._abstention(evidence=evidence, citations=citations)
@@ -177,8 +199,12 @@ class ChatService:
         # plan.  Compose those facts from the verified roles instead of allowing
         # table layout artefacts from a PDF extraction to leak into the answer.
         # This is intent/role driven, not an exact-question shortcut.
-        return ChatResponse(
-            answer=generated.answer,
+        guided_sections = self._deduplicate_section_citations([AnswerSection(
+            type="direct_answer", title="Direct answer", content=generated.answer,
+            citation_ids=[citation.citation_id for citation in citations],
+        )])
+        return self._guided_response(
+            sections=guided_sections,
             grounded=True,
             insufficient_evidence=False,
             evidence_count=len(evidence),
@@ -268,7 +294,104 @@ class ChatService:
                     if excerpt: roles.setdefault("operative_permission", (item, excerpt))
         return EvidencePlan(category, roles)
 
-    def _fallback_or_abstain(self, evidence: list[TrustedEvidence], plan: EvidencePlan) -> ChatResponse:
+    @staticmethod
+    def _fact_plan(plan: EvidencePlan) -> FactPlan:
+        """Translate selected roles into facts; no model may alter this mapping."""
+        role_facts = {
+            "primary_standard": ("IS 15644 is the primary standard for electric toys.", ()),
+            "secondary_standard": ("IS 9873 Parts are secondary or additional requirements where applicable.", ("where applicable",)),
+            "exemption_scope": ("The exception applies only to goods manufactured and sold by qualifying artisans.", ("only",)),
+            "registration_condition": ("The artisan must be registered with the Office of the Development Commissioner (Handicrafts).", ("must be registered",)),
+            "registering_authority": ("The registration authority is under the Ministry of Textiles, Government of India.", ()),
+            "series_declaration": ("A declaration is included in the retrieved new-series material.", ("partial checklist",)),
+            "series_details": ("The material asks for series or model details, including starting ages.", ("partial checklist",)),
+            "scope_fee": ("The material refers to the requisite fee for extension of scope.", ("partial checklist",)),
+            "commencement_clause": ("The selected order comes into force on publication in the Official Gazette.", ("no calendar date established",)),
+            "operative_scope": ("The order applies to goods or articles covered by specified Quality Control Orders.", ()),
+            "operative_permission": ("Permission may be granted only subject to the operative eligibility and risk-assessment conditions.", ("may", "subject to conditions")),
+        }
+        facts: list[TrustedFact] = []
+        for index, (role, (item, _excerpt)) in enumerate(plan.roles.items(), start=1):
+            statement, qualifiers = role_facts.get(role, ("Trusted evidence supports this point.", ()))
+            facts.append(TrustedFact(f"F{index}", statement, tuple(qualifiers), (item.citation_id,)))
+        limitations = ("The cited material is partial.",) if plan.category == "documents" else ()
+        return FactPlan(plan.category, tuple(facts), limitations)
+
+    @staticmethod
+    def _validate_sections(sections: list[AnswerSection], fact_plan: FactPlan, citations: list[ChatCitation]) -> None:
+        """Keep returned guidance tied to backend-selected facts and citations."""
+        allowed_citations = {citation.citation_id for citation in citations}
+        if not fact_plan.complete:
+            raise EvidenceCompletenessError("INCOMPLETE_FACT_PLAN")
+        for section in sections:
+            if not set(section.citation_ids) <= allowed_citations:
+                raise EvidenceCompletenessError("UNKNOWN_FACT_OR_CITATION_ID")
+            text = " ".join(filter(None, [section.content, *section.items])).lower()
+            if re.search(r"\bmust\b", text) and not any("must" in qualifier for fact in fact_plan.facts for qualifier in fact.qualifiers):
+                raise EvidenceCompletenessError("UNSUPPORTED_MODAL")
+
+    @staticmethod
+    def _join_sections(sections: list[AnswerSection]) -> str:
+        """Flatten visible guidance without leaking section boundaries into words."""
+        chunks: list[str] = []
+        seen: set[str] = set()
+        for section in sections:
+            for fragment in [section.content, *section.items]:
+                if not fragment or not fragment.strip():
+                    continue
+                normalized = re.sub(r"\s+", " ", fragment).strip()
+                if normalized not in seen:
+                    seen.add(normalized)
+                    chunks.append(normalized)
+        return " ".join(chunks)
+
+    @staticmethod
+    def _deduplicate_section_citations(sections: list[AnswerSection]) -> list[AnswerSection]:
+        """Preserve first-seen citation order within each user-visible section."""
+        normalized: list[AnswerSection] = []
+        for section in sections:
+            citation_ids = list(dict.fromkeys(section.citation_ids))
+            normalized.append(section.model_copy(update={"citation_ids": citation_ids}))
+        return normalized
+
+    @classmethod
+    def _guided_response(
+        cls,
+        *,
+        sections: list[AnswerSection],
+        grounded: bool,
+        insufficient_evidence: bool,
+        evidence_count: int,
+        citations: list[ChatCitation],
+        model: str | None,
+        generation_mode: str,
+        disclaimer: str,
+    ) -> ChatResponse:
+        """The sole non-abstention response assembly boundary.
+
+        The compatibility answer must always be a lossless, whitespace-safe view
+        of the user-visible guided sections; no earlier fact or PDF fragment may
+        bypass this final boundary.
+        """
+        finalized_sections = cls._deduplicate_section_citations(sections)
+        return ChatResponse(
+            answer=cls._join_sections(finalized_sections),
+            grounded=grounded,
+            insufficient_evidence=insufficient_evidence,
+            evidence_count=evidence_count,
+            citations=citations,
+            model=model,
+            generation_mode=generation_mode,
+            disclaimer=disclaimer,
+            answer_sections=finalized_sections,
+        )
+
+    def _fallback_or_abstain(
+        self,
+        evidence: list[TrustedEvidence],
+        plan: EvidencePlan,
+        audience: str = "general",
+    ) -> ChatResponse:
         if not plan.complete:
             return self._abstention(evidence=evidence)
         ordered_roles = {
@@ -291,40 +414,45 @@ class ChatService:
                 secondary = f"Part {parts[0]}"
             else:
                 secondary = ""
-            answer = (
-                "For an electric toy covered by the retrieved evidence, the primary "
-                "standard is IS 15644. "
-                f"IS 9873 {secondary} are secondary standards and additional requirements where applicable."
-            )
+            sections = [
+                AnswerSection(type="direct_answer", title="Direct answer", content="For a battery-operated electric toy, the primary standard is IS 15644.", citation_ids=[selected[0][0].citation_id]),
+                AnswerSection(type="explanation", title="What this means", content=f"IS 9873 {secondary} are secondary standards and additional requirements, where applicable. They do not replace IS 15644 as the primary standard.", citation_ids=[selected[1][0].citation_id]),
+            ]
+            if audience == "manufacturer":
+                sections.append(AnswerSection(type="next_steps", title="What you should do", items=["Check IS 15644 first, then identify the listed IS 9873 parts that apply to your toy."], citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id]))
         elif plan.category == "exemption":
             scope = re.sub(
                 r"^provided further that nothing in this order shall apply to\s+",
                 "", selected[0][1], flags=re.I,
             ).rstrip(".:")
             registration = selected[1][1].rstrip(".:")
-            answer = (
-                "No automatic blanket exemption is established. "
-                f"The indexed order states that the exemption applies to {scope} {registration}."
-            )
+            sections = [
+                AnswerSection(type="direct_answer", title="Direct answer", content="No, not all handmade toys are automatically exempt.", citation_ids=[selected[0][0].citation_id]),
+                AnswerSection(type="explanation", title="What this means", content=f"The exception applies to {scope} {registration}.", citation_ids=[item.citation_id for item, _ in selected]),
+                AnswerSection(type="important", title="Important condition", content="Handmade alone does not establish this exemption; the manufacture, sale, registration, and authority conditions all matter.", citation_ids=[item.citation_id for item, _ in selected]),
+            ]
         elif plan.category == "documents":
-            answer = self._compose_fragments(
-                "The retrieved manual indicates this partial application checklist for an addition of a new toy series:",
-                "a declaration; series/model details (including starting ages) to be declared separately to BIS;",
-                "and the requisite fee declaration for extension of scope.",
-                "This is a qualified checklist from the retrieved passages.",
-            )
+            sections = [
+                AnswerSection(type="direct_answer", title="Direct answer", content="The available manual material provides only a partial checklist for adding a new toy series.", citation_ids=[item.citation_id for item, _ in selected]),
+                AnswerSection(type="next_steps", title="What you should do", items=["Include a declaration for the new-series application.", "Include series/model details, including starting ages, to be declared separately to BIS.", "Include the requisite fee declaration for extension of scope."], citation_ids=[item.citation_id for item, _ in selected]),
+                AnswerSection(type="important", title="Important condition", content="This is not presented as the complete application package; check the current BIS application requirements before submitting.", citation_ids=[item.citation_id for item, _ in selected]),
+            ]
         elif plan.category == "commencement":
-            answer = ("The question does not identify a particular QCO, amendment, or extension. The retrieved "
-                      "extension-order clause says it comes into force on publication in the Official Gazette, "
-                      "but the cited passage does not establish a calendar date. Please specify the QCO/order.")
+            sections = [
+                AnswerSection(type="clarification", title="Please clarify", content="Which Quality Control Order, amendment, extension, or year do you mean? Several orders may have different commencement dates.", citation_ids=[]),
+                AnswerSection(type="important", title="What the cited order says", content="The selected extension-order clause says it comes into force on publication in the Official Gazette. The cited passage does not establish a calendar date.", citation_ids=[selected[0][0].citation_id]),
+            ]
         else:
-            answer = self._compose_fragments(
-                "The 2026 Transition Facilitation Order applies to goods or articles covered by the specified Quality Control Orders.",
-                "The retrieved operative provision says permission may be granted by the Department for Promotion of Industry and Internal Trade",
-                "to a company incorporated under the Companies Act, 2013, based on the Implementation Committee's risk assessment.",
-            )
+            sections = [
+                AnswerSection(type="direct_answer", title="Direct answer", content="The 2026 Transition Facilitation Order can allow permission for covered goods or articles, but approval is not automatic.", citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id]),
+                AnswerSection(type="explanation", title="What this means", content="The Department for Promotion of Industry and Internal Trade (DPIIT) may grant permission to a company incorporated under the Companies Act, 2013, based on the Implementation Committee’s risk assessment.", citation_ids=[selected[1][0].citation_id]),
+                AnswerSection(type="important", title="Important condition", content="Permission may be granted only under the order’s stated conditions.", citation_ids=[selected[1][0].citation_id]),
+            ]
+        fact_plan = self._fact_plan(plan)
+        sections = self._deduplicate_section_citations(sections)
+        self._validate_sections(sections, fact_plan, citations)
         logger.info("Chat generation_mode=extractive_fallback evidence_complete=true roles=%s citation_ids=%s", ordered_roles, [item.citation_id for item, _ in selected])
-        return ChatResponse(answer=answer, grounded=True, insufficient_evidence=False,
+        return self._guided_response(sections=sections, grounded=True, insufficient_evidence=False,
             evidence_count=len(evidence), citations=citations, model="extractive-evidence-fallback",
             generation_mode="extractive_fallback", disclaimer=LEGAL_INFORMATION_DISCLAIMER)
 
