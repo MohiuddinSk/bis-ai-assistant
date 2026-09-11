@@ -28,6 +28,17 @@ class ChatRequest(BaseModel):
     audience: Literal["general", "manufacturer", "consumer"] = "general"
 
 
+class ComplianceProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["manufacturer", "importer", "artisan", "consumer", "not_sure"]
+    product_description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=300)]
+    power_type: Literal["battery_operated", "mains_electric", "non_electric", "not_sure"]
+    intended_age_group: Literal["under_3", "3_to_8", "over_8", "multiple", "not_sure"]
+    goal: Literal["identify_standards", "new_licence", "add_new_series", "check_exemption", "understand_transition", "not_sure"]
+    application_stage: Literal["researching", "preparing_application", "existing_licence", "scope_extension", "not_sure"]
+    additional_context: Annotated[str | None, StringConstraints(max_length=500)] = None
+
+
 class RetrievalResult(BaseModel):
     rank: int
     chunk_id: str
@@ -105,3 +116,8 @@ class ChatResponse(BaseModel):
     generation_mode: str
     disclaimer: str
     answer_sections: list[AnswerSection] = Field(default_factory=list)
+
+
+class ComplianceGuideResponse(BaseModel):
+    profile: ComplianceProfile
+    guidance: ChatResponse
