@@ -16,6 +16,8 @@ npm run dev
 
 Leave `VITE_API_BASE_URL` empty to use the Vite proxy to `http://127.0.0.1:8000`. Verify with `npm run lint`, `npm run test -- --run`, and `npm run build`.
 
+Source citations open only registered PDFs through `GET /api/documents/{source_filename}`; use the citation link rather than a local file path.
+
 ## Verified Windows setup and pipeline
 
 Use Python 3.11 and the `venv311` virtual environment. Run these commands from the repository root in Windows PowerShell, in order:

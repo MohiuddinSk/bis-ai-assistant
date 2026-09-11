@@ -9,6 +9,13 @@
 
 - No frontend renderer change was required. Backend deterministic fragments now preserve word boundaries and one-space joins before the plain-text answer reaches the UI.
 
+## 2026-09-12 — Source citation visual repair
+
+- The secure PDF viewer feature remained intact, but its new CitationCard class names initially had no corresponding visual system in the compressed legacy stylesheet. This produced unstyled white rectangles and browser-default PDF links.
+- Rebuilt the citation styles around readable CSS tokens and semantic controls. Cards now have a subordinate Sources heading/count, source badge, page pill, readable filename wrapping, aligned evidence/PDF actions, visible keyboard focus, a labelled expanded-evidence panel, mobile-safe full-width controls, and reduced-motion support.
+- The assistant answer is still rendered as one safe plain-text node. The deterministic answer composer, rather than the frontend, owns sentence spacing; the regression coverage now explicitly preserves `IS 15644. IS 9873`.
+- Final stage frontend verification passed: lint, build, and verbose Vitest (4 files / 29 tests), with no React effect, `act(...)`, unhandled-promise, or unexpected-console warnings. Browser inspection at the desktop viewport found a visible non-zero application shell and no horizontal overflow. Provider-backed live submission was deliberately not run because no provider-key authorization was established for this process.
+
 ## 2026-09-11 — Stage: chat timeout repair and final frontend verification
 
 - The blank-screen repair was verified again in a real browser: the rendered accessibility tree contains the application title, welcome content, suggested questions, input, status indicator, and footer. The error boundary did not render. The local Vite instance reported `Backend ready`.

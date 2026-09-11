@@ -43,6 +43,8 @@ class RealDataGroundingIntegrationTests(unittest.TestCase):
         self.assertIn("IS 15644", response.answer)
         self.assertIn("primary standard is IS 15644", response.answer)
         self.assertIn("IS 9873", response.answer)
+        self.assertIn("IS 15644. IS 9873", response.answer)
+        self.assertNotIn("IS 15644.IS 9873", response.answer)
         self.assertIn("secondary standards", response.answer)
         self.assertNotIn("test report", response.answer.lower())
         self.assertNotIn("may also be considered", response.answer.lower())

@@ -9,9 +9,10 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from backend.chat_service import ChatRetrievalError, ChatService
+from backend.documents import SourceDocumentRegistry
 from backend.generation import (
     GenerationProvider,
     GroqGenerator,
@@ -105,6 +106,23 @@ def create_app(
         allow_methods=list(ALLOWED_METHODS),
         allow_headers=list(ALLOWED_HEADERS),
     )
+
+    document_registry = SourceDocumentRegistry()
+
+    @application.get(
+        "/api/documents/{source_filename}",
+        summary="Open a registered source PDF",
+        responses={404: {"description": "Registered source document not found"}},
+    )
+    def source_document(source_filename: str) -> FileResponse:
+        path = document_registry.resolve(source_filename)
+        return FileResponse(
+            path,
+            media_type="application/pdf",
+            filename=path.name,
+            content_disposition_type="inline",
+            headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-cache"},
+        )
 
     @application.get(
         "/health",

@@ -1,0 +1,10 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { expect, it } from 'vitest';
+import { CitationCard } from './CitationCard';
+
+const citation={citation_id:'S3',source_filename:'product manual.pdf',page_start:4,page_end:4,chunk_id:'x',excerpt:'Table 1 | Column 3'};
+it('renders a safe source-PDF link with page fragment and source hierarchy',()=>{render(<CitationCard citation={citation}/>);const link=screen.getByRole('link',{name:/product manual.pdf.*page 4/i});expect(screen.getByText('Source S3')).toBeInTheDocument();expect(screen.getByText('Page 4')).toBeInTheDocument();expect(link).toHaveAttribute('href','/api/documents/product%20manual.pdf#page=4');expect(link).toHaveAttribute('target','_blank');expect(link).toHaveAttribute('rel','noopener noreferrer')});
+it('connects the evidence toggle to the expanded extracted-source region',async()=>{render(<CitationCard citation={citation}/>);const user=userEvent.setup();const toggle=screen.getByRole('button',{name:/view evidence/i});expect(toggle).toHaveAttribute('aria-expanded','false');const regionId=toggle.getAttribute('aria-controls');await user.click(toggle);expect(toggle).toHaveAttribute('aria-expanded','true');expect(screen.getByRole('region',{name:'Extracted source text'})).toHaveAttribute('id',regionId);expect(screen.getByText('Extracted source text')).toBeInTheDocument()});
+it('opens a named source without an invalid page fragment when its page is absent',()=>{render(<CitationCard citation={{...citation,page_start:null,page_end:null}}/>);expect(screen.getByRole('link',{name:/product manual.pdf/i})).toHaveAttribute('href','/api/documents/product%20manual.pdf')});
+it('omits link without filename and keeps raw evidence harmless text',async()=>{render(<CitationCard citation={{...citation,source_filename:null,page_start:null,page_end:null,excerpt:'<b>raw</b>'}}/>);expect(screen.queryByRole('link')).toBeNull();await userEvent.setup().click(screen.getByRole('button',{name:/view evidence/i}));expect(screen.getByText((_,node)=>node?.textContent==='<b>raw</b>')).toBeInTheDocument()});
