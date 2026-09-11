@@ -4,6 +4,18 @@ This repository contains the document-ingestion and retrieval-preparation pipeli
 
 The active data package is `data/processed/generated_v3`. Previous packages under `data/processed/generated/` and `data/processed/generated_v2/` are historical outputs only; do not combine them with v3 in one collection.
 
+## Frontend MVP
+
+The React/Vite frontend lives in `frontend/` and communicates only with the local API; it never contains provider credentials.
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Leave `VITE_API_BASE_URL` empty to use the Vite proxy to `http://127.0.0.1:8000`. Verify with `npm run lint`, `npm run test -- --run`, and `npm run build`.
+
 ## Verified Windows setup and pipeline
 
 Use Python 3.11 and the `venv311` virtual environment. Run these commands from the repository root in Windows PowerShell, in order:

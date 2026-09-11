@@ -12,3 +12,5 @@ data/chroma_test/
 *.db
 *.sqlite-wal
 *.sqlite-shm
+frontend/node_modules/
+frontend/dist/
