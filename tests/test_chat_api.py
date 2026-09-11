@@ -712,7 +712,7 @@ class GroundedChatApiTests(unittest.TestCase):
     def test_bad_request_is_safely_classified_and_sanitized(self):
         from groq import BadRequestError
 
-        secret = "gsk_fake_api_key_must_not_appear"
+        secret = "fake_api_key_must_not_appear"
         prompt = "PRIVATE PROMPT MUST NOT APPEAR"
         passage = "PRIVATE PASSAGE MUST NOT APPEAR"
         request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
