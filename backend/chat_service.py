@@ -143,6 +143,10 @@ class ChatService:
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
     ) -> ChatResponse:
+        if routing_context is not None:
+            clarification = self._routing_clarification(routing_context)
+            if clarification:
+                return self._clarification(clarification)
         if routing_context is None and understanding and understanding.clarification_required:
             return self._clarification(understanding.clarification_question or "What additional detail can you provide?")
         if routing_context is None and understanding and understanding.intent == "out_of_domain":
@@ -1396,6 +1400,21 @@ class ChatService:
             disclaimer=LEGAL_INFORMATION_DISCLAIMER,
             needs_clarification=True,
         )
+
+    @staticmethod
+    def _routing_clarification(routing_context: ComplianceRoutingContext) -> str | None:
+        """Ask only for a validated wizard selection required by its chosen goal."""
+        if routing_context.goal == "not_sure":
+            return (
+                "What guidance do you need: identifying standards, a new licence, "
+                "adding a series, checking an exemption, or understanding transition?"
+            )
+        if (
+            routing_context.goal == "identify_standards"
+            and routing_context.power_type == "not_sure"
+        ):
+            return "Is the toy battery-operated, mains-powered, or non-electric?"
+        return None
 
     @staticmethod
     def _answer_matches_understanding(answer: str, understanding: QuestionUnderstanding) -> bool:

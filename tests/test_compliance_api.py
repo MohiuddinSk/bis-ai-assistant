@@ -46,6 +46,45 @@ class ComplianceApiTests(unittest.TestCase):
                 self.assertEqual(context.goal, goal)
                 self.assertEqual(context.power_type, power_type)
 
+    def test_resolvable_wizard_ambiguity_bypasses_retrieval_and_provider(self):
+        for values, expected in (
+            (
+                {"goal": "identify_standards", "power_type": "not_sure"},
+                "Is the toy battery-operated, mains-powered, or non-electric?",
+            ),
+            (
+                {"goal": "not_sure", "power_type": "battery_operated"},
+                "What guidance do you need: identifying standards, a new licence, adding a series, checking an exemption, or understanding transition?",
+            ),
+        ):
+            with self.subTest(values=values):
+                retriever = FakeRetriever()
+                generator = FakeGenerator([])
+                app = create_app(
+                    retriever_factory=lambda: retriever,
+                    generator_factory=lambda: generator,
+                )
+                with TestClient(app) as client:
+                    response = client.post("/api/compliance/guide", json={**BASE, **values})
+
+                self.assertEqual(response.status_code, 200)
+                guidance = response.json()["guidance"]
+                self.assertEqual(guidance["answer"], expected)
+                self.assertFalse(guidance["grounded"])
+                self.assertFalse(guidance["insufficient_evidence"])
+                self.assertTrue(guidance["needs_clarification"])
+                self.assertEqual(guidance["generation_mode"], "clarification")
+                self.assertEqual(guidance["citations"], [])
+                self.assertEqual(guidance["answer_sections"], [{
+                    "type": "clarification",
+                    "title": "Need more details",
+                    "content": expected,
+                    "items": [],
+                    "citation_ids": [],
+                }])
+                self.assertEqual(retriever.calls, [])
+                self.assertEqual(generator.calls, [])
+
     def test_goal_specific_query_does_not_let_power_words_override_intent(self):
         profile = ComplianceProfile(**{
             **BASE,

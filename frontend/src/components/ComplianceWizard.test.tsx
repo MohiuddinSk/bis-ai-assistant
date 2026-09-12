@@ -61,6 +61,37 @@ it('renders insufficient and raw HTML as harmless text, then starts over', async
   expect(await screen.findByText('<b>insufficient</b>')).toBeInTheDocument(); expect(document.querySelector('b')).toBeNull(); await user.click(screen.getByRole('button', { name: 'Start over' })); expect(screen.getByText(/Step 1 of 7/)).toBeInTheDocument();
 });
 
+it('renders a wizard clarification as Need more details', async () => {
+  const question = 'Is the toy battery-operated, mains-powered, or non-electric?';
+  const clarification = {
+    ...response,
+    guidance: {
+      ...guidance,
+      answer: question,
+      grounded: false,
+      insufficient_evidence: false,
+      needs_clarification: true,
+      generation_mode: 'clarification' as const,
+      citations: [],
+      answer_sections: [{
+        type: 'clarification' as const,
+        title: 'Need more details',
+        content: question,
+        items: [],
+        citation_ids: [],
+      }],
+    },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(clarification)));
+  const user = await reachReview();
+  await user.click(screen.getByRole('button', { name: 'Generate guidance' }));
+
+  expect(await screen.findByText('Need more details', { selector: '.answer-status' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Need more details' })).toBeInTheDocument();
+  expect(screen.getByText(question)).toBeInTheDocument();
+  expect(screen.queryByText('Evidence insufficient')).not.toBeInTheDocument();
+});
+
 it('aborts the active request on unmount', async () => {
   let captured: AbortSignal | undefined; vi.stubGlobal('fetch', vi.fn((_url, init) => { captured = init?.signal; return new Promise(() => undefined); })); const user = await reachReview(); await user.click(screen.getByRole('button', { name: 'Generate guidance' })); cleanup(); await waitFor(() => expect(captured?.aborted).toBe(true));
 });

@@ -42,8 +42,16 @@ class ComplianceRealDataTests(unittest.TestCase):
         self.assertIn("where applicable", non_electric["answer"].lower())
         self.assertNotIn("is 15644", non_electric["answer"].lower())
         self.assertNotIn("battery-operated", non_electric["answer"].lower())
-        self.assertTrue(uncertain["insufficient_evidence"])
+        self.assertFalse(uncertain["insufficient_evidence"])
         self.assertFalse(uncertain["grounded"])
+        self.assertTrue(uncertain["needs_clarification"])
+        self.assertEqual(uncertain["generation_mode"], "clarification")
+        self.assertEqual(uncertain["citations"], [])
+        self.assertEqual(
+            uncertain["answer"],
+            "Is the toy battery-operated, mains-powered, or non-electric?",
+        )
+        self.assertEqual(uncertain["answer_sections"][0]["type"], "clarification")
         self.assertNotIn("is 15644", uncertain["answer"].lower())
 
         self.assertNotEqual(battery["answer"], mains["answer"])
@@ -73,7 +81,11 @@ class ComplianceRealDataTests(unittest.TestCase):
         self.assertTrue(result["grounded"]); self.assertIn("partial",result["answer"].lower()); self.assertIn("declaration",result["answer"].lower()); self.assertIn("starting ages",result["answer"].lower()); self.assertIn("fee declaration",result["answer"].lower())
     def test_unclear_profile_is_safe(self):
         result=self.guide(product_description="Not sure toy")
-        self.assertTrue(result["insufficient_evidence"] or "clar" in result["answer"].lower() or "not sure" in result["answer"].lower())
+        self.assertFalse(result["grounded"])
+        self.assertFalse(result["insufficient_evidence"])
+        self.assertTrue(result["needs_clarification"])
+        self.assertEqual(result["generation_mode"], "clarification")
+        self.assertIn("what guidance do you need", result["answer"].lower())
     def test_out_of_domain_product_does_not_invent_toy_requirement(self):
         result=self.guide(product_description="Industrial solar inverter",goal="identify_standards")
         self.assertTrue(result["insufficient_evidence"]); self.assertNotIn("IS 15644",result["answer"])

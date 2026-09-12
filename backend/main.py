@@ -89,10 +89,21 @@ def enforce_compliance_invariants(
     """Fail closed when guidance contradicts the validated wizard route."""
     if guidance.insufficient_evidence:
         return guidance
+    profile_is_out_of_domain = (
+        understand_question(profile.product_description).intent == "out_of_domain"
+    )
+    if guidance.needs_clarification:
+        safe_clarification = (
+            not guidance.grounded
+            and guidance.generation_mode == "clarification"
+            and not guidance.citations
+        )
+        if safe_clarification and not profile_is_out_of_domain:
+            return guidance
 
     answer = guidance.answer.lower()
-    mismatch = False
-    if profile.goal == "identify_standards":
+    mismatch = profile_is_out_of_domain
+    if not mismatch and profile.goal == "identify_standards":
         if profile.power_type == "non_electric":
             mismatch = "is 15644" in answer or "battery-operated" in answer or "mains-powered" in answer
         elif profile.power_type == "mains_electric":
@@ -101,11 +112,11 @@ def enforce_compliance_invariants(
             mismatch = "mains-powered" in answer or "non-electric toy" in answer
         else:
             mismatch = True
-    elif profile.goal in {"check_exemption", "add_new_series", "understand_transition"}:
+    elif not mismatch and profile.goal in {"check_exemption", "add_new_series", "understand_transition"}:
         mismatch = "primary standard is is 15644" in answer or "battery-operated electric toy" in answer
-    elif profile.goal == "not_sure":
+    elif not mismatch and profile.goal == "not_sure":
         mismatch = True
-    elif profile.goal == "new_licence":
+    elif not mismatch and profile.goal == "new_licence":
         mismatch = "battery-operated electric toy" in answer or "primary standard is is 15644" in answer
 
     if not mismatch:
