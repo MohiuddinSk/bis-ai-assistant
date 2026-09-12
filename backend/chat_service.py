@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 import logging
 import re
-from typing import ContextManager
+from typing import ContextManager, Literal
 
 from pydantic import ValidationError
 
@@ -23,6 +23,7 @@ from backend.schemas import (
     RetrievalResult,
 )
 from backend.service import RetrievalService, RetrieverProtocol
+from backend.question_understanding import QuestionUnderstanding
 from backend.settings import (
     INSUFFICIENT_EVIDENCE_ANSWER,
     LEGAL_INFORMATION_DISCLAIMER,
@@ -71,12 +72,32 @@ class EvidencePlan:
     def complete(self) -> bool:
         required = {
             "standards": {"primary_standard", "secondary_standard"},
+            "standards_battery": {"primary_standard", "secondary_standard"},
+            "standards_mains": {"primary_standard", "secondary_standard"},
+            "standards_non_electric": {"non_electric_primary", "non_electric_secondary"},
+            "certification": {
+                "certification_portal", "certification_standard_selection",
+                "certification_application_details", "certification_test_facilities",
+            },
             "exemption": {"exemption_scope", "registration_condition", "registering_authority"},
             "documents": {"series_declaration", "series_details", "scope_fee"},
             "commencement": {"commencement_clause"},
             "transition": {"operative_scope", "operative_permission"},
         }.get(self.category, set())
         return bool(required) and required <= set(self.roles)
+
+
+@dataclass(frozen=True)
+class ComplianceRoutingContext:
+    """Server-only routing derived from validated ComplianceProfile enums."""
+
+    goal: Literal[
+        "identify_standards", "new_licence", "add_new_series",
+        "check_exemption", "understand_transition", "not_sure",
+    ]
+    power_type: Literal[
+        "battery_operated", "mains_electric", "non_electric", "not_sure",
+    ]
 
 
 @dataclass(frozen=True)
@@ -116,10 +137,20 @@ class ChatService:
         self._generation_lock = generation_lock
         self._model_name = model_name
 
-    def chat(self, request: ChatRequest) -> ChatResponse:
+    def chat(
+        self,
+        request: ChatRequest,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> ChatResponse:
+        if routing_context is None and understanding and understanding.clarification_required:
+            return self._clarification(understanding.clarification_question or "What additional detail can you provide?")
+        if routing_context is None and understanding and understanding.intent == "out_of_domain":
+            return self._abstention(evidence=[])
+        effective_question = understanding.normalized_query if understanding else request.question
         try:
             with self._retrieval_lock:
-                retrieved_results = self._retrieve_evidence(request)
+                retrieved_results = self._retrieve_evidence(request, routing_context, understanding)
         except Exception:
             raise ChatRetrievalError("Chat retrieval failed") from None
 
@@ -137,7 +168,9 @@ class ChatService:
 
         if not evidence:
             return self._abstention(evidence=[])
-        plan = self._build_evidence_plan(request.question, evidence)
+        plan = self._build_evidence_plan(request.question, evidence, routing_context, understanding)
+        if plan.category == "clarification":
+            return self._abstention(evidence=evidence)
         # Complete trusted evidence plans bypass Groq: this removes avoidable
         # latency and cannot weaken citation or qualification controls.
         if plan.complete:
@@ -153,28 +186,28 @@ class ChatService:
             used_completion_retry = False
             try:
                 first_output = self._generator.generate(
-                    request.question,
+                    effective_question,
                     prompt_evidence,
                 )
             except ProviderCompletionExhaustedError:
                 used_completion_retry = True
                 try:
                     first_output = self._generator.generate(
-                        request.question,
+                        effective_question,
                         prompt_evidence,
                         concise=True,
                     )
                 except ProviderCompletionExhaustedError:
                     return self._abstention(evidence=evidence)
             try:
-                generated, citations = self._validate_output(first_output, evidence, request.question)
+                generated, citations = self._validate_output(first_output, evidence, effective_question)
             except (ValidationError, ValueError) as validation_error:
                 if used_completion_retry:
                     self._log_abstention(validation_error, evidence, [])
                     return self._fallback_or_abstain(evidence, plan, request.audience)
                 try:
                     repaired_output = self._generator.generate(
-                        request.question,
+                        effective_question,
                         prompt_evidence,
                         repair=True,
                         repair_feedback=self._repair_feedback(validation_error, evidence),
@@ -185,7 +218,7 @@ class ChatService:
                     generated, citations = self._validate_output(
                         repaired_output,
                         evidence,
-                        request.question,
+                        effective_question,
                     )
                 except (ValidationError, ValueError) as repair_error:
                     # Invalid model evidence must never be surfaced as a grounded claim.
@@ -194,6 +227,13 @@ class ChatService:
 
         if generated.insufficient_evidence:
             return self._abstention(evidence=evidence, citations=citations)
+        if understanding is not None and not self._answer_matches_understanding(generated.answer, understanding):
+            logger.warning(
+                "Model candidate rejected; validation_code=QUESTION_INTENT_MISMATCH intent=%s power=%s",
+                understanding.intent,
+                understanding.power,
+            )
+            return self._fallback_or_abstain(evidence, plan, request.audience)
 
         # Certain high-risk, structured facts have an unambiguous evidence-role
         # plan.  Compose those facts from the verified roles instead of allowing
@@ -215,12 +255,63 @@ class ChatService:
         )
 
     @staticmethod
-    def _build_evidence_plan(question: str, evidence: list[TrustedEvidence]) -> EvidencePlan:
+    def _build_evidence_plan(
+        question: str,
+        evidence: list[TrustedEvidence],
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> EvidencePlan:
         question_lower = question.lower()
         roles: dict[str, tuple[TrustedEvidence, str]] = {}
-        category = ""
-        if "battery" in question_lower or "electric" in question_lower:
+        if routing_context is not None:
+            category = {
+                "check_exemption": "exemption",
+                "add_new_series": "documents",
+                "understand_transition": "transition",
+                "new_licence": "certification",
+                "not_sure": "clarification",
+            }.get(routing_context.goal, "")
+            if routing_context.goal == "identify_standards":
+                category = {
+                    "battery_operated": "standards_battery",
+                    "mains_electric": "standards_mains",
+                    "non_electric": "standards_non_electric",
+                    "not_sure": "clarification",
+                }[routing_context.power_type]
+        elif understanding is not None:
+            category = {
+                "certification": "certification",
+                "documents": "documents",
+                "exemption": "exemption",
+                "commencement": "commencement",
+                "transition": "transition",
+                "out_of_domain": "clarification",
+                "general": "",
+            }.get(understanding.intent, "")
+            if understanding.intent == "standards":
+                category = {
+                    "battery_operated": "standards_battery",
+                    "mains_electric": "standards_mains",
+                    "non_electric": "standards_non_electric",
+                    "electric_unspecified": "clarification",
+                    "unknown": "clarification",
+                }[understanding.power]
+        elif any(term in question_lower for term in ("handmade", "artisan", "exempt")):
+            category = "exemption"
+        elif any(term in question_lower for term in ("document", "application", "checklist")) and any(
+            term in question_lower for term in ("series", "model", "variety")
+        ):
+            category = "documents"
+        elif "commencement" in question_lower or "come into force" in question_lower:
+            category = "commencement"
+        elif "transition" in question_lower and "order" in question_lower:
+            category = "transition"
+        elif "battery" in question_lower or "electric" in question_lower:
             category = "standards"
+        else:
+            category = ""
+
+        if category in {"standards", "standards_battery", "standards_mains"}:
             primary_options: list[tuple[TrustedEvidence, str]] = []
             secondary_options: list[tuple[TrustedEvidence, str]] = []
             for item in evidence:
@@ -248,8 +339,30 @@ class ChatService:
                 if "secondary_standard" not in roles and "is 9873" in item.text.lower():
                     excerpt = ChatService._excerpt_for_anchor(item.text, "is 9873")
                     if excerpt: roles["secondary_standard"] = (item, excerpt)
-        elif any(term in question_lower for term in ("handmade", "artisan", "exempt")):
-            category = "exemption"
+        elif category == "standards_non_electric":
+            for item in evidence:
+                if ChatService._is_normative_non_electric_primary(item.text):
+                    excerpt = ChatService._excerpt_for_non_electric_role(item.text, "primary")
+                    if excerpt: roles.setdefault("non_electric_primary", (item, excerpt))
+                if ChatService._is_normative_non_electric_secondary(item.text):
+                    excerpt = ChatService._excerpt_for_non_electric_role(item.text, "secondary")
+                    if excerpt: roles.setdefault("non_electric_secondary", (item, excerpt))
+        elif category == "certification":
+            for item in evidence:
+                text = ChatService._display_text(item.text).lower()
+                if "step 1: create login on manakonline" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "step 1: create login on manakonline")
+                    if excerpt: roles.setdefault("certification_portal", (item, excerpt))
+                if "while submitting application" in text and "following indian standards" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "while submitting application")
+                    if excerpt: roles.setdefault("certification_standard_selection", (item, excerpt))
+                if "upload/provide detail of raw materials" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "upload/provide detail of raw materials")
+                    if excerpt: roles.setdefault("certification_application_details", (item, excerpt))
+                if "step 4: provide details of test facilities" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "step 4: provide details of test facilities")
+                    if excerpt: roles.setdefault("certification_test_facilities", (item, excerpt))
+        elif category == "exemption":
             for item in evidence:
                 text = item.text.lower()
                 if "manufactured and sold by artisans" in text:
@@ -261,10 +374,7 @@ class ChatService:
                         roles.setdefault("registration_condition", (item, excerpt))
                         if "ministry of textiles" in text:
                             roles.setdefault("registering_authority", (item, excerpt))
-        elif any(term in question_lower for term in ("document", "application", "checklist")) and any(
-            term in question_lower for term in ("series", "model", "variety")
-        ):
-            category = "documents"
+        elif category == "documents":
             for item in evidence:
                 text = item.text.lower()
                 if "i hereby declare" in text and "applying for addition" in text:
@@ -276,14 +386,12 @@ class ChatService:
                 if "requisite fees for extension in scope" in text:
                     excerpt = ChatService._excerpt_for_anchor(item.text, "requisite fees for extension in scope")
                     if excerpt: roles["scope_fee"] = (item, excerpt)
-        elif "commencement" in question_lower or "come into force" in question_lower:
-            category = "commencement"
+        elif category == "commencement":
             for item in evidence:
                 if "come into force" in item.text.lower():
                     excerpt = ChatService._excerpt_for_anchor(item.text, "come into force")
                     if excerpt: roles.setdefault("commencement_clause", (item, excerpt))
-        elif "transition" in question_lower and "order" in question_lower:
-            category = "transition"
+        elif category == "transition":
             for item in evidence:
                 text = item.text.lower()
                 if "this order shall apply" in text:
@@ -300,6 +408,12 @@ class ChatService:
         role_facts = {
             "primary_standard": ("IS 15644 is the primary standard for electric toys.", ()),
             "secondary_standard": ("IS 9873 Parts are secondary or additional requirements where applicable.", ("where applicable",)),
+            "non_electric_primary": ("IS 9873 Part 1 is the primary standard for non-electric toys.", ()),
+            "non_electric_secondary": ("Other IS 9873 parts are secondary requirements where applicable.", ("where applicable",)),
+            "certification_portal": ("The BIS guidance starts with creating a Manakonline account and applying through it.", ()),
+            "certification_standard_selection": ("The application requires selection of the standard matching the toy type.", ()),
+            "certification_application_details": ("The application guidance asks for specified product and factory information.", ("partial procedure",)),
+            "certification_test_facilities": ("The guidance asks for details of available test facilities.", ("partial procedure",)),
             "exemption_scope": ("The exception applies only to goods manufactured and sold by qualifying artisans.", ("only",)),
             "registration_condition": ("The artisan must be registered with the Office of the Development Commissioner (Handicrafts).", ("must be registered",)),
             "registering_authority": ("The registration authority is under the Ministry of Textiles, Government of India.", ()),
@@ -366,6 +480,7 @@ class ChatService:
         model: str | None,
         generation_mode: str,
         disclaimer: str,
+        needs_clarification: bool = False,
     ) -> ChatResponse:
         """The sole non-abstention response assembly boundary.
 
@@ -384,6 +499,7 @@ class ChatService:
             generation_mode=generation_mode,
             disclaimer=disclaimer,
             answer_sections=finalized_sections,
+            needs_clarification=needs_clarification,
         )
 
     def _fallback_or_abstain(
@@ -396,6 +512,13 @@ class ChatService:
             return self._abstention(evidence=evidence)
         ordered_roles = {
             "standards": ("primary_standard", "secondary_standard"),
+            "standards_battery": ("primary_standard", "secondary_standard"),
+            "standards_mains": ("primary_standard", "secondary_standard"),
+            "standards_non_electric": ("non_electric_primary", "non_electric_secondary"),
+            "certification": (
+                "certification_portal", "certification_standard_selection",
+                "certification_application_details", "certification_test_facilities",
+            ),
             "exemption": ("exemption_scope", "registration_condition", "registering_authority"),
             "documents": ("series_declaration", "series_details", "scope_fee"),
             "commencement": ("commencement_clause",),
@@ -405,7 +528,7 @@ class ChatService:
         citations = self._map_citations(
             [(item.citation_id, excerpt) for item, excerpt in selected], evidence
         )
-        if plan.category == "standards":
+        if plan.category in {"standards", "standards_battery", "standards_mains"}:
             parts = self._standard_parts(selected[1][1])
             secondary = ", ".join(f"Part {part}" for part in parts[:-1])
             if len(parts) > 1:
@@ -414,12 +537,59 @@ class ChatService:
                 secondary = f"Part {parts[0]}"
             else:
                 secondary = ""
+            subject = (
+                "a mains-powered electric toy" if plan.category == "standards_mains"
+                else "a battery-operated electric toy"
+            )
             sections = [
-                AnswerSection(type="direct_answer", title="Direct answer", content="For a battery-operated electric toy, the primary standard is IS 15644.", citation_ids=[selected[0][0].citation_id]),
+                AnswerSection(type="direct_answer", title="Direct answer", content=f"For {subject}, the primary standard is IS 15644.", citation_ids=[selected[0][0].citation_id]),
                 AnswerSection(type="explanation", title="What this means", content=f"IS 9873 {secondary} are secondary standards and additional requirements, where applicable. They do not replace IS 15644 as the primary standard.", citation_ids=[selected[1][0].citation_id]),
             ]
             if audience == "manufacturer":
                 sections.append(AnswerSection(type="next_steps", title="What you should do", items=["Check IS 15644 first, then identify the listed IS 9873 parts that apply to your toy."], citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id]))
+        elif plan.category == "standards_non_electric":
+            sections = [
+                AnswerSection(
+                    type="direct_answer", title="Direct answer",
+                    content="For a non-electric toy, the primary standard is IS 9873 Part 1.",
+                    citation_ids=[selected[0][0].citation_id],
+                ),
+                AnswerSection(
+                    type="explanation", title="What this means",
+                    content=("The 2026 product manual also identifies IS 9873 Parts 2, 3, 4, 7, 9, 10 and 11 "
+                             "as secondary standards, where applicable."),
+                    citation_ids=[selected[1][0].citation_id],
+                ),
+            ]
+            if audience == "manufacturer":
+                sections.append(AnswerSection(
+                    type="next_steps", title="What you should do",
+                    items=["Start with IS 9873 Part 1, then identify which cited secondary parts apply to the toy."],
+                    citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id],
+                ))
+        elif plan.category == "certification":
+            sections = [
+                AnswerSection(
+                    type="direct_answer", title="Direct answer",
+                    content="The indexed BIS guidance supports the opening steps for a new toy-licence application.",
+                    citation_ids=[item.citation_id for item, _ in selected],
+                ),
+                AnswerSection(
+                    type="next_steps", title="What you should do",
+                    items=[
+                        "Create an account on Manakonline and apply for a licence through that account.",
+                        "Choose the Indian Standard that matches whether the toy is electric or non-electric.",
+                        "Provide the listed product and factory details, including raw materials, factory location, manufacturing process, machinery, plant layout and testing personnel.",
+                        "Provide details of the test facilities available at the factory.",
+                    ],
+                    citation_ids=[item.citation_id for item, _ in selected],
+                ),
+                AnswerSection(
+                    type="important", title="Important limitation",
+                    content="These are only the cited opening steps, not the complete certification procedure. The selected evidence does not establish every remaining step.",
+                    citation_ids=[item.citation_id for item, _ in selected],
+                ),
+            ]
         elif plan.category == "exemption":
             scope = re.sub(
                 r"^provided further that nothing in this order shall apply to\s+",
@@ -486,7 +656,12 @@ class ChatService:
             code, rejected_ids, [item.citation_id for item in evidence],
         )
 
-    def _retrieve_evidence(self, request: ChatRequest) -> list[RetrievalResult]:
+    def _retrieve_evidence(
+        self,
+        request: ChatRequest,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> list[RetrievalResult]:
         """Merge controlled coverage searches with normal retrieval, deterministically."""
         service = RetrievalService(self._retriever)
         base = service.retrieve(RetrieveRequest(
@@ -495,13 +670,15 @@ class ChatService:
         candidates: list[tuple[RetrievalResult, int, int]] = [
             (item, 0, index) for index, item in enumerate(base)
         ]
-        for coverage_index, coverage_question in enumerate(self._coverage_queries(request.question), start=1):
+        for coverage_index, coverage_question in enumerate(
+            self._coverage_queries(request.question, routing_context, understanding), start=1
+        ):
             coverage = service.retrieve(RetrieveRequest(
                 question=coverage_question, top_k=8, include_guidance=request.include_guidance,
             )).results
             candidates.extend((item, coverage_index, index) for index, item in enumerate(coverage))
         candidates.extend((item, -1, index) for index, item in enumerate(
-            self._controlled_role_candidates(request.question)
+            self._controlled_role_candidates(request.question, routing_context, understanding)
         ))
 
         unique: dict[str, tuple[RetrievalResult, int, int]] = {}
@@ -512,7 +689,7 @@ class ChatService:
 
         merged = list(unique.values())
         merged.sort(key=lambda entry: (
-            -self._coverage_score(request.question, entry[0].text),
+            -self._coverage_score(request.question, entry[0].text, routing_context, understanding),
             entry[0].distance,
             entry[1], entry[2], entry[0].chunk_id,
         ))
@@ -521,17 +698,57 @@ class ChatService:
         ordered = [item for item, _, _ in merged]
         reserved: list[RetrievalResult] = []
         seen_ids: set[str] = set()
-        for role in self._required_retrieval_roles(request.question):
+        for role in self._required_retrieval_roles(request.question, routing_context, understanding):
             match = next((item for item in ordered if self._role_matches(role, item.text)), None)
             if match is not None and match.chunk_id not in seen_ids:
                 reserved.append(match)
                 seen_ids.add(match.chunk_id)
         reserved.extend(item for item in ordered if item.chunk_id not in seen_ids)
-        expanded = self._include_adjacent_context(reserved, request.question)
+        expanded = self._include_adjacent_context(reserved, request.question, routing_context, understanding)
         return expanded[:8]
 
     @staticmethod
-    def _required_retrieval_roles(question: str) -> tuple[str, ...]:
+    def _required_retrieval_roles(
+        question: str,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> tuple[str, ...]:
+        if routing_context is not None:
+            if routing_context.goal == "identify_standards":
+                if routing_context.power_type in {"battery_operated", "mains_electric"}:
+                    return ("is 15644", "is 9873")
+                if routing_context.power_type == "non_electric":
+                    return ("non-electric-primary", "non-electric-secondary")
+                return ()
+            if routing_context.goal == "check_exemption":
+                return (
+                    "manufactured and sold by artisans",
+                    "registered with office of the development commissioner",
+                )
+            if routing_context.goal == "new_licence":
+                return (
+                    "step 1: create login on manakonline",
+                    "while submitting application",
+                    "upload/provide detail of raw materials",
+                    "step 4: provide details of test facilities",
+                )
+            return ()
+        if understanding is not None:
+            if understanding.intent == "standards":
+                if understanding.power in {"battery_operated", "mains_electric"}:
+                    return ("is 15644", "is 9873")
+                if understanding.power == "non_electric":
+                    return ("non-electric-primary", "non-electric-secondary")
+            if understanding.intent == "certification":
+                return (
+                    "step 1: create login on manakonline",
+                    "while submitting application",
+                    "upload/provide detail of raw materials",
+                    "step 4: provide details of test facilities",
+                )
+            if understanding.intent == "exemption":
+                return ("manufactured and sold by artisans", "registered with office of the development commissioner")
+            return ()
         lowered = question.lower()
         if "battery" in lowered or "electric" in lowered:
             return ("is 15644", "is 9873")
@@ -542,17 +759,52 @@ class ChatService:
             )
         return ()
 
-    def _controlled_role_candidates(self, question: str) -> list[RetrievalResult]:
+    def _controlled_role_candidates(
+        self,
+        question: str,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> list[RetrievalResult]:
         """Find direct, normative role passages in the existing indexed corpus."""
         lowered_question = question.lower()
-        standard_intent = "battery" in lowered_question or "electric" in lowered_question
-        document_intent = (
-            any(term in lowered_question for term in ("document", "application", "checklist"))
-            and any(term in lowered_question for term in ("series", "model", "toy"))
-        )
-        commencement_intent = "commencement" in lowered_question or "come into force" in lowered_question
-        transition_intent = "transition" in lowered_question and "order" in lowered_question
-        if not (standard_intent or document_intent or commencement_intent or transition_intent):
+        if routing_context is None and understanding is not None:
+            electric_standard_intent = (
+                understanding.intent == "standards"
+                and understanding.power in {"battery_operated", "mains_electric"}
+            )
+            non_electric_standard_intent = understanding.intent == "standards" and understanding.power == "non_electric"
+            certification_intent = understanding.intent == "certification"
+            exemption_intent = understanding.intent == "exemption"
+            document_intent = understanding.intent == "documents"
+            commencement_intent = understanding.intent == "commencement"
+            transition_intent = understanding.intent == "transition"
+        elif routing_context is None:
+            electric_standard_intent = "battery" in lowered_question or "electric" in lowered_question
+            non_electric_standard_intent = False
+            certification_intent = any(term in lowered_question for term in ("certify", "certification", "licence"))
+            exemption_intent = any(term in lowered_question for term in ("handmade", "artisan", "exempt"))
+            document_intent = (
+                any(term in lowered_question for term in ("document", "application", "checklist"))
+                and any(term in lowered_question for term in ("series", "model", "toy"))
+            )
+            commencement_intent = "commencement" in lowered_question or "come into force" in lowered_question
+            transition_intent = "transition" in lowered_question and "order" in lowered_question
+        else:
+            electric_standard_intent = (
+                routing_context.goal == "identify_standards"
+                and routing_context.power_type in {"battery_operated", "mains_electric"}
+            )
+            non_electric_standard_intent = (
+                routing_context.goal == "identify_standards"
+                and routing_context.power_type == "non_electric"
+            )
+            certification_intent = routing_context.goal == "new_licence"
+            exemption_intent = routing_context.goal == "check_exemption"
+            document_intent = routing_context.goal == "add_new_series"
+            commencement_intent = False
+            transition_intent = routing_context.goal == "understand_transition"
+        if not any((electric_standard_intent, non_electric_standard_intent, certification_intent, exemption_intent,
+                    document_intent, commencement_intent, transition_intent)):
             return []
         rows = getattr(self._retriever, "chunks_by_id", {}).values()
         candidates: list[RetrievalResult] = []
@@ -560,7 +812,25 @@ class ChatService:
             text, metadata = row["document"], row["metadata"]
             if not metadata.get("retrieval_enabled"):
                 continue
-            is_standard_role = self._is_normative_primary(text) or self._is_normative_secondary(text)
+            is_electric_standard_role = self._is_normative_primary(text) or self._is_normative_secondary(text)
+            is_non_electric_role = (
+                self._is_normative_non_electric_primary(text)
+                or self._is_normative_non_electric_secondary(text)
+            )
+            is_exemption_role = (
+                "manufactured and sold by artisans" in text.lower()
+                or "registered with office of the development commissioner" in text.lower()
+            )
+            is_certification_role = (
+                metadata.get("source_filename") == "10-steps-for-BIS-toy-certification.pdf"
+                and metadata.get("page_start") in {5, 6}
+                and any(term in text.lower() for term in (
+                    "step 1: create login on manakonline",
+                    "while submitting application",
+                    "upload/provide detail of raw materials",
+                    "step 4: provide details of test facilities",
+                ))
+            )
             is_document_role = (
                 metadata.get("source_filename") == "product_manual_2026.pdf"
                 and metadata.get("page_start") in {58, 59, 60}
@@ -569,7 +839,11 @@ class ChatService:
             is_commencement_role = metadata.get("source_filename") == "Toys-Extension.pdf" and "come into force" in text.lower()
             is_transition_role = (metadata.get("source_filename") == "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf"
                                   and ("this order shall apply" in text.lower() or "permission under this order may be granted" in text.lower()))
-            if not ((standard_intent and is_standard_role) or (document_intent and is_document_role)
+            if not ((electric_standard_intent and is_electric_standard_role)
+                    or (non_electric_standard_intent and is_non_electric_role)
+                    or (certification_intent and is_certification_role)
+                    or (exemption_intent and is_exemption_role)
+                    or (document_intent and is_document_role)
                     or (commencement_intent and is_commencement_role) or (transition_intent and is_transition_role)):
                 continue
             candidates.append(RetrievalResult(
@@ -587,6 +861,8 @@ class ChatService:
         return (
             ChatService._is_normative_primary(text) if role == "is 15644"
             else ChatService._is_normative_secondary(text) if role == "is 9873"
+            else ChatService._is_normative_non_electric_primary(text) if role == "non-electric-primary"
+            else ChatService._is_normative_non_electric_secondary(text) if role == "non-electric-secondary"
             else role in text.lower()
         )
 
@@ -609,8 +885,121 @@ class ChatService:
         )
 
     @staticmethod
-    def _coverage_queries(question: str) -> list[str]:
+    def _is_normative_non_electric_primary(text: str) -> bool:
+        lowered = ChatService._display_text(text).lower()
+        return (
+            "non electric toys" in lowered
+            and "is 9873 (part 1):2019" in lowered
+            and "applicable primary standard" in lowered
+            and "test report" not in lowered
+        )
+
+    @staticmethod
+    def _is_normative_non_electric_secondary(text: str) -> bool:
+        lowered = ChatService._display_text(text).lower()
+        faq_role = (
+            "secondary standards which are applicable" in lowered
+            and "is 9873 parts" in lowered
+        )
+        manual_role = (
+            "non electric toys" in lowered
+            and "is 9873 part 1" in lowered
+            and "is 9873 parts 2" in lowered
+        )
+        return (faq_role or manual_role) and all(
+            re.search(rf"(?:^|\D){part}(?:\D|$)", lowered)
+            for part in (1, 2, 3, 4, 7, 9, 10, 11)
+        )
+
+    @staticmethod
+    def _excerpt_for_non_electric_role(passage: str, role: str) -> str | None:
+        text = ChatService._display_text(passage)
+        lowered = text.lower()
+        if role == "primary":
+            anchor = "applicable primary standard"
+        else:
+            anchor = (
+                "secondary standards which are applicable"
+                if "secondary standards which are applicable" in lowered
+                else "is 9873 parts 2"
+            )
+        start = lowered.find(anchor)
+        if start < 0:
+            return None
+        if role == "primary":
+            end_anchor = "function dependent on electricity)"
+            end = lowered.find(end_anchor, start)
+            end = end + len(end_anchor) if end >= 0 else min(len(text), start + 400)
+        else:
+            end_match = re.search(r"(?:etc\.?(?:\)|\.)?)", lowered[start:])
+            end = start + end_match.end() if end_match else min(len(text), start + 250)
+        excerpt = text[start:end].strip(" .:|")
+        return excerpt if 20 <= len(excerpt) <= 500 else None
+
+    @staticmethod
+    def _excerpt_for_certification_role(passage: str, anchor: str) -> str | None:
+        """Select a complete step sentence without stopping on a heading colon."""
+        text = ChatService._display_text(passage)
+        start = text.lower().find(anchor.lower())
+        if start < 0:
+            return None
+        tail = text[start:min(len(text), start + 500)]
+        search_from = min(len(tail), len(anchor) + 20)
+        boundary = re.search(r"\.(?:\s|$)", tail[search_from:])
+        end = search_from + boundary.end() if boundary else len(tail)
+        excerpt = tail[:end].strip(" .:|")
+        if excerpt.endswith((" the", " and", " or", ",")):
+            return None
+        return excerpt if 20 <= len(excerpt) <= 500 else None
+
+    @staticmethod
+    def _coverage_queries(
+        question: str,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> list[str]:
         lowered = question.lower()
+        if routing_context is not None:
+            if routing_context.goal == "identify_standards":
+                if routing_context.power_type == "battery_operated":
+                    return ["battery operated electric toy applicable primary standard IS 15644 applicable secondary IS 9873"]
+                if routing_context.power_type == "mains_electric":
+                    return ["mains powered electric toy applicable primary standard IS 15644 applicable secondary IS 9873"]
+                if routing_context.power_type == "non_electric":
+                    return ["non electric toys applicable primary standard IS 9873 Part 1 secondary standards applicable"]
+                return []
+            return {
+                "check_exemption": ["artisan manufactured sold registered Development Commissioner Handicrafts exemption"],
+                "add_new_series": ["product manual toy series application documents declaration"],
+                "understand_transition": ["Transition Facilitation Quality Control Order 2026 grant permission conditions"],
+                "new_licence": ["toy new licence certification application requirements"],
+                "not_sure": [],
+            }[routing_context.goal]
+        if understanding is not None:
+            normalized = (
+                [understanding.normalized_query]
+                if understanding.spelling_corrections or " follow-up " in understanding.normalized_query
+                else []
+            )
+            if understanding.intent == "standards":
+                focused = {
+                    "battery_operated": ["electric toy applicable primary standard IS 15644"],
+                    "mains_electric": ["electric toy applicable primary standard IS 15644"],
+                    "non_electric": ["non electric toy primary IS 9873 Part 1 secondary standards"],
+                    "electric_unspecified": [],
+                    "unknown": [],
+                }[understanding.power]
+                return [*normalized, *focused]
+            focused = {
+                "certification": ["10 steps BIS licence toys Manakonline application test facilities"],
+                "documents": ["product manual toy series application documents declaration"],
+                "exemption": ["artisan manufactured sold registered Development Commissioner Handicrafts exemption"],
+                "commencement": ["Toys Quality Control Order commencement come into force extension"],
+                "transition": ["Transition Facilitation Quality Control Order 2026 grant permission conditions"],
+                "general": [],
+                "out_of_domain": [],
+            }[understanding.intent]
+            return [*normalized, *focused]
         queries: list[str] = []
         if "battery" in lowered or "electric" in lowered:
             queries.append("electric toy applicable primary standard IS 15644")
@@ -627,26 +1016,67 @@ class ChatService:
         return queries
 
     @staticmethod
-    def _coverage_score(question: str, text: str) -> int:
+    def _coverage_score(
+        question: str,
+        text: str,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> int:
         lowered_question, lowered_text = question.lower(), text.lower()
         score = 0
-        if "battery" in lowered_question or "electric" in lowered_question:
+        electric_intent = (
+            routing_context.goal == "identify_standards"
+            and routing_context.power_type in {"battery_operated", "mains_electric"}
+        ) if routing_context else (
+            understanding.intent == "standards" and understanding.power in {"battery_operated", "mains_electric"}
+            if understanding else ("battery" in lowered_question or "electric" in lowered_question)
+        )
+        non_electric_intent = bool(
+            routing_context
+            and routing_context.goal == "identify_standards"
+            and routing_context.power_type == "non_electric"
+        )
+        if understanding and not routing_context:
+            non_electric_intent = understanding.intent == "standards" and understanding.power == "non_electric"
+        exemption_intent = (
+            routing_context.goal == "check_exemption"
+        ) if routing_context else (
+            understanding.intent == "exemption" if understanding
+            else any(term in lowered_question for term in ("handmade", "artisan", "exempt"))
+        )
+        if electric_intent:
             score += 8 if "is 15644" in lowered_text else 0
             score += 4 if "is 9873" in lowered_text else 0
             score += 2 if "primary" in lowered_text else 0
             score += 1 if "secondary" in lowered_text else 0
-        if "handmade" in lowered_question or "artisan" in lowered_question or "exempt" in lowered_question:
+        if non_electric_intent:
+            score += 10 if ChatService._is_normative_non_electric_primary(text) else 0
+            score += 9 if ChatService._is_normative_non_electric_secondary(text) else 0
+        if exemption_intent:
             score += 8 if "registered with office of the development commissioner" in lowered_text else 0
             score += 4 if "artisans" in lowered_text else 0
             score += 2 if "ministry of textiles" in lowered_text else 0
+        if understanding and understanding.intent == "certification":
+            score += 8 if "step 1: create login on manakonline" in lowered_text else 0
+            score += 6 if "while submitting application" in lowered_text else 0
+            score += 5 if "upload/provide detail of raw materials" in lowered_text else 0
+            score += 4 if "step 4: provide details of test facilities" in lowered_text else 0
         return score
 
     def _include_adjacent_context(
         self,
         results: list[RetrievalResult],
         question: str,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
     ) -> list[RetrievalResult]:
-        if not any(term in question.lower() for term in ("handmade", "artisan", "exempt")):
+        exemption_intent = (
+            routing_context.goal == "check_exemption"
+        ) if routing_context else (
+            understanding.intent == "exemption" if understanding
+            else any(term in question.lower() for term in ("handmade", "artisan", "exempt"))
+        )
+        if not exemption_intent:
             return results
         adjacent = getattr(self._retriever, "adjacent_chunks", None)
         if not callable(adjacent):
@@ -667,7 +1097,9 @@ class ChatService:
                     chunk_type=item["chunk_type"], distance=result.distance,
                     similarity=result.similarity,
                 ))
-        merged.sort(key=lambda item: (-self._coverage_score(question, item.text), item.distance, item.chunk_id))
+        merged.sort(key=lambda item: (
+            -self._coverage_score(question, item.text, routing_context, understanding), item.distance, item.chunk_id
+        ))
         return merged
 
     @staticmethod
@@ -945,3 +1377,42 @@ class ChatService:
             generation_mode="abstention",
             disclaimer=LEGAL_INFORMATION_DISCLAIMER,
         )
+
+    def _clarification(self, question: str) -> ChatResponse:
+        sections = [AnswerSection(
+            type="clarification",
+            title="Need more details",
+            content=question,
+            citation_ids=[],
+        )]
+        return self._guided_response(
+            sections=sections,
+            grounded=False,
+            insufficient_evidence=False,
+            evidence_count=0,
+            citations=[],
+            model=self._generator.model if self._generator else self._model_name,
+            generation_mode="clarification",
+            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            needs_clarification=True,
+        )
+
+    @staticmethod
+    def _answer_matches_understanding(answer: str, understanding: QuestionUnderstanding) -> bool:
+        lowered = answer.lower()
+        if understanding.intent == "standards":
+            if understanding.power == "non_electric":
+                return "is 15644" not in lowered and "battery-operated" not in lowered
+            if understanding.power == "mains_electric":
+                return "battery-operated" not in lowered
+            if understanding.power == "battery_operated":
+                return "non-electric toy" not in lowered and "mains-powered" not in lowered
+        if understanding.intent == "certification":
+            return bool(re.search(r"\b(certif|licen[cs]e|application|manakonline)\w*\b", lowered))
+        expected = {
+            "exemption": ("exempt", "artisan", "handmade"),
+            "documents": ("series", "model", "scope"),
+            "commencement": ("commencement", "come into force", "gazette"),
+            "transition": ("transition", "permission"),
+        }.get(understanding.intent)
+        return not expected or any(term in lowered for term in expected)
