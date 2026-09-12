@@ -53,5 +53,51 @@ it('Start over clears messages and active assistant context',async()=>{
  const clarification={...a,answer:'Need power',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],assistant_context:{original_question:'What standards apply?',expected_slots:['power_type']},suggested_replies:['Non-electric']};
  mock(clarification);render(<App/>);const u=userEvent.setup();await u.click(screen.getByText(/battery-operated/i));await screen.findByText('Need more details',{selector:'.answer-status'});
  await u.click(screen.getByRole('button',{name:'Start over'}));
- expect(screen.getByText('Suggested questions')).toBeInTheDocument();expect(screen.queryByText('Need power')).not.toBeInTheDocument();
+ expect(screen.getByText('Suggested questions')).toBeInTheDocument(); expect(screen.queryByText('Need power')).not.toBeInTheDocument();
+});
+
+it('renders accessible suggested standard replies and sends the chosen standard once',async()=>{
+ const context={original_question:'Explain the standard',expected_slots:['standard_reference' as const],current_goal:'explain_standard' as const,referenced_standards:['IS 15644','IS 9873 Part 1']};
+ const clarification={...a,answer:'Which Indian Standard would you like me to explain?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['IS 15644','IS 9873 Part 1'],assistant_context:context,answer_sections:[{type:'clarification' as const,title:'Need more details',content:'Which Indian Standard would you like me to explain?',items:[],citation_ids:[]}]};
+ let chatCall=0;
+ const f=vi.fn((url:string,init?:RequestInit)=>{
+  if(url.includes('health'))return Promise.resolve(rep({status:'ready'}));
+  chatCall+=1;
+  return Promise.resolve(rep(chatCall===1?clarification:{...a,needs_clarification:false,answer:'IS 15644 is identified as the primary standard for electric toys.'}));
+ });
+ vi.stubGlobal('fetch',f);render(<App/>);const u=userEvent.setup();
+ await u.type(screen.getByLabelText(/ask a question/i),'Explain the standard{Enter}');
+ expect(await screen.findByRole('group',{name:'Suggested replies'})).toBeInTheDocument();
+ await u.click(screen.getByRole('button',{name:'IS 15644'}));
+ await screen.findByText(/primary standard for electric toys/i);
+ const payload=JSON.parse(String((f.mock.calls[2]?.[1] as RequestInit).body));
+ expect(payload.question).toBe('IS 15644');
+ expect(payload.assistant_context).toEqual(context);
+ expect(f).toHaveBeenCalledTimes(3);
+});
+
+it('displays ambiguous standard-reference clarification',async()=>{
+ const clarification={...a,answer:'Which of the previously mentioned Indian Standards would you like me to explain?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['IS 15644','IS 9873 Part 1'],assistant_context:{referenced_standards:['IS 15644','IS 9873 Part 1'],expected_slots:['standard_reference' as const]}};
+ mock(clarification);render(<App/>);await userEvent.setup().type(screen.getByLabelText(/ask a question/i),'Explain that standard{Enter}');
+ expect(await screen.findByText('Need more details',{selector:'.answer-status'})).toBeInTheDocument();
+ expect(screen.getByText(/previously mentioned Indian Standards/i)).toBeInTheDocument();
+});
+
+it('mode switching clears retained standard context',async()=>{
+ const clarification={...a,answer:'Which Indian Standard would you like me to explain?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['IS 15644'],assistant_context:{expected_slots:['standard_reference' as const],referenced_standards:['IS 15644']}};
+ mock(clarification);render(<App/>);const u=userEvent.setup();
+ await u.type(screen.getByLabelText(/ask a question/i),'Explain the standard{Enter}');
+ await screen.findByText('Need more details',{selector:'.answer-status'});
+ await u.click(screen.getByRole('button',{name:'Compliance Wizard'}));
+ await u.click(screen.getByRole('button',{name:'Ask a question'}));
+ expect(screen.getByText('Suggested questions')).toBeInTheDocument();
+ expect(screen.queryByText(/Which Indian Standard/i)).not.toBeInTheDocument();
+});
+
+it('keeps citations, page metadata and hides internal identifiers after a standard explanation',async()=>{
+ mock({...a,answer:'IS 15644 is identified as the primary standard for electric toys.'});
+ render(<App/>);await userEvent.setup().click(screen.getByText(/battery-operated/i));
+ expect(await screen.findByText(/manual.pdf/)).toBeInTheDocument();
+ expect(screen.getByText(/Page 4/)).toBeInTheDocument();
+ expect(document.body).not.toHaveTextContent('secret');
 });

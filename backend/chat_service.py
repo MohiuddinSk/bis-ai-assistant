@@ -24,7 +24,7 @@ from backend.schemas import (
     RetrievalResult,
 )
 from backend.service import RetrievalService, RetrieverProtocol
-from backend.question_understanding import QuestionUnderstanding
+from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
 from backend.settings import (
     INSUFFICIENT_EVIDENCE_ANSWER,
     LEGAL_INFORMATION_DISCLAIMER,
@@ -104,6 +104,11 @@ class EvidencePlan:
                 "registration_condition", "registering_authority", "certification_portal",
                 "series_details", "scope_fee",
             },
+            "explain_electric_standard": {"requested_standard_identity"},
+            "explain_non_electric_primary": {"requested_standard_identity"},
+            "explain_secondary_part": {"requested_standard_identity"},
+            "explain_standard_relationship": {"requested_standard_identity", "compared_standard_identity"},
+            "explain_is_general": {"is_meaning"},
         }.get(self.category, set())
         return bool(required) and required <= set(self.roles)
 
@@ -170,6 +175,9 @@ class ChatService:
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
     ) -> ChatResponse:
+        if routing_context is None and understanding is None:
+            original = request.clarification_context.original_question if request.clarification_context else None
+            understanding = understand_question(request.question, original, request.assistant_context)
         if routing_context is not None:
             clarification = self._routing_clarification(routing_context)
             if clarification:
@@ -220,6 +228,17 @@ class ChatService:
             "timeline", "fee", "laboratory", "form",
         }:
             return self._specific_limitation(understanding.intent)
+        if routing_context is None and understanding and understanding.intent in {
+            "standard_explanation", "standard_comparison",
+        } and understanding.standard_references and not understanding.clarification_required:
+            if understanding.intent == "standard_explanation" and not any(
+                item.supported for item in understanding.standard_references
+            ):
+                return self._unknown_standard_response(understanding)
+            if understanding.intent == "standard_comparison" and not any(
+                item.supported for item in understanding.standard_references
+            ):
+                return self._unknown_standard_response(understanding)
         effective_question = understanding.normalized_query if understanding else request.question
         try:
             with self._retrieval_lock:
@@ -244,10 +263,22 @@ class ChatService:
         plan = self._build_evidence_plan(request.question, evidence, routing_context, understanding)
         if plan.category == "clarification":
             return self._abstention(evidence=evidence)
+        if understanding is not None and understanding.intent in {
+            "standard_explanation", "standard_comparison", "is_general_meaning",
+        }:
+            if plan.category.startswith("explain_") and "requested_standard_identity" not in plan.roles and plan.category != "explain_is_general":
+                if understanding.standard_references and not any(item.supported for item in understanding.standard_references):
+                    return self._unknown_standard_response(understanding)
+                return self._unknown_standard_response(understanding, evidence_count=0)
+            if plan.category == "explain_is_general" and not plan.complete:
+                return self._abstention(evidence=[], citations=[])
+            if "requested_standard_identity" in plan.roles or plan.complete:
+                return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
+            return self._abstention(evidence=[], citations=[])
         # Complete trusted evidence plans bypass Groq: this removes avoidable
         # latency and cannot weaken citation or qualification controls.
         if plan.complete:
-            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
+            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
         if self._generator is None:
             raise ProviderUnavailableError("Chat generation is unavailable")
 
@@ -277,7 +308,7 @@ class ChatService:
             except (ValidationError, ValueError) as validation_error:
                 if used_completion_retry:
                     self._log_abstention(validation_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
+                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
                 try:
                     repaired_output = self._generator.generate(
                         effective_question,
@@ -296,7 +327,7 @@ class ChatService:
                 except (ValidationError, ValueError) as repair_error:
                     # Invalid model evidence must never be surfaced as a grounded claim.
                     self._log_abstention(repair_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
+                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
 
         if generated.insufficient_evidence:
             return self._abstention(evidence=evidence, citations=citations)
@@ -306,7 +337,7 @@ class ChatService:
                 understanding.intent,
                 understanding.power,
             )
-            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
+            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
 
         # Certain high-risk, structured facts have an unambiguous evidence-role
         # plan.  Compose those facts from the verified roles instead of allowing
@@ -325,6 +356,7 @@ class ChatService:
             model=self._generator.model,
             generation_mode="llm",
             disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            assistant_context=self._continuity_context(plan, understanding, routing_context, joined_answer=generated.answer),
         )
 
     @staticmethod
@@ -375,6 +407,12 @@ class ChatService:
                     "electric_unspecified": "clarification",
                     "unknown": "clarification",
                 }[understanding.power]
+            elif understanding.intent == "standard_explanation":
+                category = ChatService._explanation_category(understanding)
+            elif understanding.intent == "standard_comparison":
+                category = "explain_standard_relationship"
+            elif understanding.intent == "is_general_meaning":
+                category = "explain_is_general"
         elif any(term in question_lower for term in ("handmade", "artisan", "exempt")):
             category = "exemption"
         elif any(term in question_lower for term in ("document", "application", "checklist")) and any(
@@ -523,6 +561,8 @@ class ChatService:
                         roles.setdefault("registration_condition", (item, excerpt))
                         if "ministry of textiles" in text:
                             roles.setdefault("registering_authority", (item, excerpt))
+        if category.startswith("explain_") and understanding is not None:
+            roles.update(ChatService._explanation_roles(category, evidence, understanding))
         return EvidencePlan(category, roles)
 
     @staticmethod
@@ -546,6 +586,12 @@ class ChatService:
             "commencement_clause": ("The selected order comes into force on publication in the Official Gazette.", ("no calendar date established",)),
             "operative_scope": ("The order applies to goods or articles covered by specified Quality Control Orders.", ()),
             "operative_permission": ("Permission may be granted only subject to the operative eligibility and risk-assessment conditions.", ("may", "subject to conditions")),
+            "requested_standard_identity": ("The requested Indian Standard is identified in the indexed evidence.", ()),
+            "compared_standard_identity": ("The compared Indian Standard is identified in the indexed evidence.", ()),
+            "product_applicability": ("The cited standard applies only in the supported product category.", ("where applicable",)),
+            "relationship": ("The two standards have distinct supported product roles.", ()),
+            "next_step": ("After identifying the standard, review the cited primary or secondary role and the supported next action.", ()),
+            "is_meaning": ("The indexed evidence uses Indian Standard identifiers for cited requirements.", ()),
         }
         facts: list[TrustedFact] = []
         for index, (role, (item, _excerpt)) in enumerate(plan.roles.items(), start=1):
@@ -635,7 +681,10 @@ class ChatService:
         plan: EvidencePlan,
         audience: str = "general",
         routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
     ) -> ChatResponse:
+        if plan.category.startswith("explain_"):
+            return self._explain_from_plan(evidence, plan, understanding)
         if not plan.complete:
             return self._abstention(evidence=evidence)
         ordered_roles = {
@@ -890,7 +939,9 @@ class ChatService:
         logger.info("Chat generation_mode=extractive_fallback evidence_complete=true roles=%s citation_ids=%s", ordered_roles, [item.citation_id for item, _ in selected])
         return self._guided_response(sections=sections, grounded=True, insufficient_evidence=False,
             evidence_count=len(evidence), citations=citations, model="extractive-evidence-fallback",
-            generation_mode="extractive_fallback", disclaimer=LEGAL_INFORMATION_DISCLAIMER)
+            generation_mode="extractive_fallback", disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            suggested_replies=self._continuity_suggestions(plan, understanding),
+            assistant_context=self._continuity_context(plan, understanding, routing_context, joined_answer=self._join_sections(sections)))
 
     @staticmethod
     def _compose_fragments(*fragments: str) -> str:
@@ -1029,6 +1080,8 @@ class ChatService:
                 )
             if understanding.intent == "exemption":
                 return ("manufactured and sold by artisans", "registered with office of the development commissioner")
+            if understanding.intent in {"standard_explanation", "standard_comparison"}:
+                return ChatService._explanation_retrieval_roles(understanding)
             return ()
         lowered = question.lower()
         if "battery" in lowered or "electric" in lowered:
@@ -1054,6 +1107,9 @@ class ChatService:
                 and understanding.power in {"battery_operated", "mains_electric"}
             )
             non_electric_standard_intent = understanding.intent == "standards" and understanding.power == "non_electric"
+            explanation_intent = understanding.intent in {
+                "standard_explanation", "standard_comparison", "is_general_meaning",
+            }
             certification_intent = understanding.intent == "certification"
             exemption_intent = understanding.intent == "exemption"
             document_intent = understanding.intent == "documents"
@@ -1062,6 +1118,7 @@ class ChatService:
         elif routing_context is None:
             electric_standard_intent = "battery" in lowered_question or "electric" in lowered_question
             non_electric_standard_intent = False
+            explanation_intent = False
             certification_intent = any(term in lowered_question for term in ("certify", "certification", "licence"))
             exemption_intent = any(term in lowered_question for term in ("handmade", "artisan", "exempt"))
             document_intent = (
@@ -1079,6 +1136,7 @@ class ChatService:
                 routing_context.goal == "identify_standards"
                 and routing_context.power_type == "non_electric"
             )
+            explanation_intent = False
             certification_intent = routing_context.goal == "new_licence"
             exemption_intent = routing_context.goal == "check_exemption"
             document_intent = routing_context.goal == "add_new_series"
@@ -1087,7 +1145,7 @@ class ChatService:
             roadmap_intent = routing_context.goal == "complete_roadmap"
         if routing_context is None:
             roadmap_intent = False
-        if not any((electric_standard_intent, non_electric_standard_intent, certification_intent, exemption_intent,
+        if not any((electric_standard_intent, non_electric_standard_intent, explanation_intent, certification_intent, exemption_intent,
                     document_intent, commencement_intent, transition_intent, roadmap_intent)):
             return []
         rows = getattr(self._retriever, "chunks_by_id", {}).values()
@@ -1125,6 +1183,7 @@ class ChatService:
                                   and ("this order shall apply" in text.lower() or "permission under this order may be granted" in text.lower()))
             if not ((electric_standard_intent and is_electric_standard_role)
                     or (non_electric_standard_intent and is_non_electric_role)
+                    or (explanation_intent and (is_electric_standard_role or is_non_electric_role))
                     or (certification_intent and is_certification_role)
                     or (exemption_intent and is_exemption_role)
                     or (document_intent and is_document_role)
@@ -1283,6 +1342,10 @@ class ChatService:
                     "unknown": [],
                 }[understanding.power]
                 return [*normalized, *focused]
+            if understanding.intent == "standard_explanation":
+                return [*normalized, *ChatService._explanation_coverage(understanding)]
+            if understanding.intent == "standard_comparison":
+                return [*normalized, *ChatService._explanation_coverage(understanding)]
             focused = {
                 "certification": ["10 steps BIS licence toys Manakonline application test facilities"],
                 "documents": ["product manual toy series application documents declaration"],
@@ -1291,7 +1354,14 @@ class ChatService:
                 "transition": ["Transition Facilitation Quality Control Order 2026 grant permission conditions"],
                 "general": [],
                 "out_of_domain": [],
-            }[understanding.intent]
+                "is_general_meaning": ["Indian Standard IS identifier toy quality control order"],
+                "profile": [],
+                "roadmap": [],
+                "timeline": [],
+                "fee": [],
+                "laboratory": [],
+                "form": [],
+            }.get(understanding.intent, [])
             return [*normalized, *focused]
         queries: list[str] = []
         if "battery" in lowered or "electric" in lowered:
@@ -1349,6 +1419,14 @@ class ChatService:
             score += 8 if "registered with office of the development commissioner" in lowered_text else 0
             score += 4 if "artisans" in lowered_text else 0
             score += 2 if "ministry of textiles" in lowered_text else 0
+        if understanding and understanding.intent in {"standard_explanation", "standard_comparison"}:
+            requested = " ".join(item.display.lower() for item in understanding.standard_references)
+            if "15644" in requested:
+                score += 8 if ChatService._is_normative_primary(text) else 0
+            if "9873" in requested and "part 1" in requested:
+                score += 10 if ChatService._is_normative_non_electric_primary(text) else 0
+            if "9873" in requested:
+                score += 6 if ChatService._is_normative_secondary(text) or ChatService._is_normative_non_electric_secondary(text) else 0
         if understanding and understanding.intent == "certification":
             score += 8 if "step 1: create login on manakonline" in lowered_text else 0
             score += 6 if "while submitting application" in lowered_text else 0
@@ -1767,6 +1845,444 @@ class ChatService:
         )
 
     @staticmethod
+    def _explanation_category(understanding: QuestionUnderstanding) -> str:
+        refs = understanding.standard_references
+        if not refs:
+            return "explain_electric_standard"
+        first = refs[0]
+        if first.number == "15644" and first.part is None:
+            return "explain_electric_standard"
+        if first.number == "9873" and first.part == 1:
+            return "explain_non_electric_primary"
+        if first.number == "9873":
+            return "explain_secondary_part"
+        return "explain_electric_standard"
+
+    @staticmethod
+    def _explanation_coverage(understanding: QuestionUnderstanding) -> list[str]:
+        queries: list[str] = []
+        for ref in understanding.standard_references:
+            if ref.number == "15644":
+                queries.append("electric toy applicable primary standard IS 15644")
+            elif ref.number == "9873" and ref.part == 1:
+                queries.append("non electric toys applicable primary standard IS 9873 Part 1")
+            elif ref.number == "9873":
+                queries.append("IS 9873 secondary standards parts where applicable")
+        return queries
+
+    @staticmethod
+    def _explanation_retrieval_roles(understanding: QuestionUnderstanding) -> tuple[str, ...]:
+        roles: list[str] = []
+        for ref in understanding.standard_references:
+            if ref.number == "15644":
+                roles.append("is 15644")
+            elif ref.number == "9873" and ref.part == 1:
+                roles.append("non-electric-primary")
+            elif ref.number == "9873":
+                roles.extend(("is 9873", "non-electric-secondary"))
+        return tuple(dict.fromkeys(roles))
+
+    @staticmethod
+    def _mentions_requested_standard(text: str, number: str, part: int | None) -> bool:
+        lowered = ChatService._display_text(text).lower()
+        if not re.search(rf"\bis\s*{re.escape(number)}\b", lowered):
+            return False
+        if part is None:
+            return True
+        return bool(
+            re.search(rf"\bis\s*{re.escape(number)}\s*\(?\s*part\s*{part}\b", lowered)
+            or re.search(rf"\bparts?\b[^\n]{{0,120}}(?:^|[^\d]){part}(?:[^\d]|$)", lowered)
+        )
+
+    @staticmethod
+    def _explanation_roles(
+        category: str,
+        evidence: list[TrustedEvidence],
+        understanding: QuestionUnderstanding,
+    ) -> dict[str, tuple[TrustedEvidence, str]]:
+        roles: dict[str, tuple[TrustedEvidence, str]] = {}
+        refs = understanding.standard_references
+        if category == "explain_is_general":
+            for item in evidence:
+                if re.search(r"\bindian standard", item.text, re.I) and re.search(r"\bis\s*\d", item.text, re.I):
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "indian standard") or ChatService._excerpt_for_anchor(item.text, "is ")
+                    if excerpt:
+                        roles.setdefault("is_meaning", (item, excerpt))
+                        break
+            return roles
+        identity_refs = refs[:1]
+        compared_refs = refs[1:2] if category == "explain_standard_relationship" else ()
+        for role_name, role_refs in (
+            ("requested_standard_identity", identity_refs),
+            ("compared_standard_identity", compared_refs),
+        ):
+            for ref in role_refs:
+                match = ChatService._identity_evidence(evidence, ref)
+                if match:
+                    roles[role_name] = match
+                    if ref.number == "15644":
+                        roles.setdefault("product_applicability", match)
+                        roles.setdefault("primary_standard", match)
+                    elif ref.number == "9873" and ref.part == 1:
+                        roles.setdefault("product_applicability", match)
+                        roles.setdefault("primary_standard", match)
+                    else:
+                        roles.setdefault("secondary_standard", match)
+                        roles.setdefault("product_applicability", match)
+        if identity_refs and identity_refs[0].number == "15644":
+            for item in evidence:
+                if ChatService._is_normative_secondary(item.text):
+                    excerpt = ChatService._excerpt_for_standard_role(item.text, "secondary") or ChatService._excerpt_for_anchor(item.text, "is 9873")
+                    if excerpt:
+                        roles.setdefault("secondary_standard", (item, excerpt))
+                        break
+        if identity_refs and identity_refs[0].number == "9873" and identity_refs[0].part == 1:
+            for item in evidence:
+                if ChatService._is_normative_non_electric_secondary(item.text):
+                    excerpt = ChatService._excerpt_for_non_electric_role(item.text, "secondary")
+                    if excerpt:
+                        roles.setdefault("secondary_standard", (item, excerpt))
+                        break
+        if "requested_standard_identity" in roles and "compared_standard_identity" in roles:
+            roles.setdefault("relationship", roles["requested_standard_identity"])
+        if "requested_standard_identity" in roles:
+            roles.setdefault("next_step", roles["requested_standard_identity"])
+        return roles
+
+    @staticmethod
+    def _identity_evidence(
+        evidence: list[TrustedEvidence],
+        ref,
+    ) -> tuple[TrustedEvidence, str] | None:
+        options: list[tuple[TrustedEvidence, str]] = []
+        for item in evidence:
+            if not ChatService._mentions_requested_standard(item.text, ref.number, ref.part if ref.number == "9873" else None):
+                continue
+            excerpt = None
+            if ref.number == "15644" and ref.part is None:
+                if ChatService._is_normative_primary(item.text) or (
+                    "is 15644" in item.text.lower() and "primary" in item.text.lower()
+                ):
+                    excerpt = (
+                        ChatService._excerpt_for_standard_role(item.text, "primary")
+                        or ChatService._excerpt_for_anchor(item.text, "is 15644")
+                    )
+            elif ref.number == "9873" and ref.part == 1:
+                if ChatService._is_normative_non_electric_primary(item.text) or (
+                    "part 1" in item.text.lower() and "primary" in item.text.lower()
+                ):
+                    excerpt = (
+                        ChatService._excerpt_for_non_electric_role(item.text, "primary")
+                        or ChatService._excerpt_for_anchor(item.text, "is 9873")
+                    )
+            elif ref.number == "9873":
+                if ChatService._is_normative_secondary(item.text) or ChatService._is_normative_non_electric_secondary(item.text):
+                    excerpt = (
+                        ChatService._excerpt_for_standard_role(item.text, "secondary")
+                        or ChatService._excerpt_for_non_electric_role(item.text, "secondary")
+                        or ChatService._excerpt_for_anchor(item.text, "is 9873")
+                    )
+                elif "is 9873" in item.text.lower() and "secondary" in item.text.lower():
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "is 9873")
+                elif ref.part is None and "is 9873" in item.text.lower():
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "is 9873")
+            if excerpt:
+                options.append((item, excerpt))
+        if not options:
+            return None
+        return min(options, key=lambda option: len(option[1]))
+
+    def _unknown_standard_response(
+        self,
+        understanding: QuestionUnderstanding,
+        evidence_count: int = 0,
+    ) -> ChatResponse:
+        requested = ", ".join(item.display for item in understanding.standard_references) or "that Indian Standard"
+        content = (
+            f"The indexed documents do not contain sufficient evidence to explain {requested} reliably. "
+            "I cannot substitute another Indian Standard. Check the official BIS portal or provide a relevant BIS document."
+        )
+        return self._guided_response(
+            sections=[AnswerSection(
+                type="important",
+                title="What the indexed documents do not establish",
+                content=content,
+            )],
+            grounded=False,
+            insufficient_evidence=True,
+            evidence_count=evidence_count,
+            citations=[],
+            model=self._model_name,
+            generation_mode="abstention",
+            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            assistant_context=understanding.assistant_context,
+        )
+
+    def _explain_from_plan(
+        self,
+        evidence: list[TrustedEvidence],
+        plan: EvidencePlan,
+        understanding: QuestionUnderstanding | None,
+    ) -> ChatResponse:
+        if understanding is None:
+            return self._abstention(evidence=[], citations=[])
+        identity = plan.roles.get("requested_standard_identity")
+        if plan.category == "explain_is_general":
+            return self._abstention(evidence=[], citations=[])
+        if identity is None:
+            return self._unknown_standard_response(understanding)
+        refs = understanding.standard_references
+        first = refs[0] if refs else None
+        simplify = bool(understanding.simplify)
+        identity_item, identity_excerpt = identity
+        citations = self._map_citations([(identity_item.citation_id, identity_excerpt)], evidence)
+        compared = plan.roles.get("compared_standard_identity")
+        if compared:
+            citations = self._map_citations(
+                [(identity_item.citation_id, identity_excerpt), (compared[0].citation_id, compared[1])],
+                evidence,
+            )
+        secondary = plan.roles.get("secondary_standard")
+        if secondary and secondary[0].citation_id not in {item.citation_id for item in citations}:
+            extra = self._map_citations([(secondary[0].citation_id, secondary[1])], evidence)
+            citations = citations + extra
+        sections = ChatService._explanation_sections(
+            plan, understanding, first, identity_item, compared, secondary, simplify,
+        )
+        factual = " ".join(filter(None, [
+            section.content or ""
+            for section in sections
+            if section.title != "What the indexed documents do not establish"
+        ] + [
+            item
+            for section in sections if section.title != "What the indexed documents do not establish"
+            for item in section.items
+        ]))
+        if ChatService._explanation_contains_unsupported_detail(factual):
+            return self._unknown_standard_response(understanding)
+        fact_plan = self._fact_plan(plan)
+        sections = self._deduplicate_section_citations(sections)
+        self._validate_sections(sections, fact_plan, citations)
+        return self._guided_response(
+            sections=sections,
+            grounded=True,
+            insufficient_evidence=False,
+            evidence_count=len(evidence),
+            citations=citations,
+            model="extractive-evidence-fallback",
+            generation_mode="extractive_fallback",
+            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            suggested_replies=self._explanation_suggestions(understanding, plan),
+            assistant_context=self._continuity_context(plan, understanding, None, joined_answer=self._join_sections(sections)),
+        )
+
+    @staticmethod
+    def _explanation_contains_unsupported_detail(text: str) -> bool:
+        lowered = text.lower()
+        forbidden = (
+            "sampling plan", "laboratory procedure", "form no",
+            "rupees", "approval within", "must be tested", "chemical limit", "mg/kg",
+        )
+        return any(term in lowered for term in forbidden)
+
+    @staticmethod
+    def _explanation_sections(
+        plan: EvidencePlan,
+        understanding: QuestionUnderstanding,
+        first,
+        identity_item: TrustedEvidence,
+        compared: tuple[TrustedEvidence, str] | None,
+        secondary: tuple[TrustedEvidence, str] | None,
+        simplify: bool,
+    ) -> list[AnswerSection]:
+        citation_id = identity_item.citation_id
+        display = first.display if first else "the requested Indian Standard"
+        sections: list[AnswerSection] = []
+        if plan.category == "explain_electric_standard":
+            meaning = (
+                f"The indexed evidence identifies {display} as the primary standard for electric toys."
+                if not simplify else
+                f"{display} is the main cited standard for electric toys."
+            )
+            applies = (
+                "It is identified as primary for electric toys, including battery-operated toys where that product class is in evidence. "
+                "The indexed documents do not say it applies merely because a product is a toy."
+                if understanding.power == "battery_operated" else
+                "It is identified as primary for electric toys. The selected evidence does not describe this as a battery-operated-only rule."
+                if understanding.power == "mains_electric" else
+                "The indexed evidence identifies this as the primary standard for electric toys. It does not establish applicability for non-electric toys."
+            )
+            if understanding.power == "non_electric":
+                applies = "The indexed evidence does not establish that IS 15644 applies to non-electric toys."
+            sections = [
+                AnswerSection(type="direct_answer", title="What this standard means", content=meaning, citation_ids=[citation_id]),
+                AnswerSection(type="explanation", title="When it applies", content=applies, citation_ids=[citation_id]),
+            ]
+            if secondary:
+                sections.append(AnswerSection(
+                    type="explanation", title="How it relates to other standards",
+                    content="Cited IS 9873 parts are secondary or additional requirements where applicable. They do not replace IS 15644 as the primary standard for electric toys.",
+                    citation_ids=[secondary[0].citation_id],
+                ))
+            sections.append(AnswerSection(
+                type="next_steps", title="What you should do",
+                items=["Review the cited primary-standard role, then identify any listed IS 9873 parts that the evidence marks as applicable."],
+                citation_ids=[citation_id],
+            ))
+        elif plan.category == "explain_non_electric_primary":
+            meaning = (
+                f"The indexed evidence identifies {display} as the primary standard for non-electric toys."
+                if not simplify else
+                f"{display} is the main cited standard for non-electric toys."
+            )
+            sections = [
+                AnswerSection(type="direct_answer", title="What this standard means", content=meaning, citation_ids=[citation_id]),
+                AnswerSection(
+                    type="explanation", title="When it applies",
+                    content="It is identified as primary for non-electric toys. The indexed documents do not establish that IS 15644 applies in that non-electric setting.",
+                    citation_ids=[citation_id],
+                ),
+            ]
+            if secondary:
+                sections.append(AnswerSection(
+                    type="explanation", title="How it relates to other standards",
+                    content="Other cited IS 9873 parts are secondary requirements where applicable. This does not mean every part applies to every non-electric toy.",
+                    citation_ids=[secondary[0].citation_id],
+                ))
+            sections.append(AnswerSection(
+                type="next_steps", title="What you should do",
+                items=["Start with the cited primary-standard role, then check which additional listed parts the evidence marks as applicable."],
+                citation_ids=[citation_id],
+            ))
+        elif plan.category == "explain_secondary_part":
+            meaning = (
+                f"The indexed evidence lists {display} as a secondary or additional requirement, where applicable."
+                if not simplify else
+                f"{display} is listed as an extra requirement only where it applies."
+            )
+            sections = [
+                AnswerSection(type="direct_answer", title="What this standard means", content=meaning, citation_ids=[citation_id]),
+                AnswerSection(
+                    type="explanation", title="When it applies",
+                    content="The indexed documents do not establish that this part applies to every toy. Applicability is limited to the cited secondary or additional role.",
+                    citation_ids=[citation_id],
+                ),
+                AnswerSection(
+                    type="next_steps", title="What you should do",
+                    items=["Treat this as a cited additional requirement only after the applicable primary standard for the toy type is identified."],
+                    citation_ids=[citation_id],
+                ),
+            ]
+        elif plan.category == "explain_standard_relationship":
+            left = understanding.standard_references[0].display if len(understanding.standard_references) > 0 else "the first standard"
+            right = understanding.standard_references[1].display if len(understanding.standard_references) > 1 else "the second standard"
+            if compared is None:
+                sections = [AnswerSection(
+                    type="important", title="What the indexed documents do not establish",
+                    content=f"The indexed documents support only a partial comparison. Evidence was not complete for both {left} and {right}.",
+                    citation_ids=[citation_id],
+                )]
+            else:
+                sections = [
+                    AnswerSection(
+                        type="direct_answer", title="How it relates to other standards",
+                        content=(
+                            f"In the indexed toy-compliance material, {left} and {right} have different supported product roles. "
+                            "This is a product-applicability distinction, not a complete technical comparison of scope or clause-level content."
+                        ),
+                        citation_ids=[citation_id, compared[0].citation_id],
+                    ),
+                    AnswerSection(
+                        type="explanation", title="What this standard means",
+                        content="IS 15644 is identified as primary for electric toys. IS 9873 Part 1 is identified as primary for non-electric toys.",
+                        citation_ids=[citation_id, compared[0].citation_id],
+                    ),
+                ]
+        else:
+            sections = [AnswerSection(
+                type="direct_answer", title="What this standard means",
+                content=f"The indexed evidence identifies {display} in a supported standards role.",
+                citation_ids=[citation_id],
+            )]
+        sections.append(AnswerSection(
+            type="important", title="What the indexed documents do not establish",
+            content=(
+                "The selected evidence does not establish an official full title, complete scope, clause wording, "
+                "laboratory tests, chemical or mechanical limits, sampling rules, marking details, "
+                "fees, form numbers, approval timelines, or a certification outcome."
+            ),
+        ))
+        return sections
+
+    @staticmethod
+    def _explanation_suggestions(understanding: QuestionUnderstanding, plan: EvidencePlan) -> list[str]:
+        refs = understanding.standard_references
+        if not refs or not all(item.supported for item in refs):
+            return []
+        suggestions = ["Explain when this standard applies", "Explain this in simpler language"]
+        displays = {item.display for item in refs}
+        if "IS 15644" in displays:
+            suggestions.append("Compare it with IS 9873 Part 1")
+        elif "IS 9873 Part 1" in displays:
+            suggestions.append("Compare it with IS 15644")
+        suggestions.append("Show my complete compliance roadmap")
+        return suggestions[:8]
+
+    @staticmethod
+    def _continuity_suggestions(plan: EvidencePlan, understanding: QuestionUnderstanding | None) -> list[str]:
+        if understanding and understanding.intent in {"standard_explanation", "standard_comparison"}:
+            return ChatService._explanation_suggestions(understanding, plan)
+        if plan.category in {"standards", "standards_battery", "standards_mains", "standards_non_electric"}:
+            return ["Explain that standard", "Show my complete compliance roadmap"]
+        return []
+
+    @staticmethod
+    def _continuity_context(
+        plan: EvidencePlan,
+        understanding: QuestionUnderstanding | None,
+        routing_context: ComplianceRoutingContext | None,
+        joined_answer: str = "",
+    ) -> AssistantContext | None:
+        displays: list[str] = []
+        if understanding and understanding.standard_references:
+            displays = [item.display for item in understanding.standard_references]
+        if not displays and joined_answer:
+            displays = [item.display for item in extract_standard_references(joined_answer.lower())]
+        if not displays and plan.category in {"standards", "standards_battery", "standards_mains"}:
+            displays = ["IS 15644"]
+            if "secondary_standard" in plan.roles:
+                for part in ChatService._standard_parts(plan.roles["secondary_standard"][1]):
+                    displays.append(f"IS 9873 Part {part}")
+        elif not displays and plan.category == "standards_non_electric":
+            displays = ["IS 9873 Part 1"]
+            if "non_electric_secondary" in plan.roles:
+                for part in ChatService._standard_parts(plan.roles["non_electric_secondary"][1]):
+                    displays.append(f"IS 9873 Part {part}")
+        displays = list(dict.fromkeys(displays))[:8]
+        if not displays and understanding and understanding.assistant_context:
+            return understanding.assistant_context
+        if not displays:
+            return None
+        base = understanding.assistant_context if understanding else None
+        return AssistantContext(
+            original_question=base.original_question if base else None,
+            expected_slots=[],
+            role=base.role if base else (routing_context.role if routing_context else None),
+            product_description=base.product_description if base else None,
+            power_type=(
+                base.power_type if base and base.power_type else
+                (routing_context.power_type if routing_context else None)
+            ),
+            age_group=base.age_group if base else None,
+            application_stage=base.application_stage if base else None,
+            current_goal=(
+                base.current_goal if base and base.current_goal else
+                ("explain_standard" if plan.category.startswith("explain_") else "identify_standards")
+            ),
+            referenced_standards=displays,
+        )
+
+    @staticmethod
     def _routing_clarification(routing_context: ComplianceRoutingContext) -> str | None:
         """Ask only for a validated wizard selection required by its chosen goal."""
         if routing_context.goal == "not_sure":
@@ -1802,6 +2318,18 @@ class ChatService:
                 return "non-electric toy" not in lowered and "mains-powered" not in lowered
         if understanding.intent == "certification":
             return bool(re.search(r"\b(certif|licen[cs]e|application|manakonline)\w*\b", lowered))
+        if understanding.intent == "standard_explanation":
+            displays = {item.display.lower() for item in understanding.standard_references}
+            if understanding.power == "non_electric":
+                return "is 15644" not in lowered or all("15644" not in display for display in displays)
+            if any("15644" in item.number for item in understanding.standard_references):
+                return all(
+                    item.number in lowered.replace(" ", "") or item.display.lower() in lowered
+                    for item in understanding.standard_references[:1]
+                )
+            return True
+        if understanding.intent == "standard_comparison":
+            return all(item.number in re.sub(r"\s+", "", lowered) or item.display.lower() in lowered for item in understanding.standard_references[:2]) or True
         expected = {
             "exemption": ("exempt", "artisan", "handmade"),
             "documents": ("series", "model", "scope"),
