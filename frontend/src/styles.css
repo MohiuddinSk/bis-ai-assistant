@@ -57,7 +57,6 @@ nav [aria-pressed="false"] { background: #e7eef6; color: var(--primary-blue); }
 .evidence-toggle:active, .pdf-link:active { transform: translateY(1px); }
 .evidence-panel { margin-top: 10px; padding: 11px; background: #eaf2f9; border-radius: 8px; color: #243b53; line-height: 1.5; }
 .evidence-panel p { margin: 6px 0; white-space: pre-wrap; }
-.evidence-panel code { overflow-wrap: anywhere; font-size: .8rem; }
 
 button { border: 0; border-radius: 8px; padding: 10px 12px; background: var(--primary-blue); color: #fff; cursor: pointer; font: inherit; }
 button:disabled { opacity: .55; cursor: not-allowed; }
