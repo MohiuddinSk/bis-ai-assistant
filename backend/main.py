@@ -74,6 +74,13 @@ def compliance_query(profile: ComplianceProfile) -> str:
         "understand_transition": (
             f"product described as: {product}; guidance sought: transition-order conditions"
         ),
+        "complete_roadmap": (
+            f"product described as: {product}; role selection: {profile.role.replace('_', ' ')}; "
+            f"power selection: {profile.power_type.replace('_', ' ')}; "
+            f"age selection: {profile.intended_age_group.replace('_', ' ')}; "
+            f"application stage: {profile.application_stage.replace('_', ' ')}; "
+            "guidance sought: complete compliance roadmap"
+        ),
         "not_sure": f"product described as: {product}; guidance goal is not specified",
     }
     fields = goal_fields[profile.goal]
@@ -114,6 +121,15 @@ def enforce_compliance_invariants(
             mismatch = True
     elif not mismatch and profile.goal in {"check_exemption", "add_new_series", "understand_transition"}:
         mismatch = "primary standard is is 15644" in answer or "battery-operated electric toy" in answer
+    elif not mismatch and profile.goal == "complete_roadmap":
+        if profile.power_type == "non_electric":
+            mismatch = "is 15644" in answer or "battery-operated electric toy" in answer
+        elif profile.power_type == "mains_electric":
+            mismatch = "battery-operated" in answer
+        elif profile.power_type == "battery_operated":
+            mismatch = "mains-powered" in answer or "non-electric toy" in answer
+        else:
+            mismatch = True
     elif not mismatch and profile.goal == "not_sure":
         mismatch = True
     elif not mismatch and profile.goal == "new_licence":
@@ -367,8 +383,21 @@ def create_app(
     )
     def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         original = payload.clarification_context.original_question if payload.clarification_context else None
-        understanding = understand_question(payload.question, original)
-        return run_chat(payload, request, understanding=understanding)
+        understanding = understand_question(payload.question, original, payload.assistant_context)
+        routing_context = None
+        context = understanding.assistant_context
+        if understanding.intent == "roadmap" and context is not None:
+            routing_context = ComplianceRoutingContext(
+                goal="complete_roadmap",
+                power_type=(context.power_type if context.power_type in {
+                    "battery_operated", "mains_electric", "non_electric", "not_sure",
+                } else "not_sure"),
+                role=context.role or "not_sure",
+                age_group=context.age_group or "not_sure",
+                application_stage=context.application_stage or "not_sure",
+                product_description=context.product_description or "toys",
+            )
+        return run_chat(payload, request, routing_context=routing_context, understanding=understanding)
 
     @application.post("/api/compliance/guide", response_model=ComplianceGuideResponse)
     def compliance_guide(profile: ComplianceProfile, request: Request) -> ComplianceGuideResponse:
@@ -377,6 +406,10 @@ def create_app(
         routing_context = ComplianceRoutingContext(
             goal=profile.goal,
             power_type=profile.power_type,
+            role=profile.role,
+            age_group=profile.intended_age_group,
+            application_stage=profile.application_stage,
+            product_description=profile.product_description,
         )
         guidance = run_chat(ChatRequest(
             question=compliance_query(profile), top_k=8, include_guidance=False, audience=audience,

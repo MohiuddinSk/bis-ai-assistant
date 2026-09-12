@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { askQuestion, getHealth } from './services/api';
-import type { Audience, ClarificationContext, ChatResponse } from './types/chat';
+import type { AssistantContext, Audience, ChatResponse } from './types/chat';
 import { ChatHeader } from './components/ChatHeader';
 import { ChatInput } from './components/ChatInput';
 import { ChatMessage } from './components/ChatMessage';
@@ -11,9 +11,9 @@ import { ComplianceWizard } from './components/ComplianceWizard';
 
 type Message = { role: 'user' | 'assistant'; text: string; response?: ChatResponse };
 
-function isUnrelatedFullQuestion(value: string): boolean {
+function isIndependentQuestion(value: string): boolean {
   const text = value.trim();
-  return text.endsWith('?') && /^(?:what|which|how|when|why|where|can|does|do|is|are)\b/i.test(text);
+  return /^(?:what|which|how|ow\s+many|when|why|where|can|does|do|is|are|will|should)\b/i.test(text);
 }
 
 export default function App() {
@@ -21,8 +21,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [last, setLast] = useState('');
-  const [lastContext, setLastContext] = useState<ClarificationContext | undefined>();
-  const [pendingClarification, setPendingClarification] = useState<string | null>(null);
+  const [lastContext, setLastContext] = useState<AssistantContext | undefined>();
+  const [pendingContext, setPendingContext] = useState<AssistantContext | null>(null);
   const [audience, setAudience] = useState<Audience>('general');
   const [mode, setMode] = useState<'chat' | 'wizard'>('chat');
   const [status, setStatus] = useState<'ready' | 'degraded' | 'unavailable'>('unavailable');
@@ -49,25 +49,23 @@ export default function App() {
 
   useEffect(() => () => chatController.current?.abort(), []);
 
-  const send = async (question: string, retryContext?: ClarificationContext) => {
+  const send = async (question: string, suppliedContext?: AssistantContext) => {
     if (busy) return;
-    const continuing = Boolean(pendingClarification && !isUnrelatedFullQuestion(question));
-    const clarificationContext = retryContext ?? (
-      continuing && pendingClarification ? { original_question: pendingClarification } : undefined
-    );
-    if (!continuing && !retryContext) setPendingClarification(null);
+    const continuing = Boolean(pendingContext && !isIndependentQuestion(question));
+    const assistantContext = suppliedContext ?? (continuing ? pendingContext ?? undefined : undefined);
+    if (!continuing && !suppliedContext) setPendingContext(null);
     setBusy(true);
     setError('');
     setLast(question);
-    setLastContext(clarificationContext);
+    setLastContext(assistantContext);
     setMessages((items) => [...items, { role: 'user', text: question }]);
     const controller = new AbortController();
     chatController.current = controller;
     try {
-      const response = await askQuestion(question, audience, clarificationContext, controller.signal);
+      const response = await askQuestion(question, audience, assistantContext, controller.signal);
       setMessages((items) => [...items, { role: 'assistant', text: response.answer, response }]);
-      setPendingClarification(response.needs_clarification
-        ? (clarificationContext?.original_question ?? question)
+      setPendingContext(response.needs_clarification
+        ? (response.assistant_context ?? { original_question: assistantContext?.original_question ?? question, expected_slots: [] })
         : null);
     } catch (caught) {
       if (!controller.signal.aborted) {
@@ -77,6 +75,11 @@ export default function App() {
       if (chatController.current === controller) chatController.current = null;
       setBusy(false);
     }
+  };
+
+  const resetConversation = () => {
+    chatController.current?.abort();
+    setMessages([]); setPendingContext(null); setLastContext(undefined); setLast(''); setError(''); setBusy(false);
   };
 
   return <main>
@@ -92,12 +95,13 @@ export default function App() {
       </section>
       {messages.length === 0 && <SuggestedQuestions onSelect={send} />}
       <section className="chat" aria-live="polite">
-        {messages.map((message, index) => <ChatMessage key={index} {...message} />)}
+        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedReply={message.role === 'assistant' && pendingContext ? (reply) => void send(reply, pendingContext) : undefined} />)}
         {busy && <LoadingMessage />}
         {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext)} />}
         <div ref={end} />
       </section>
       <ChatInput onSend={send} busy={busy} audience={audience} onAudienceChange={setAudience} />
+      {messages.length > 0 && <button type="button" className="secondary reset-conversation" onClick={resetConversation} disabled={busy}>Start over</button>}
     </>}
     <footer>Informational guidance only. Final compliance requirements should be verified with BIS or a qualified professional.</footer>
   </main>;

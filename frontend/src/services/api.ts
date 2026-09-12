@@ -1,4 +1,4 @@
-import type { Audience, ChatResponse, ClarificationContext, HealthResponse } from '../types/chat';
+import type { AssistantContext, Audience, ChatResponse, HealthResponse } from '../types/chat';
 import type { ComplianceGuideResponse, ComplianceProfile } from '../types/compliance';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -69,7 +69,7 @@ export const getHealth = (signal?: AbortSignal) => request<HealthResponse>('/hea
 export const askQuestion = (
   question: string,
   audience: Audience = 'general',
-  clarificationContext?: ClarificationContext,
+  assistantContext?: AssistantContext,
   signal?: AbortSignal,
 ) =>
   request<ChatResponse>('/api/chat', chatTimeoutMs, {
@@ -79,7 +79,7 @@ export const askQuestion = (
       top_k: 8,
       include_guidance: false,
       audience,
-      ...(clarificationContext ? { clarification_context: clarificationContext } : {}),
+      ...(assistantContext ? { assistant_context: assistantContext } : {}),
     }),
     signal,
   });

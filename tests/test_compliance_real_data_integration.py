@@ -90,4 +90,47 @@ class ComplianceRealDataTests(unittest.TestCase):
         result=self.guide(product_description="Industrial solar inverter",goal="identify_standards")
         self.assertTrue(result["insufficient_evidence"]); self.assertNotIn("IS 15644",result["answer"])
 
+    def test_complete_roadmap_uses_power_specific_grounded_evidence(self):
+        common = {"goal": "complete_roadmap", "intended_age_group": "3_to_8"}
+        battery = self.guide(**common, product_description="Battery toy car", power_type="battery_operated", application_stage="preparing_application")
+        non_electric = self.guide(**common, product_description="Non-electric play set", power_type="non_electric", application_stage="researching")
+        mains = self.guide(**common, role="importer", product_description="Mains-powered toy", power_type="mains_electric", application_stage="researching")
+        self.assertTrue(battery["grounded"])
+        self.assertIn("IS 15644", battery["answer"])
+        self.assertIn("not the complete official application package", battery["answer"])
+        self.assertTrue(non_electric["grounded"])
+        self.assertIn("IS 9873 Part 1", non_electric["answer"])
+        self.assertNotIn("IS 15644", non_electric["answer"])
+        self.assertTrue(mains["grounded"])
+        self.assertIn("mains-powered", mains["answer"])
+
+    def test_artisan_roadmap_preserves_exemption_qualifications(self):
+        result = self.guide(
+            role="artisan", product_description="Handmade non-electric toy",
+            power_type="non_electric", intended_age_group="3_to_8",
+            goal="complete_roadmap", application_stage="researching",
+        )
+        self.assertTrue(result["grounded"])
+        for phrase in ("not automatic", "manufactured and sold", "registered", "Development Commissioner", "Ministry of Textiles"):
+            self.assertIn(phrase.lower(), result["answer"].lower())
+
+    def test_roadmap_next_action_changes_with_application_stage(self):
+        values = {"product_description": "Non-electric toy", "power_type": "non_electric", "intended_age_group": "3_to_8", "goal": "complete_roadmap"}
+        researching = self.guide(**values, application_stage="researching")
+        extension = self.guide(**values, application_stage="scope_extension")
+        self.assertNotEqual(researching["answer"], extension["answer"])
+        self.assertIn("primary standard", researching["answer"].lower())
+        self.assertIn("scope change", extension["answer"].lower())
+
+    def test_incomplete_roadmap_profile_asks_only_for_next_essential_field(self):
+        result = self.guide(
+            product_description="Toy", power_type="not_sure",
+            intended_age_group="not_sure", goal="complete_roadmap",
+            application_stage="not_sure",
+        )
+        self.assertTrue(result["needs_clarification"])
+        self.assertIn("battery-operated", result["answer"])
+        self.assertNotIn("application stage", result["answer"].lower())
+        self.assertEqual(result["suggested_replies"], ["Battery-operated", "Mains-powered", "Non-electric"])
+
 if __name__=="__main__": unittest.main()

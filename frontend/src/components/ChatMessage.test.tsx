@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { expect, it, vi } from 'vitest';
 import { ChatMessage } from './ChatMessage';
 
 const response = {
@@ -30,4 +31,17 @@ it('presents guided sections before the trusted sources', () => {
   expect(screen.getByRole('heading', { name: 'Direct answer' })).toBeInTheDocument();
   expect(screen.getByText('Check the applicable standard.')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /sources 2/i })).toBeInTheDocument();
+});
+
+it('renders harmless accessible suggested replies and submits one once', async () => {
+  const reply = vi.fn();
+  render(<ChatMessage role="assistant" text="Choose" response={{
+    ...response,
+    suggested_replies: ['Non-electric', '<b>Battery</b>'],
+  }} onSuggestedReply={reply} />);
+  expect(screen.getByRole('group', { name: 'Suggested replies' })).toBeInTheDocument();
+  expect(document.querySelector('.suggested-replies b')).toBeNull();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Non-electric' }));
+  expect(reply).toHaveBeenCalledTimes(1);
+  expect(reply).toHaveBeenCalledWith('Non-electric');
 });

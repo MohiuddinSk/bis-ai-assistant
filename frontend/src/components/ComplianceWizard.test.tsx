@@ -40,6 +40,16 @@ it('offers Not sure across choice steps and shows the complete review', async ()
   expect(screen.getByText('Review your answers')).toBeInTheDocument(); expect(screen.getByText('Toy')).toBeInTheDocument();
 });
 
+it('offers the complete compliance roadmap goal', async () => {
+  const user = userEvent.setup(); render(<ComplianceWizard />);
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await user.type(screen.getByLabelText('Describe your product'), 'Toy');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  expect(screen.getByLabelText('Guide me through the complete process')).toBeInTheDocument();
+});
+
 it('posts the exact normalized profile once and renders sections, citations, and PDF link', async () => {
   const fetchMock = vi.fn().mockResolvedValue(ok(response)); vi.stubGlobal('fetch', fetchMock); const user = await reachReview();
   await user.click(screen.getByRole('button', { name: 'Generate guidance' }));
