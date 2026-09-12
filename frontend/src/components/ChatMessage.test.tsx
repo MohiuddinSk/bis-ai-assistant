@@ -17,6 +17,9 @@ it('renders a source heading, count, distinct citation cards, and page range', (
   expect(document.querySelectorAll('.citation-card')).toHaveLength(2);
   expect(screen.getByText('Pages 5–6')).toBeInTheDocument();
   expect(screen.getByText('a very long trusted source filename.pdf')).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent('one');
+  expect(document.body).not.toHaveTextContent('two');
+  expect(screen.queryByText('Technical details')).toBeNull();
 });
 
 it('presents guided sections before the trusted sources', () => {
