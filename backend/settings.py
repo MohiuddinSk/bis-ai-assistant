@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import os
+from urllib.parse import urlsplit
 
 SERVICE_NAME = "bis-toys-retrieval-api"
 
@@ -14,6 +15,33 @@ ALLOWED_ORIGINS = (
 
 ALLOWED_METHODS = ("GET", "POST")
 ALLOWED_HEADERS = ("Content-Type",)
+
+
+def get_allowed_origins() -> tuple[str, ...]:
+    """Return explicit CORS origins from the environment or safe local defaults."""
+    raw_origins = os.getenv("ALLOWED_ORIGINS")
+    if raw_origins is None or not raw_origins.strip():
+        return ALLOWED_ORIGINS
+
+    valid: list[str] = []
+    for candidate in raw_origins.split(","):
+        origin = candidate.strip().rstrip("/")
+        if not origin or "*" in origin:
+            continue
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            continue
+        if origin not in valid:
+            valid.append(origin)
+    return tuple(valid) if valid else ALLOWED_ORIGINS
 
 DEFAULT_LLM_PROVIDER = "groq"
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
