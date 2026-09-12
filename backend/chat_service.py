@@ -14,6 +14,7 @@ from backend.generation import (
     ProviderUnavailableError,
 )
 from backend.schemas import (
+    AssistantContext,
     AnswerSection,
     ChatCitation,
     ChatRequest,
@@ -83,6 +84,26 @@ class EvidencePlan:
             "documents": {"series_declaration", "series_details", "scope_fee"},
             "commencement": {"commencement_clause"},
             "transition": {"operative_scope", "operative_permission"},
+            "roadmap_battery": {
+                "primary_standard", "secondary_standard", "certification_portal",
+                "certification_standard_selection", "certification_application_details",
+                "series_declaration", "series_details", "scope_fee",
+            },
+            "roadmap_mains": {
+                "primary_standard", "secondary_standard", "certification_portal",
+                "certification_standard_selection", "certification_application_details",
+                "series_declaration", "series_details", "scope_fee",
+            },
+            "roadmap_non_electric": {
+                "non_electric_primary", "non_electric_secondary", "certification_portal",
+                "certification_standard_selection", "certification_application_details",
+                "series_declaration", "series_details", "scope_fee",
+            },
+            "roadmap_artisan_non_electric": {
+                "non_electric_primary", "non_electric_secondary", "exemption_scope",
+                "registration_condition", "registering_authority", "certification_portal",
+                "series_details", "scope_fee",
+            },
         }.get(self.category, set())
         return bool(required) and required <= set(self.roles)
 
@@ -93,11 +114,17 @@ class ComplianceRoutingContext:
 
     goal: Literal[
         "identify_standards", "new_licence", "add_new_series",
-        "check_exemption", "understand_transition", "not_sure",
+        "check_exemption", "understand_transition", "complete_roadmap", "not_sure",
     ]
     power_type: Literal[
         "battery_operated", "mains_electric", "non_electric", "not_sure",
     ]
+    role: Literal["manufacturer", "importer", "artisan", "consumer", "not_sure"] = "not_sure"
+    age_group: Literal["under_3", "3_to_8", "over_8", "multiple", "not_sure"] = "not_sure"
+    application_stage: Literal[
+        "researching", "preparing_application", "existing_licence", "scope_extension", "not_sure",
+    ] = "not_sure"
+    product_description: str = ""
 
 
 @dataclass(frozen=True)
@@ -146,11 +173,53 @@ class ChatService:
         if routing_context is not None:
             clarification = self._routing_clarification(routing_context)
             if clarification:
-                return self._clarification(clarification)
+                replies: list[str] = []
+                expected: list[str] = []
+                if "battery-operated" in clarification:
+                    replies = ["Battery-operated", "Mains-powered", "Non-electric"]
+                    expected = ["power_type"]
+                elif "role" in clarification.lower():
+                    replies = ["Manufacturer", "Importer", "Artisan"]
+                    expected = ["role"]
+                elif "age group" in clarification.lower():
+                    replies = ["Under 3", "3–8", "Both age groups"]
+                    expected = ["age_group"]
+                elif "application stage" in clarification.lower():
+                    replies = ["Researching", "Preparing a new application", "Existing licence", "Scope extension"]
+                    expected = ["application_stage"]
+                else:
+                    replies = [
+                        "Identify applicable standards", "Apply for a new licence", "Add a model or series",
+                        "Check an exemption", "Understand a transition order", "Show my complete compliance roadmap",
+                    ]
+                    expected = ["goal"]
+                return self._clarification(
+                    clarification,
+                    suggested_replies=replies,
+                    assistant_context=AssistantContext(
+                        expected_slots=expected,
+                        role=routing_context.role,
+                        product_description=routing_context.product_description or None,
+                        power_type=routing_context.power_type,
+                        age_group=routing_context.age_group,
+                        application_stage=routing_context.application_stage,
+                        current_goal=routing_context.goal,
+                    ),
+                )
+        if routing_context is None and understanding and understanding.profile_statement:
+            return self._profile_clarification(understanding)
         if routing_context is None and understanding and understanding.clarification_required:
-            return self._clarification(understanding.clarification_question or "What additional detail can you provide?")
+            return self._clarification(
+                understanding.clarification_question or "What additional detail can you provide?",
+                suggested_replies=list(understanding.suggested_replies),
+                assistant_context=understanding.assistant_context,
+            )
         if routing_context is None and understanding and understanding.intent == "out_of_domain":
             return self._abstention(evidence=[])
+        if routing_context is None and understanding and understanding.intent in {
+            "timeline", "fee", "laboratory", "form",
+        }:
+            return self._specific_limitation(understanding.intent)
         effective_question = understanding.normalized_query if understanding else request.question
         try:
             with self._retrieval_lock:
@@ -178,7 +247,7 @@ class ChatService:
         # Complete trusted evidence plans bypass Groq: this removes avoidable
         # latency and cannot weaken citation or qualification controls.
         if plan.complete:
-            return self._fallback_or_abstain(evidence, plan, request.audience)
+            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
         if self._generator is None:
             raise ProviderUnavailableError("Chat generation is unavailable")
 
@@ -208,7 +277,7 @@ class ChatService:
             except (ValidationError, ValueError) as validation_error:
                 if used_completion_retry:
                     self._log_abstention(validation_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan, request.audience)
+                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
                 try:
                     repaired_output = self._generator.generate(
                         effective_question,
@@ -227,7 +296,7 @@ class ChatService:
                 except (ValidationError, ValueError) as repair_error:
                     # Invalid model evidence must never be surfaced as a grounded claim.
                     self._log_abstention(repair_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan, request.audience)
+                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
 
         if generated.insufficient_evidence:
             return self._abstention(evidence=evidence, citations=citations)
@@ -237,7 +306,7 @@ class ChatService:
                 understanding.intent,
                 understanding.power,
             )
-            return self._fallback_or_abstain(evidence, plan, request.audience)
+            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context)
 
         # Certain high-risk, structured facts have an unambiguous evidence-role
         # plan.  Compose those facts from the verified roles instead of allowing
@@ -275,6 +344,12 @@ class ChatService:
                 "new_licence": "certification",
                 "not_sure": "clarification",
             }.get(routing_context.goal, "")
+            if routing_context.goal == "complete_roadmap":
+                category = (
+                    "roadmap_artisan_non_electric"
+                    if routing_context.role == "artisan" and routing_context.power_type == "non_electric"
+                    else f"roadmap_{'battery' if routing_context.power_type == 'battery_operated' else 'mains' if routing_context.power_type == 'mains_electric' else 'non_electric'}"
+                )
             if routing_context.goal == "identify_standards":
                 category = {
                     "battery_operated": "standards_battery",
@@ -404,6 +479,50 @@ class ChatService:
                 if "permission under this order may be granted" in text and "company" in text:
                     excerpt = ChatService._excerpt_for_anchor(item.text, "permission under this order may be granted")
                     if excerpt: roles.setdefault("operative_permission", (item, excerpt))
+        elif category.startswith("roadmap_"):
+            for item in evidence:
+                text = ChatService._display_text(item.text).lower()
+                if category in {"roadmap_battery", "roadmap_mains"}:
+                    if ChatService._is_normative_primary(item.text):
+                        excerpt = ChatService._excerpt_for_standard_role(item.text, "primary")
+                        if excerpt: roles.setdefault("primary_standard", (item, excerpt))
+                    if ChatService._is_normative_secondary(item.text):
+                        excerpt = ChatService._excerpt_for_standard_role(item.text, "secondary")
+                        if excerpt: roles.setdefault("secondary_standard", (item, excerpt))
+                else:
+                    if ChatService._is_normative_non_electric_primary(item.text):
+                        excerpt = ChatService._excerpt_for_non_electric_role(item.text, "primary")
+                        if excerpt: roles.setdefault("non_electric_primary", (item, excerpt))
+                    if ChatService._is_normative_non_electric_secondary(item.text):
+                        excerpt = ChatService._excerpt_for_non_electric_role(item.text, "secondary")
+                        if excerpt: roles.setdefault("non_electric_secondary", (item, excerpt))
+                if "step 1: create login on manakonline" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "step 1: create login on manakonline")
+                    if excerpt: roles.setdefault("certification_portal", (item, excerpt))
+                if "while submitting application" in text and "following indian standards" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "while submitting application")
+                    if excerpt: roles.setdefault("certification_standard_selection", (item, excerpt))
+                if "upload/provide detail of raw materials" in text:
+                    excerpt = ChatService._excerpt_for_certification_role(item.text, "upload/provide detail of raw materials")
+                    if excerpt: roles.setdefault("certification_application_details", (item, excerpt))
+                if "i hereby declare" in text and "applying for addition" in text:
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "i hereby declare")
+                    if excerpt: roles.setdefault("series_declaration", (item, excerpt))
+                if "details of models contained in each series" in text:
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "details of models contained in each series")
+                    if excerpt: roles.setdefault("series_details", (item, excerpt))
+                if "requisite fees for extension in scope" in text:
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "requisite fees for extension in scope")
+                    if excerpt: roles.setdefault("scope_fee", (item, excerpt))
+                if "manufactured and sold by artisans" in text:
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "manufactured and sold by artisans")
+                    if excerpt: roles.setdefault("exemption_scope", (item, excerpt))
+                if "registered with office of the development commissioner" in text:
+                    excerpt = ChatService._excerpt_for_anchor(item.text, "registered with office of the development commissioner")
+                    if excerpt:
+                        roles.setdefault("registration_condition", (item, excerpt))
+                        if "ministry of textiles" in text:
+                            roles.setdefault("registering_authority", (item, excerpt))
         return EvidencePlan(category, roles)
 
     @staticmethod
@@ -485,6 +604,8 @@ class ChatService:
         generation_mode: str,
         disclaimer: str,
         needs_clarification: bool = False,
+        suggested_replies: list[str] | None = None,
+        assistant_context: AssistantContext | None = None,
     ) -> ChatResponse:
         """The sole non-abstention response assembly boundary.
 
@@ -504,6 +625,8 @@ class ChatService:
             disclaimer=disclaimer,
             answer_sections=finalized_sections,
             needs_clarification=needs_clarification,
+            suggested_replies=suggested_replies or [],
+            assistant_context=assistant_context,
         )
 
     def _fallback_or_abstain(
@@ -511,6 +634,7 @@ class ChatService:
         evidence: list[TrustedEvidence],
         plan: EvidencePlan,
         audience: str = "general",
+        routing_context: ComplianceRoutingContext | None = None,
     ) -> ChatResponse:
         if not plan.complete:
             return self._abstention(evidence=evidence)
@@ -527,11 +651,32 @@ class ChatService:
             "documents": ("series_declaration", "series_details", "scope_fee"),
             "commencement": ("commencement_clause",),
             "transition": ("operative_scope", "operative_permission"),
+            "roadmap_battery": (
+                "primary_standard", "secondary_standard", "certification_portal",
+                "certification_standard_selection", "certification_application_details",
+                "series_declaration", "series_details", "scope_fee",
+            ),
+            "roadmap_mains": (
+                "primary_standard", "secondary_standard", "certification_portal",
+                "certification_standard_selection", "certification_application_details",
+                "series_declaration", "series_details", "scope_fee",
+            ),
+            "roadmap_non_electric": (
+                "non_electric_primary", "non_electric_secondary", "certification_portal",
+                "certification_standard_selection", "certification_application_details",
+                "series_declaration", "series_details", "scope_fee",
+            ),
+            "roadmap_artisan_non_electric": (
+                "non_electric_primary", "non_electric_secondary", "exemption_scope",
+                "registration_condition", "registering_authority", "certification_portal",
+                "series_details", "scope_fee",
+            ),
         }[plan.category]
         selected = [plan.roles[role] for role in ordered_roles]
         citations = self._map_citations(
             [(item.citation_id, excerpt) for item, excerpt in selected], evidence
         )
+        selected_by_role = dict(zip(ordered_roles, selected))
         if plan.category in {"standards", "standards_battery", "standards_mains"}:
             parts = self._standard_parts(selected[1][1])
             secondary = ", ".join(f"Part {part}" for part in parts[:-1])
@@ -571,6 +716,114 @@ class ChatService:
                     items=["Start with IS 9873 Part 1, then identify which cited secondary parts apply to the toy."],
                     citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id],
                 ))
+        elif plan.category.startswith("roadmap_"):
+            assert routing_context is not None
+            electric = plan.category in {"roadmap_battery", "roadmap_mains"}
+            primary_role = "primary_standard" if electric else "non_electric_primary"
+            secondary_role = "secondary_standard" if electric else "non_electric_secondary"
+            primary_id = selected_by_role[primary_role][0].citation_id
+            secondary_id = selected_by_role[secondary_role][0].citation_id
+            power_label = {
+                "battery_operated": "battery-operated", "mains_electric": "mains-powered",
+                "non_electric": "non-electric",
+            }[routing_context.power_type]
+            age_label = {
+                "under_3": "under 3", "3_to_8": "3–8", "over_8": "over 8",
+                "multiple": "multiple age groups", "not_sure": "not specified",
+            }[routing_context.age_group]
+            stage_label = {
+                "researching": "researching requirements",
+                "preparing_application": "preparing a new application",
+                "existing_licence": "holding an existing licence",
+                "scope_extension": "extending an existing licence scope",
+                "not_sure": "with an unspecified application stage",
+            }[routing_context.application_stage]
+            role_article = "an" if routing_context.role in {"artisan", "importer"} else "a"
+            standard_text = (
+                "IS 15644 is the primary standard. The cited IS 9873 parts are secondary requirements where applicable."
+                if electric else
+                "IS 9873 Part 1 is the primary standard. The cited additional IS 9873 parts are secondary requirements where applicable."
+            )
+            sections = [
+                AnswerSection(
+                    type="explanation", title="Your profile",
+                    content=(f"You described yourself as {role_article} {routing_context.role} working with {power_label} toys "
+                             f"for the {age_label} age group and said you are {stage_label}. "
+                             "This is user-provided information, not verified BIS evidence."),
+                ),
+                AnswerSection(
+                    type="direct_answer", title="Applicable standard", content=standard_text,
+                    citation_ids=[primary_id, secondary_id],
+                ),
+                AnswerSection(
+                    type="explanation", title="Certification position",
+                    content=f"Your selected application stage is: {stage_label}. This describes where you said you are in the process; it is not a BIS finding.",
+                ),
+            ]
+            if "certification_standard_selection" in selected_by_role:
+                certification_ids = [
+                    selected_by_role[role][0].citation_id for role in (
+                        "certification_portal", "certification_standard_selection",
+                        "certification_application_details",
+                    ) if role in selected_by_role
+                ]
+                sections.append(AnswerSection(
+                    type="next_steps", title="Supported application steps",
+                    items=[
+                        "Create a Manakonline account and apply through it.",
+                        "Choose the Indian Standard matching the toy type.",
+                        "Provide the cited product and factory details, including raw materials, manufacturing process, machinery, layout and testing personnel.",
+                    ], citation_ids=certification_ids,
+                ))
+            else:
+                sections.append(AnswerSection(
+                    type="next_steps", title="Supported application step",
+                    items=["Create a Manakonline account and apply through it."],
+                    citation_ids=[selected_by_role["certification_portal"][0].citation_id],
+                ))
+            document_items: list[str] = []
+            document_ids: list[str] = []
+            if "series_declaration" in selected_by_role:
+                document_items.append("Include the cited declaration when applying to add a series.")
+                document_ids.append(selected_by_role["series_declaration"][0].citation_id)
+            if "series_details" in selected_by_role:
+                document_items.append("Provide model and series details, including starting ages.")
+                document_ids.append(selected_by_role["series_details"][0].citation_id)
+            if "scope_fee" in selected_by_role:
+                document_items.append("Include the cited requisite-fee declaration for an extension of scope; the evidence does not state an exact amount.")
+                document_ids.append(selected_by_role["scope_fee"][0].citation_id)
+            sections.append(AnswerSection(
+                type="next_steps", title="Documents or declarations",
+                content="The indexed material provides only this partial checklist, not the complete official application package.",
+                items=document_items, citation_ids=document_ids,
+            ))
+            if plan.category == "roadmap_artisan_non_electric":
+                exemption_ids = [selected_by_role[role][0].citation_id for role in (
+                    "exemption_scope", "registration_condition", "registering_authority",
+                )]
+                sections.append(AnswerSection(
+                    type="important", title="Special conditions",
+                    content=("An artisan exemption is not automatic. It applies only to qualifying goods manufactured and sold by artisans "
+                             "registered with the Office of the Development Commissioner (Handicrafts), under the Ministry of Textiles, Government of India."),
+                    citation_ids=exemption_ids,
+                ))
+            sections.append(AnswerSection(
+                type="important", title="What the indexed documents do not establish",
+                content="The selected evidence does not establish exact current fees, a guaranteed timeline, a recommended laboratory, every current form, or every remaining certification step.",
+            ))
+            next_item = (
+                "Start by reviewing the cited primary standard and the secondary parts that may apply."
+                if routing_context.application_stage == "researching" else
+                "Use the cited Manakonline and application-detail steps while checking the current complete application requirements with BIS."
+                if routing_context.application_stage == "preparing_application" else
+                "Use the cited partial series checklist to prepare the scope change, then verify the complete current submission requirements with BIS."
+            )
+            next_ids = [primary_id, secondary_id]
+            if routing_context.application_stage != "researching" and "certification_portal" in selected_by_role:
+                next_ids.append(selected_by_role["certification_portal"][0].citation_id)
+            sections.append(AnswerSection(
+                type="next_steps", title="Your next action", items=[next_item], citation_ids=next_ids,
+            ))
         elif plan.category == "certification":
             sections = [
                 AnswerSection(
@@ -622,6 +875,15 @@ class ChatService:
                 AnswerSection(type="explanation", title="What this means", content="The Department for Promotion of Industry and Internal Trade (DPIIT) may grant permission to a company incorporated under the Companies Act, 2013, based on the Implementation Committee’s risk assessment.", citation_ids=[selected[1][0].citation_id]),
                 AnswerSection(type="important", title="Important condition", content="Permission may be granted only under the order’s stated conditions.", citation_ids=[selected[1][0].citation_id]),
             ]
+        if routing_context is not None and not plan.category.startswith("roadmap_"):
+            stage = routing_context.application_stage.replace("_", " ")
+            goal = routing_context.goal.replace("_", " ")
+            sections.append(AnswerSection(
+                type="explanation",
+                title="Where this fits in your journey",
+                content=(f"You selected the {stage} stage and asked for {goal}. "
+                         "These are profile details you provided, not verified BIS evidence."),
+            ))
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
         self._validate_sections(sections, fact_plan, citations)
@@ -736,6 +998,21 @@ class ChatService:
                     "upload/provide detail of raw materials",
                     "step 4: provide details of test facilities",
                 )
+            if routing_context.goal == "complete_roadmap":
+                standards = (
+                    ("is 15644", "is 9873")
+                    if routing_context.power_type in {"battery_operated", "mains_electric"}
+                    else ("non-electric-primary", "non-electric-secondary")
+                )
+                if routing_context.role == "artisan" and routing_context.power_type == "non_electric":
+                    return (*standards, "manufactured and sold by artisans",
+                            "registered with office of the development commissioner",
+                            "ministry of textiles", "step 1: create login on manakonline",
+                            "details of models contained in each series", "requisite fees for extension in scope")
+                return (*standards, "step 1: create login on manakonline",
+                        "while submitting application", "upload/provide detail of raw materials",
+                        "i hereby declare", "details of models contained in each series",
+                        "requisite fees for extension in scope")
             return ()
         if understanding is not None:
             if understanding.intent == "standards":
@@ -807,8 +1084,11 @@ class ChatService:
             document_intent = routing_context.goal == "add_new_series"
             commencement_intent = False
             transition_intent = routing_context.goal == "understand_transition"
+            roadmap_intent = routing_context.goal == "complete_roadmap"
+        if routing_context is None:
+            roadmap_intent = False
         if not any((electric_standard_intent, non_electric_standard_intent, certification_intent, exemption_intent,
-                    document_intent, commencement_intent, transition_intent)):
+                    document_intent, commencement_intent, transition_intent, roadmap_intent)):
             return []
         rows = getattr(self._retriever, "chunks_by_id", {}).values()
         candidates: list[RetrievalResult] = []
@@ -848,7 +1128,9 @@ class ChatService:
                     or (certification_intent and is_certification_role)
                     or (exemption_intent and is_exemption_role)
                     or (document_intent and is_document_role)
-                    or (commencement_intent and is_commencement_role) or (transition_intent and is_transition_role)):
+                    or (commencement_intent and is_commencement_role) or (transition_intent and is_transition_role)
+                    or (roadmap_intent and (is_electric_standard_role or is_non_electric_role
+                                           or is_certification_role or is_document_role or is_exemption_role))):
                 continue
             candidates.append(RetrievalResult(
                 rank=0, chunk_id=row["id"], text=text,
@@ -867,6 +1149,7 @@ class ChatService:
             else ChatService._is_normative_secondary(text) if role == "is 9873"
             else ChatService._is_normative_non_electric_primary(text) if role == "non-electric-primary"
             else ChatService._is_normative_non_electric_secondary(text) if role == "non-electric-secondary"
+            else ("i hereby declare" in text.lower() and "applying for addition" in text.lower()) if role == "i hereby declare"
             else role in text.lower()
         )
 
@@ -977,6 +1260,12 @@ class ChatService:
                 "add_new_series": ["product manual toy series application documents declaration"],
                 "understand_transition": ["Transition Facilitation Quality Control Order 2026 grant permission conditions"],
                 "new_licence": ["toy new licence certification application requirements"],
+                "complete_roadmap": [
+                    "toy applicable primary secondary standards",
+                    "10 steps BIS licence toys Manakonline application",
+                    "product manual toy series application declaration extension scope",
+                    "artisan registered Development Commissioner Handicrafts exemption",
+                ],
                 "not_sure": [],
             }[routing_context.goal]
         if understanding is not None:
@@ -1029,7 +1318,7 @@ class ChatService:
         lowered_question, lowered_text = question.lower(), text.lower()
         score = 0
         electric_intent = (
-            routing_context.goal == "identify_standards"
+            routing_context.goal in {"identify_standards", "complete_roadmap"}
             and routing_context.power_type in {"battery_operated", "mains_electric"}
         ) if routing_context else (
             understanding.intent == "standards" and understanding.power in {"battery_operated", "mains_electric"}
@@ -1037,7 +1326,7 @@ class ChatService:
         )
         non_electric_intent = bool(
             routing_context
-            and routing_context.goal == "identify_standards"
+            and routing_context.goal in {"identify_standards", "complete_roadmap"}
             and routing_context.power_type == "non_electric"
         )
         if understanding and not routing_context:
@@ -1382,7 +1671,13 @@ class ChatService:
             disclaimer=LEGAL_INFORMATION_DISCLAIMER,
         )
 
-    def _clarification(self, question: str) -> ChatResponse:
+    def _clarification(
+        self,
+        question: str,
+        *,
+        suggested_replies: list[str] | None = None,
+        assistant_context: AssistantContext | None = None,
+    ) -> ChatResponse:
         sections = [AnswerSection(
             type="clarification",
             title="Need more details",
@@ -1399,6 +1694,76 @@ class ChatService:
             generation_mode="clarification",
             disclaimer=LEGAL_INFORMATION_DISCLAIMER,
             needs_clarification=True,
+            suggested_replies=suggested_replies,
+            assistant_context=assistant_context,
+        )
+
+    def _profile_clarification(self, understanding: QuestionUnderstanding) -> ChatResponse:
+        context = understanding.assistant_context
+        if context is None:
+            return self._clarification(understanding.clarification_question or "What would you like help with?")
+        role = context.role or "toy business"
+        role_article = "an" if role in {"artisan", "importer"} else "a"
+        power = {
+            "battery_operated": "battery-operated", "mains_electric": "mains-powered",
+            "non_electric": "non-electric", "electric_unspecified": "electric",
+        }.get(context.power_type or "", "")
+        product = context.product_description or "toys"
+        age = {
+            "under_3": " for children under 3", "3_to_8": " for children aged 3–8",
+            "over_8": " for children over 8", "multiple": " for multiple age groups",
+            "not_sure": " for children under eight",
+        }.get(context.age_group or "", "")
+        subject = " ".join(part for part in (power, product) if part)
+        summary = (
+            f"You said you are {role_article} {role} working with {subject}{age}. "
+            "This is user-provided profile information, not verified BIS evidence."
+        )
+        question = understanding.clarification_question or "What would you like help with?"
+        if "Which age group applies:" in question:
+            question = "Which age group applies: under 3, 3–8, or both? Age can affect the applicable requirements."
+        sections = [
+            AnswerSection(type="explanation", title="What I understand", content=summary),
+            AnswerSection(type="clarification", title="What I still need", content=question),
+            AnswerSection(
+                type="next_steps", title="How I can help",
+                content="I can identify supported standards, explain cited application steps, or build a grounded compliance roadmap once the essential profile details are clear.",
+            ),
+        ]
+        return self._guided_response(
+            sections=sections, grounded=False, insufficient_evidence=False,
+            evidence_count=0, citations=[], model=self._model_name,
+            generation_mode="clarification", disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            needs_clarification=True,
+            suggested_replies=list(understanding.suggested_replies),
+            assistant_context=context,
+        )
+
+    def _specific_limitation(self, intent: str) -> ChatResponse:
+        messages = {
+            "timeline": (
+                "Licence approval timeline",
+                "The indexed BIS toy documents do not state a guaranteed licence-approval timeline. I cannot give you a number without reliable evidence. Check the current application status or timeline directly with BIS.",
+            ),
+            "fee": (
+                "Exact fees",
+                "The indexed BIS toy documents do not establish the current exact fee for this request. I cannot quote an amount without reliable evidence. Check the current BIS fee schedule or application portal.",
+            ),
+            "laboratory": (
+                "Laboratory recommendation",
+                "The indexed BIS toy documents do not provide a current recommendation for a specific laboratory. I cannot recommend one without reliable evidence. Check the current BIS-recognized laboratory information.",
+            ),
+            "form": (
+                "Required form",
+                "The indexed BIS toy documents do not establish which current form number applies to this request. I cannot name a form without reliable evidence. Check the current BIS application requirements.",
+            ),
+        }
+        title, content = messages[intent]
+        return self._guided_response(
+            sections=[AnswerSection(type="important", title=title, content=content)],
+            grounded=False, insufficient_evidence=True, evidence_count=0, citations=[],
+            model=self._model_name, generation_mode="abstention",
+            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
         )
 
     @staticmethod
@@ -1414,6 +1779,15 @@ class ChatService:
             and routing_context.power_type == "not_sure"
         ):
             return "Is the toy battery-operated, mains-powered, or non-electric?"
+        if routing_context.goal == "complete_roadmap":
+            if routing_context.power_type == "not_sure":
+                return "Is the toy battery-operated, mains-powered, or non-electric? This determines the applicable standards category."
+            if routing_context.role == "not_sure":
+                return "What is your role: manufacturer, importer, or artisan? This helps tailor the supported conditions."
+            if routing_context.age_group == "not_sure":
+                return "Which age group applies: under 3, 3–8, or both? Age can affect the applicable requirements."
+            if routing_context.application_stage == "not_sure":
+                return "What is your application stage: researching, preparing a new application, existing licence, or scope extension?"
         return None
 
     @staticmethod

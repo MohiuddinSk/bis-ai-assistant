@@ -45,8 +45,7 @@ class ChatUnderstandingApiTests(unittest.TestCase):
         self.assertTrue(body["needs_clarification"])
         self.assertIn("what kind of toy", body["answer"])
         self.assertIn("battery-operated", body["answer"])
-        self.assertIn("manufacturer, importer, or artisan", body["answer"])
-        self.assertIn("new licence", body["answer"])
+        self.assertEqual(body["assistant_context"]["expected_slots"], ["product_description", "power_type"])
         self.assertNotIn("IS 15644", body["answer"])
 
     def test_electrical_certification_is_not_misrouted_as_battery_standard(self):

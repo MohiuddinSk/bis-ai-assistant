@@ -21,7 +21,8 @@ it('malformed API response is safe',async()=>{mock({bad:true});render(<App/>);aw
 it('raw HTML remains text',async()=>{mock({...a,answer:'<b>unsafe</b>'});render(<App/>);await userEvent.setup().click(screen.getByText(/battery-operated/i));expect(await screen.findByText('<b>unsafe</b>')).toBeInTheDocument();expect(document.querySelector('b')).toBeNull()});
 
 it('renders clarification as Need more details and sends bounded context with the follow-up',async()=>{
- const clarification={...a,answer:'Is the toy battery-operated, mains-powered, or non-electric?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],answer_sections:[{type:'clarification' as const,title:'Need more details',content:'Is the toy battery-operated, mains-powered, or non-electric?',items:[],citation_ids:[]}]};
+ const context={original_question:'What standards apply to toys?',expected_slots:['power_type' as const],current_goal:'identify_standards' as const};
+ const clarification={...a,answer:'Is the toy battery-operated, mains-powered, or non-electric?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['Battery-operated','Mains-powered','Non-electric'],assistant_context:context,answer_sections:[{type:'clarification' as const,title:'Need more details',content:'Is the toy battery-operated, mains-powered, or non-electric?',items:[],citation_ids:[]}]};
  let chatCall=0;
  const f=vi.fn((url:string,init?:RequestInit)=>{
   if(url.includes('health'))return Promise.resolve(rep({status:'ready'}));
@@ -31,18 +32,26 @@ it('renders clarification as Need more details and sends bounded context with th
  vi.stubGlobal('fetch',f);render(<App/>);const u=userEvent.setup();
  await u.type(screen.getByLabelText(/ask a question/i),'What standards apply to toys?{Enter}');
  expect(await screen.findByText('Need more details',{selector:'.answer-status'})).toBeInTheDocument();
- await u.type(screen.getByLabelText(/ask a question/i),'Non-electric toy for children.{Enter}');
+ await u.click(screen.getByRole('button',{name:'Non-electric'}));
  await screen.findByText(a.answer);
  const payload=JSON.parse(String((f.mock.calls[2]?.[1] as RequestInit).body));
- expect(payload.clarification_context).toEqual({original_question:'What standards apply to toys?'});
+ expect(payload.assistant_context).toEqual(context);
+ expect(f).toHaveBeenCalledTimes(3);
 });
 
 it('does not attach stale clarification context to an unrelated full question',async()=>{
- const clarification={...a,answer:'Is the toy battery-operated, mains-powered, or non-electric?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[]};
+ const clarification={...a,answer:'Is the toy battery-operated, mains-powered, or non-electric?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],assistant_context:{original_question:'What standards apply to toys?',expected_slots:['power_type']}};
  let chatCall=0;const f=vi.fn((url:string,_init?:RequestInit)=>Promise.resolve(rep(url.includes('health')?{status:'ready'}:(chatCall++===0?clarification:a))));
  vi.stubGlobal('fetch',f);render(<App/>);const u=userEvent.setup();
  await u.type(screen.getByLabelText(/ask a question/i),'What standards apply to toys?{Enter}');await screen.findByText('Need more details',{selector:'.answer-status'});
- await u.type(screen.getByLabelText(/ask a question/i),'How are artisans exempt?{Enter}');await screen.findByText(a.answer);
+ await u.type(screen.getByLabelText(/ask a question/i),'How many days will BIS take to approve my licence?{Enter}');await screen.findByText(a.answer);
  const payload=JSON.parse(String((f.mock.calls[2]?.[1] as RequestInit).body));
- expect(payload).not.toHaveProperty('clarification_context');
+ expect(payload).not.toHaveProperty('assistant_context');
+});
+
+it('Start over clears messages and active assistant context',async()=>{
+ const clarification={...a,answer:'Need power',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],assistant_context:{original_question:'What standards apply?',expected_slots:['power_type']},suggested_replies:['Non-electric']};
+ mock(clarification);render(<App/>);const u=userEvent.setup();await u.click(screen.getByText(/battery-operated/i));await screen.findByText('Need more details',{selector:'.answer-status'});
+ await u.click(screen.getByRole('button',{name:'Start over'}));
+ expect(screen.getByText('Suggested questions')).toBeInTheDocument();expect(screen.queryByText('Need power')).not.toBeInTheDocument();
 });
