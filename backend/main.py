@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from backend.chat_service import ChatRetrievalError, ChatService
+from backend.chat_service import ChatRetrievalError, ChatService, ComplianceRoutingContext
 from backend.documents import SourceDocumentRegistry
 from backend.generation import (
     GenerationProvider,
@@ -36,6 +36,8 @@ from backend.settings import (
     ALLOWED_HEADERS,
     ALLOWED_METHODS,
     DEFAULT_GROQ_MODEL,
+    INSUFFICIENT_EVIDENCE_ANSWER,
+    LEGAL_INFORMATION_DISCLAIMER,
     SERVICE_NAME,
     get_allowed_origins,
 )
@@ -49,24 +51,80 @@ GeneratorFactory = Callable[[], GenerationProvider]
 
 def compliance_query(profile: ComplianceProfile) -> str:
     """Build neutral retrieval context; profile selections are never evidence."""
-    goal_terms = {
-        "identify_standards": "applicable standards",
-        "new_licence": "new licence certification process",
-        "add_new_series": "addition of new toy series documents",
-        "check_exemption": "exemption qualifications",
-        "understand_transition": "transition order conditions",
-        "not_sure": "compliance guidance",
-    }
     context = " ".join((profile.additional_context or "").split())
     product = " ".join(profile.product_description.split())
-    fields = (
-        f"product described as: {product}; power selection: {profile.power_type.replace('_', ' ')}; "
-        f"age-group selection: {profile.intended_age_group.replace('_', ' ')}; role selection: {profile.role.replace('_', ' ')}; "
-        f"application stage: {profile.application_stage.replace('_', ' ')}; guidance sought: {goal_terms[profile.goal]}"
-    )
+    goal_fields = {
+        "identify_standards": (
+            f"product described as: {product}; power selection: {profile.power_type.replace('_', ' ')}; "
+            "guidance sought: applicable standards"
+        ),
+        "new_licence": (
+            f"product described as: {product}; role selection: {profile.role.replace('_', ' ')}; "
+            f"application stage: {profile.application_stage.replace('_', ' ')}; guidance sought: new licence"
+        ),
+        "add_new_series": (
+            f"product described as: {product}; application stage: {profile.application_stage.replace('_', ' ')}; "
+            "guidance sought: addition of a new toy series"
+        ),
+        "check_exemption": (
+            f"product described as: {product}; role selection: {profile.role.replace('_', ' ')}; "
+            "guidance sought: exemption qualifications"
+        ),
+        "understand_transition": (
+            f"product described as: {product}; guidance sought: transition-order conditions"
+        ),
+        "not_sure": f"product described as: {product}; guidance goal is not specified",
+    }
+    fields = goal_fields[profile.goal]
     if context:
         fields += f"; additional user context: {context}"
     return f"UNTRUSTED USER CONTEXT (retrieval context only, not legal evidence): {fields}. Establish every compliance claim from indexed evidence."
+
+
+def enforce_compliance_invariants(
+    profile: ComplianceProfile,
+    guidance: ChatResponse,
+) -> ChatResponse:
+    """Fail closed when guidance contradicts the validated wizard route."""
+    if guidance.insufficient_evidence:
+        return guidance
+
+    answer = guidance.answer.lower()
+    mismatch = False
+    if profile.goal == "identify_standards":
+        if profile.power_type == "non_electric":
+            mismatch = "is 15644" in answer or "battery-operated" in answer or "mains-powered" in answer
+        elif profile.power_type == "mains_electric":
+            mismatch = "battery-operated" in answer
+        elif profile.power_type == "battery_operated":
+            mismatch = "mains-powered" in answer or "non-electric toy" in answer
+        else:
+            mismatch = True
+    elif profile.goal in {"check_exemption", "add_new_series", "understand_transition"}:
+        mismatch = "primary standard is is 15644" in answer or "battery-operated electric toy" in answer
+    elif profile.goal == "not_sure":
+        mismatch = True
+    elif profile.goal == "new_licence":
+        mismatch = "battery-operated electric toy" in answer or "primary standard is is 15644" in answer
+
+    if not mismatch:
+        return guidance
+    logger.warning(
+        "Compliance guidance rejected; reason=PROFILE_ROUTE_MISMATCH goal=%s power_type=%s",
+        profile.goal,
+        profile.power_type,
+    )
+    return ChatResponse(
+        answer=INSUFFICIENT_EVIDENCE_ANSWER,
+        grounded=False,
+        insufficient_evidence=True,
+        evidence_count=guidance.evidence_count,
+        citations=[],
+        model=guidance.model,
+        generation_mode="abstention",
+        disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+        answer_sections=[],
+    )
 
 
 def create_app(
@@ -204,16 +262,12 @@ def create_app(
         )
         return response
 
-    @application.post(
-        "/api/chat",
-        response_model=ChatResponse,
-        responses={
-            502: {"description": "Generation output invalid"},
-            503: {"description": "Retrieval or generation unavailable"},
-            504: {"description": "Generation timed out"},
-        },
-    )
-    def chat(payload: ChatRequest, request: Request) -> ChatResponse:
+    def run_chat(
+        payload: ChatRequest,
+        request: Request,
+        routing_context: ComplianceRoutingContext | None = None,
+    ) -> ChatResponse:
+        """Shared chat execution; routing_context is server-owned and never an API field."""
         retriever = request.app.state.retriever
         if retriever is None:
             raise HTTPException(
@@ -230,7 +284,7 @@ def create_app(
             model_name=request.app.state.chat_model,
         )
         try:
-            response = service.chat(payload)
+            response = service.chat(payload, routing_context)
         except ChatRetrievalError:
             logger.error("Chat retrieval failed")
             raise HTTPException(
@@ -289,13 +343,30 @@ def create_app(
         )
         return response
 
+    @application.post(
+        "/api/chat",
+        response_model=ChatResponse,
+        responses={
+            502: {"description": "Generation output invalid"},
+            503: {"description": "Retrieval or generation unavailable"},
+            504: {"description": "Generation timed out"},
+        },
+    )
+    def chat(payload: ChatRequest, request: Request) -> ChatResponse:
+        return run_chat(payload, request)
+
     @application.post("/api/compliance/guide", response_model=ComplianceGuideResponse)
     def compliance_guide(profile: ComplianceProfile, request: Request) -> ComplianceGuideResponse:
         """Grounded manufacturer guide; submitted profile is untrusted query context."""
         audience = "consumer" if profile.role == "consumer" else "manufacturer"
-        guidance = chat(ChatRequest(
+        routing_context = ComplianceRoutingContext(
+            goal=profile.goal,
+            power_type=profile.power_type,
+        )
+        guidance = run_chat(ChatRequest(
             question=compliance_query(profile), top_k=8, include_guidance=False, audience=audience,
-        ), request)
+        ), request, routing_context)
+        guidance = enforce_compliance_invariants(profile, guidance)
         return ComplianceGuideResponse(profile=profile, guidance=guidance)
 
     return application
