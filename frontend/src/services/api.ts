@@ -1,4 +1,4 @@
-import type { Audience, ChatResponse, HealthResponse } from '../types/chat';
+import type { Audience, ChatResponse, ClarificationContext, HealthResponse } from '../types/chat';
 import type { ComplianceGuideResponse, ComplianceProfile } from '../types/compliance';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -66,10 +66,22 @@ async function request<T>(path: string, timeout: number, init: RequestInit = {})
 }
 
 export const getHealth = (signal?: AbortSignal) => request<HealthResponse>('/health', HEALTH_TIMEOUT_MS, { signal });
-export const askQuestion = (question: string, audience: Audience = 'general') =>
+export const askQuestion = (
+  question: string,
+  audience: Audience = 'general',
+  clarificationContext?: ClarificationContext,
+  signal?: AbortSignal,
+) =>
   request<ChatResponse>('/api/chat', chatTimeoutMs, {
     method: 'POST',
-    body: JSON.stringify({ question, top_k: 8, include_guidance: false, audience }),
+    body: JSON.stringify({
+      question,
+      top_k: 8,
+      include_guidance: false,
+      audience,
+      ...(clarificationContext ? { clarification_context: clarificationContext } : {}),
+    }),
+    signal,
   });
 export const getComplianceGuide = (profile: ComplianceProfile, signal?: AbortSignal) =>
   request<ComplianceGuideResponse>('/api/compliance/guide', chatTimeoutMs, {

@@ -26,6 +26,14 @@ class ChatRequest(BaseModel):
     top_k: int = Field(default=8, ge=1, le=8)
     include_guidance: bool = False
     audience: Literal["general", "manufacturer", "consumer"] = "general"
+    clarification_context: "ClarificationContext | None" = None
+
+
+class ClarificationContext(BaseModel):
+    """Bounded, untrusted context for resolving one prior clarification."""
+
+    model_config = ConfigDict(extra="forbid")
+    original_question: Question
 
 
 class ComplianceProfile(BaseModel):
@@ -116,6 +124,7 @@ class ChatResponse(BaseModel):
     generation_mode: str
     disclaimer: str
     answer_sections: list[AnswerSection] = Field(default_factory=list)
+    needs_clarification: bool = False
 
 
 class ComplianceGuideResponse(BaseModel):

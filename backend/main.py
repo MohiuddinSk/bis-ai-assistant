@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from backend.chat_service import ChatRetrievalError, ChatService, ComplianceRoutingContext
 from backend.documents import SourceDocumentRegistry
+from backend.question_understanding import QuestionUnderstanding, understand_question
 from backend.generation import (
     GenerationProvider,
     GroqGenerator,
@@ -266,6 +267,7 @@ def create_app(
         payload: ChatRequest,
         request: Request,
         routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
     ) -> ChatResponse:
         """Shared chat execution; routing_context is server-owned and never an API field."""
         retriever = request.app.state.retriever
@@ -284,7 +286,7 @@ def create_app(
             model_name=request.app.state.chat_model,
         )
         try:
-            response = service.chat(payload, routing_context)
+            response = service.chat(payload, routing_context, understanding)
         except ChatRetrievalError:
             logger.error("Chat retrieval failed")
             raise HTTPException(
@@ -353,7 +355,9 @@ def create_app(
         },
     )
     def chat(payload: ChatRequest, request: Request) -> ChatResponse:
-        return run_chat(payload, request)
+        original = payload.clarification_context.original_question if payload.clarification_context else None
+        understanding = understand_question(payload.question, original)
+        return run_chat(payload, request, understanding=understanding)
 
     @application.post("/api/compliance/guide", response_model=ComplianceGuideResponse)
     def compliance_guide(profile: ComplianceProfile, request: Request) -> ComplianceGuideResponse:

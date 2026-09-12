@@ -25,6 +25,7 @@ nav [aria-pressed="false"] { background: #e7eef6; color: var(--primary-blue); }
 .ready, .grounded { background: #d7f3e4; color: var(--success); }
 .degraded { background: #fff0c7; color: #805a00; }
 .unavailable, .insufficient { background: #fde1e1; color: #962d2d; }
+.clarification-needed { background: #fff0c7; color: #805a00; }
 .hero, .suggestions, .chat, .input-wrap { margin-top: 22px; background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 3px 14px #1233; }
 .suggestions button { display: block; width: 100%; text-align: left; margin: 8px 0; background: #edf4fc; color: #063970; }
 

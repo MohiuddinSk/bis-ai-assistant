@@ -450,7 +450,7 @@ class GroundedChatApiTests(unittest.TestCase):
             generator_factory=unavailable,
         )
         with TestClient(app) as client:
-            response = client.post("/api/chat", json={"question": "Toy standard"})
+            response = client.post("/api/chat", json={"question": "Tell me about BIS toy regulation"})
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {"detail": "Chat generation is unavailable."})
 
