@@ -35,9 +35,9 @@ from backend.service import RetrievalService
 from backend.settings import (
     ALLOWED_HEADERS,
     ALLOWED_METHODS,
-    ALLOWED_ORIGINS,
     DEFAULT_GROQ_MODEL,
     SERVICE_NAME,
+    get_allowed_origins,
 )
 from retrieval.search import Retriever
 
@@ -125,7 +125,7 @@ def create_app(
     )
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=list(ALLOWED_ORIGINS),
+        allow_origins=list(get_allowed_origins()),
         allow_credentials=False,
         allow_methods=list(ALLOWED_METHODS),
         allow_headers=list(ALLOWED_HEADERS),
