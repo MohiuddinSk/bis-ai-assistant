@@ -39,7 +39,12 @@ class ClarificationContext(BaseModel):
 
 ClarificationSlot = Literal[
     "role", "product_description", "product_scope", "power_type", "age_group",
-    "application_stage", "goal",
+    "application_stage", "goal", "standard_reference",
+]
+
+StandardDisplay = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=4, max_length=40, pattern=r"^IS \d{3,6}(?: Part \d{1,2})?$"),
 ]
 
 
@@ -48,7 +53,7 @@ class AssistantContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     original_question: Question | None = None
-    expected_slots: list[ClarificationSlot] = Field(default_factory=list, max_length=7)
+    expected_slots: list[ClarificationSlot] = Field(default_factory=list, max_length=8)
     role: Literal["manufacturer", "importer", "artisan", "consumer", "not_sure"] | None = None
     product_description: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=300)] = None
     power_type: Literal[
@@ -60,8 +65,9 @@ class AssistantContext(BaseModel):
     ] | None = None
     current_goal: Literal[
         "identify_standards", "new_licence", "add_new_series", "check_exemption",
-        "understand_transition", "complete_roadmap", "not_sure",
+        "understand_transition", "complete_roadmap", "explain_standard", "not_sure",
     ] | None = None
+    referenced_standards: list[StandardDisplay] = Field(default_factory=list, max_length=8)
 
 
 class ComplianceProfile(BaseModel):

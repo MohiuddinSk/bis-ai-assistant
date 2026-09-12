@@ -11,6 +11,7 @@ from backend.schemas import AssistantContext
 Intent = Literal[
     "standards", "certification", "documents", "exemption", "commencement",
     "transition", "roadmap", "timeline", "fee", "laboratory", "form", "profile",
+    "standard_explanation", "standard_comparison", "is_general_meaning",
     "general", "out_of_domain",
 ]
 PowerClassification = Literal[
@@ -34,6 +35,42 @@ class QuestionUnderstanding:
     assistant_context: AssistantContext | None = None
     context_retained: bool = False
     profile_statement: bool = False
+    standard_references: tuple["StandardReference", ...] = ()
+    simplify: bool = False
+
+
+@dataclass(frozen=True)
+class StandardReference:
+    """A conservatively extracted IS citation; the number is never auto-corrected."""
+
+    number: str
+    part: int | None
+    display: str
+    supported: bool
+
+
+_SUPPORTED_STANDARD_NUMBERS = frozenset({"15644", "9873"})
+_SUPPORTED_9873_PARTS = frozenset({1, 2, 3, 4, 7, 9, 10, 11})
+_MAX_STANDARD_REFERENCES = 4
+_STANDARD_PATTERN = re.compile(
+    r"\bis[\s-]*(\d{3,6})(?:\s*(?:parts?|pt\.?)\s*(\d{1,2}))?\b",
+    re.IGNORECASE,
+)
+_GENERAL_IS_MEANING = re.compile(
+    r"\b(?:what does is mean|what is an? indian standard|what does is stand for|meaning of(?: an?)? indian standard)\b",
+)
+_COMPARISON_CUE = re.compile(r"\b(?:difference|differences|compare|compared|versus| vs\.? )\b")
+_EXPLANATION_CUE = re.compile(
+    r"\b(?:explain|what is|what does|what do|tell me about|mean(?:ing)?|why does|why do|which parts)\b",
+)
+_CONTEXTUAL_STANDARD = re.compile(
+    r"\b(?:this|that|the)\s+standards?\b|\btell me about the is\b|\bthe is\b|"
+    r"\bprimary standard(?: that)? you mentioned\b|\bafter identifying the standard\b",
+)
+_SIMPLIFY_CUE = re.compile(r"\b(?:simple words|simpler language|in simple(?:r)?(?:\s+language)?|more simply)\b")
+_CORPUS_STANDARD_SUGGESTIONS = (
+    "IS 15644", "IS 9873 Part 1", "IS 9873 Part 3", "IS 9873 Part 4",
+)
 
 
 _TOKEN_CORRECTIONS = {
@@ -78,6 +115,64 @@ def normalize_question(value: str) -> tuple[str, tuple[str, ...]]:
     return normalized, tuple(corrections)
 
 
+def standard_is_supported(number: str, part: int | None) -> bool:
+    if number == "15644" and part is None:
+        return True
+    if number == "9873" and (part is None or part in _SUPPORTED_9873_PARTS):
+        return True
+    return False
+
+
+def format_standard_display(number: str, part: int | None) -> str:
+    display = f"IS {number}"
+    if part is not None:
+        display += f" Part {part}"
+    return display[:40]
+
+
+def extract_standard_references(query: str) -> tuple[StandardReference, ...]:
+    """Extract written IS numbers exactly; never coerce them to a known standard."""
+    found: list[StandardReference] = []
+    seen: set[tuple[str, int | None]] = set()
+    for match in _STANDARD_PATTERN.finditer(query):
+        number = match.group(1)
+        part = int(match.group(2)) if match.group(2) else None
+        key = (number, part)
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(StandardReference(
+            number=number,
+            part=part,
+            display=format_standard_display(number, part),
+            supported=standard_is_supported(number, part),
+        ))
+        if len(found) >= _MAX_STANDARD_REFERENCES:
+            break
+    return tuple(found)
+
+
+def parse_standard_display(value: str) -> StandardReference | None:
+    refs = extract_standard_references(value.lower())
+    return refs[0] if len(refs) == 1 else None
+
+
+def _is_standard_follow_up(query: str) -> bool:
+    return bool(_CONTEXTUAL_STANDARD.search(query) or _SIMPLIFY_CUE.search(query))
+
+
+def _explanation_intent(query: str, refs: tuple[StandardReference, ...]) -> Intent | None:
+    if _GENERAL_IS_MEANING.search(query):
+        return "is_general_meaning"
+    if len(refs) >= 2 and _COMPARISON_CUE.search(query):
+        return "standard_comparison"
+    if refs and (_EXPLANATION_CUE.search(query) or _SIMPLIFY_CUE.search(query)):
+        return "standard_explanation"
+    if _is_standard_follow_up(query):
+        return "standard_explanation"
+    return None
+
+
 def _intent(query: str) -> Intent:
     # What the user asks takes precedence over product/power mentions.
     if re.search(r"\b(industrial inverter|solar inverter|refrigerator|washing machine|actual household)\b", query):
@@ -101,6 +196,9 @@ def _intent(query: str) -> Intent:
     if (
         re.search(r"\b(add|addition|include|inclusion|extend|extension|scope)\b", query)
         and re.search(r"\b(series|model|variety|licence)\b", query)
+    ) or (
+        re.search(r"\b(documents?|application|checklist)\b", query)
+        and re.search(r"\b(series|model|variety)\b", query)
     ):
         return "documents"
     if (
@@ -166,6 +264,8 @@ def _goal_for_intent(intent: Intent) -> str | None:
         "standards": "identify_standards", "certification": "new_licence",
         "documents": "add_new_series", "exemption": "check_exemption",
         "transition": "understand_transition", "roadmap": "complete_roadmap",
+        "standard_explanation": "explain_standard", "standard_comparison": "explain_standard",
+        "is_general_meaning": "explain_standard",
     }.get(intent)
 
 
@@ -193,10 +293,15 @@ def _slot_answered(slot: str, query: str) -> bool:
         "age_group": _age_group(query)[0] is not None,
         "application_stage": _application_stage(query) is not None,
         "goal": _goal_for_intent(_intent(query)) is not None or "complete roadmap" in query,
+        "standard_reference": bool(extract_standard_references(query)),
     }.get(slot, False)
 
 
 def _is_context_continuation(query: str, context: AssistantContext) -> bool:
+    if _is_standard_follow_up(query) and (
+        context.referenced_standards or "standard_reference" in context.expected_slots
+    ):
+        return True
     if _is_interrogative(query):
         return False
     return len(query) <= 160 and any(_slot_answered(slot, query) for slot in context.expected_slots)
@@ -237,6 +342,7 @@ def understand_question(
     current, corrections = normalize_question(question)
     retained = bool(assistant_context and _is_context_continuation(current, assistant_context))
     active_context = assistant_context if retained else None
+    current_refs = extract_standard_references(current)
     if active_context and active_context.original_question:
         original, original_corrections = normalize_question(active_context.original_question)
         combined = f"{original} follow-up {current}"
@@ -255,14 +361,27 @@ def understand_question(
     profile_statement = profile_origin and (
         not retained or _goal_for_intent(_intent(current)) is None
     )
-    intent = "profile" if profile_statement else _intent(combined)
+    explanation = None if profile_statement else _explanation_intent(current, current_refs)
+    intent = "profile" if profile_statement else (explanation or _intent(combined))
     if retained and intent == "general" and active_context and active_context.current_goal:
         intent = {
             "identify_standards": "standards", "new_licence": "certification",
             "add_new_series": "documents", "check_exemption": "exemption",
             "understand_transition": "transition", "complete_roadmap": "roadmap",
+            "explain_standard": "standard_explanation",
             "not_sure": "general",
         }[active_context.current_goal]
+    if (
+        not profile_statement
+        and current_refs
+        and active_context
+        and (
+            "standard_reference" in active_context.expected_slots
+            or active_context.current_goal == "explain_standard"
+        )
+        and intent in {"general", "standards"}
+    ):
+        intent = "standard_explanation"
     current_power = _power(current)
     power = current_power if current_power != "unknown" else _power(combined)
     if power == "unknown" and active_context and active_context.power_type:
@@ -274,7 +393,7 @@ def understand_question(
     age_group = current_age or combined_age or (active_context.age_group if active_context else None)
     age_ambiguous = current_age_ambiguous if current_age is not None else combined_age_ambiguous
     stage = _application_stage(current) or _application_stage(combined) or (active_context.application_stage if active_context else None)
-    goal = _goal_for_intent(_intent(current)) or _goal_for_intent(intent) or (active_context.current_goal if active_context else None)
+    goal = _goal_for_intent(intent) or _goal_for_intent(_intent(current)) or (active_context.current_goal if active_context else None)
     product_description = (
         active_context.product_description if active_context and active_context.product_description else None
     )
@@ -282,6 +401,18 @@ def understand_question(
         product_description = "kitchen play sets" if "children_play" in signals else "kitchen sets"
     elif "toy" in signals and not product_description:
         product_description = "toys"
+    context_refs = tuple(
+        ref
+        for display in (active_context.referenced_standards if active_context else [])
+        if (ref := parse_standard_display(display)) is not None
+    )
+    if current_refs:
+        refs = current_refs
+    elif intent in {"standard_explanation", "standard_comparison"} and len(context_refs) == 1:
+        refs = context_refs
+    else:
+        refs = ()
+    simplify = bool(_SIMPLIFY_CUE.search(current))
     missing: list[str] = []
     asked_slots: list[str] = []
     ambiguity: list[str] = []
@@ -363,6 +494,35 @@ def understand_question(
                 suggestions = ("Manufacturer", "Importer", "Artisan")
             elif "application_stage" in next_missing:
                 suggestions = ("First BIS licence", "Add to an existing licence")
+    elif intent in {"standard_explanation", "standard_comparison"} and not refs:
+        missing.append("standard_reference")
+        asked_slots = ["standard_reference"]
+        supported_context = tuple(ref.display for ref in context_refs if ref.supported)
+        if len(context_refs) > 1:
+            clarification = "Which of the previously mentioned Indian Standards would you like me to explain?"
+            suggestions = supported_context or _CORPUS_STANDARD_SUGGESTIONS
+        else:
+            clarification = "Which Indian Standard would you like me to explain?"
+            suggestions = _CORPUS_STANDARD_SUGGESTIONS
+    elif (
+        intent == "standard_explanation"
+        and refs
+        and re.search(r"\bwhy\b", current)
+        and re.search(r"\bapply", current)
+        and power in {"unknown", "electric_unspecified"}
+    ):
+        missing.append("power_type")
+        asked_slots = ["power_type"]
+        if power == "electric_unspecified":
+            ambiguity.append("electric_power_source_unspecified")
+        clarification = "Is the toy battery-operated, mains-powered, or non-electric?"
+        suggestions = ("Battery-operated", "Mains-powered", "Non-electric")
+
+    referenced = [ref.display for ref in refs][:8]
+    if not referenced and active_context:
+        referenced = list(active_context.referenced_standards[:8])
+    if goal is None and intent in {"standard_explanation", "standard_comparison", "is_general_meaning"}:
+        goal = "explain_standard"
 
     context = None
     if clarification:
@@ -376,16 +536,18 @@ def understand_question(
             age_group=age_group,
             application_stage=stage,
             current_goal=goal,
+            referenced_standards=referenced,
         )
-    elif active_context:
+    elif refs or active_context:
         context = AssistantContext(
-            original_question=active_context.original_question,
+            original_question=(active_context.original_question if active_context and active_context.original_question else None),
             expected_slots=[], role=role,
             product_description=product_description,
-            power_type=(power if power != "unknown" else active_context.power_type),
+            power_type=(power if power != "unknown" else (active_context.power_type if active_context else None)),
             age_group=age_group,
             application_stage=stage,
             current_goal=goal,
+            referenced_standards=referenced,
         )
 
     return QuestionUnderstanding(
@@ -402,4 +564,6 @@ def understand_question(
         assistant_context=context,
         context_retained=retained,
         profile_statement=profile_statement,
+        standard_references=refs,
+        simplify=simplify,
     )

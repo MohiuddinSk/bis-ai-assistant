@@ -16,6 +16,10 @@ function isIndependentQuestion(value: string): boolean {
   return /^(?:what|which|how|ow\s+many|when|why|where|can|does|do|is|are|will|should)\b/i.test(text);
 }
 
+function isStandardFollowUp(value: string): boolean {
+  return /\b(?:this|that|the)\s+standards?\b|\bprimary standard\b|\bsimpler language\b|\bin simple(?:r)?(?:\s+words|\s+language)?\b|\bmore simply\b|\bafter identifying\b|\btell me about the is\b/i.test(value);
+}
+
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [busy, setBusy] = useState(false);
@@ -23,6 +27,7 @@ export default function App() {
   const [last, setLast] = useState('');
   const [lastContext, setLastContext] = useState<AssistantContext | undefined>();
   const [pendingContext, setPendingContext] = useState<AssistantContext | null>(null);
+  const [sessionContext, setSessionContext] = useState<AssistantContext | undefined>();
   const [audience, setAudience] = useState<Audience>('general');
   const [mode, setMode] = useState<'chat' | 'wizard'>('chat');
   const [status, setStatus] = useState<'ready' | 'degraded' | 'unavailable'>('unavailable');
@@ -52,8 +57,9 @@ export default function App() {
   const send = async (question: string, suppliedContext?: AssistantContext) => {
     if (busy) return;
     const continuing = Boolean(pendingContext && !isIndependentQuestion(question));
-    const assistantContext = suppliedContext ?? (continuing ? pendingContext ?? undefined : undefined);
-    if (!continuing && !suppliedContext) setPendingContext(null);
+    const followUp = Boolean(sessionContext && isStandardFollowUp(question));
+    const assistantContext = suppliedContext ?? (continuing ? pendingContext ?? undefined : followUp ? sessionContext : undefined);
+    if (!continuing && !suppliedContext && !followUp) setPendingContext(null);
     setBusy(true);
     setError('');
     setLast(question);
@@ -64,6 +70,7 @@ export default function App() {
     try {
       const response = await askQuestion(question, audience, assistantContext, controller.signal);
       setMessages((items) => [...items, { role: 'assistant', text: response.answer, response }]);
+      setSessionContext(response.assistant_context ?? undefined);
       setPendingContext(response.needs_clarification
         ? (response.assistant_context ?? { original_question: assistantContext?.original_question ?? question, expected_slots: [] })
         : null);
@@ -79,14 +86,20 @@ export default function App() {
 
   const resetConversation = () => {
     chatController.current?.abort();
-    setMessages([]); setPendingContext(null); setLastContext(undefined); setLast(''); setError(''); setBusy(false);
+    setMessages([]); setPendingContext(null); setSessionContext(undefined); setLastContext(undefined); setLast(''); setError(''); setBusy(false);
+  };
+
+  const switchMode = (next: 'chat' | 'wizard') => {
+    if (next === mode) return;
+    resetConversation();
+    setMode(next);
   };
 
   return <main>
     <ChatHeader status={status} />
     <nav aria-label="Guidance mode">
-      <button onClick={() => setMode('chat')} aria-pressed={mode === 'chat'}>Ask a question</button>
-      <button onClick={() => setMode('wizard')} aria-pressed={mode === 'wizard'}>Compliance Wizard</button>
+      <button onClick={() => switchMode('chat')} aria-pressed={mode === 'chat'}>Ask a question</button>
+      <button onClick={() => switchMode('wizard')} aria-pressed={mode === 'wizard'}>Compliance Wizard</button>
     </nav>
     {mode === 'wizard' ? <ComplianceWizard /> : <>
       <section className="hero">
@@ -95,7 +108,7 @@ export default function App() {
       </section>
       {messages.length === 0 && <SuggestedQuestions onSelect={send} />}
       <section className="chat" aria-live="polite">
-        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedReply={message.role === 'assistant' && pendingContext ? (reply) => void send(reply, pendingContext) : undefined} />)}
+        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedReply={message.role === 'assistant' && (pendingContext || (message.response?.suggested_replies?.length ?? 0) > 0) ? (reply) => void send(reply, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
         {busy && <LoadingMessage />}
         {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext)} />}
         <div ref={end} />

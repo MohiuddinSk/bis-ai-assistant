@@ -82,6 +82,87 @@ class QuestionUnderstandingTests(unittest.TestCase):
         self.assertEqual(understood.power, "non_electric")
         self.assertFalse(understood.clarification_required)
 
+    def test_standard_explanation_and_comparison_intents(self):
+        explanation = understand_question("What is IS 15644?")
+        self.assertEqual(explanation.intent, "standard_explanation")
+        self.assertEqual(explanation.standard_references[0].display, "IS 15644")
+        self.assertTrue(explanation.standard_references[0].supported)
+        self.assertFalse(explanation.clarification_required)
+
+        comparison = understand_question("What is the difference between IS 15644 and IS 9873 Part 1?")
+        self.assertEqual(comparison.intent, "standard_comparison")
+        self.assertEqual([item.display for item in comparison.standard_references], ["IS 15644", "IS 9873 Part 1"])
+
+        meaning = understand_question("What does IS mean?")
+        self.assertEqual(meaning.intent, "is_general_meaning")
+
+    def test_standard_number_formatting_is_normalized_without_correction(self):
+        for query, display in (
+            ("Explain IS-15644 in simple words.", "IS 15644"),
+            ("Explain IS15644", "IS 15644"),
+            ("explain is 15644", "IS 15644"),
+            ("What does IS 9873 Part 1 mean?", "IS 9873 Part 1"),
+        ):
+            with self.subTest(query=query):
+                understood = understand_question(query)
+                self.assertEqual(understood.standard_references[0].display, display)
+                self.assertEqual(understood.standard_references[0].number, display.split()[1])
+
+    def test_ambiguous_or_unknown_numbers_are_preserved(self):
+        for query, display in (
+            ("Explain IS 1564", "IS 1564"),
+            ("Explain IS 987", "IS 987"),
+            ("Explain IS 99999", "IS 99999"),
+        ):
+            with self.subTest(query=query):
+                understood = understand_question(query)
+                self.assertEqual(understood.standard_references[0].display, display)
+                self.assertFalse(understood.standard_references[0].supported)
+                self.assertNotEqual(understood.standard_references[0].display, "IS 15644")
+                self.assertNotEqual(understood.standard_references[0].display, "IS 9873")
+
+    def test_contextual_standard_resolution_and_ambiguity(self):
+        from backend.schemas import AssistantContext
+        single = understand_question(
+            "Explain that standard.",
+            assistant_context=AssistantContext(referenced_standards=["IS 15644"], current_goal="explain_standard"),
+        )
+        self.assertTrue(single.context_retained)
+        self.assertEqual(single.intent, "standard_explanation")
+        self.assertEqual(single.standard_references[0].display, "IS 15644")
+        self.assertFalse(single.clarification_required)
+
+        multiple = understand_question(
+            "Explain that standard.",
+            assistant_context=AssistantContext(
+                referenced_standards=["IS 15644", "IS 9873 Part 1", "IS 9873 Part 3"],
+                current_goal="explain_standard",
+            ),
+        )
+        self.assertTrue(multiple.clarification_required)
+        self.assertEqual(multiple.standard_references, ())
+        self.assertIn("Which of the previously mentioned", multiple.clarification_question)
+
+    def test_independent_question_clears_stale_standard_context(self):
+        from backend.schemas import AssistantContext
+        understood = understand_question(
+            "How many days will BIS take to approve my licence?",
+            assistant_context=AssistantContext(
+                referenced_standards=["IS 15644"],
+                current_goal="explain_standard",
+                expected_slots=["standard_reference"],
+            ),
+        )
+        self.assertFalse(understood.context_retained)
+        self.assertEqual(understood.intent, "timeline")
+        self.assertEqual(understood.standard_references, ())
+
+    def test_product_description_is_not_treated_as_standard_evidence(self):
+        understood = understand_question("I manufacture battery-operated toys")
+        self.assertTrue(understood.profile_statement)
+        self.assertEqual(understood.standard_references, ())
+        self.assertTrue(understood.clarification_required)
+
 
 if __name__ == "__main__":
     unittest.main()
