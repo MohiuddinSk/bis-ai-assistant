@@ -1,8 +1,9 @@
 import unittest
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 
-from backend.main import create_app
+from backend.main import create_app, select_request_id
 
 
 class FakeCollection:
@@ -250,12 +251,57 @@ class RetrievalApiTests(unittest.TestCase):
                     "Access-Control-Request-Method": "POST",
                 },
             )
+            exposed = client.get("/health", headers={"Origin": "http://localhost:5173"})
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(
             allowed.headers.get("access-control-allow-origin"),
             "http://localhost:5173",
         )
+        self.assertIn("x-request-id", allowed.headers.get("access-control-allow-headers", "").lower())
+        self.assertIn("x-request-id", exposed.headers.get("access-control-expose-headers", "").lower())
         self.assertNotIn("access-control-allow-origin", denied.headers)
+
+
+class VersionedApiTests(unittest.TestCase):
+    def client(self):
+        return TestClient(create_app(retriever_factory=FakeRetriever))
+
+    def test_v1_health_and_retrieve_match_legacy_routes(self):
+        with self.client() as client:
+            legacy_health = client.get("/health")
+            versioned_health = client.get("/api/v1/health")
+            self.assertEqual(legacy_health.status_code, versioned_health.status_code)
+            self.assertEqual(legacy_health.json(), versioned_health.json())
+            payload = {"question": "Toy standard"}
+            legacy = client.post("/api/retrieve", json=payload)
+            versioned = client.post("/api/v1/retrieve", json=payload)
+            self.assertEqual(legacy.status_code, versioned.status_code)
+            self.assertEqual(legacy.json(), versioned.json())
+
+    def test_request_ids_are_safe_and_present_on_validation_errors(self):
+        with self.client() as client:
+            generated = client.get("/health").headers["x-request-id"]
+            self.assertRegex(generated, r"^[0-9a-f]{8}-[0-9a-f-]{27}$")
+            self.assertEqual(str(UUID(generated)), generated)
+            self.assertEqual(UUID(generated).version, 4)
+            self.assertEqual(client.get("/health", headers={"X-Request-ID": "portal.req_123"}).headers["x-request-id"], "portal.req_123")
+            for invalid in ("short", "x" * 65, "contains space", "slash/id", r"back\\slash"):
+                response = client.post("/api/retrieve", headers={"X-Request-ID": invalid}, json={"question": ""})
+                self.assertEqual(response.status_code, 422)
+                self.assertRegex(response.headers["x-request-id"], r"^[0-9a-f]{8}-[0-9a-f-]{27}$")
+                self.assertNotIn("request_id", response.json())
+        for invalid in ("café", "line\nbreak", "\u0000control"):
+            replacement = select_request_id(invalid)
+            self.assertRegex(replacement, r"^[0-9a-f]{8}-[0-9a-f-]{27}$")
+
+    def test_openapi_lists_aliases_with_unique_operation_ids(self):
+        with self.client() as client:
+            paths = client.get("/openapi.json").json()["paths"]
+        expected = {"/health", "/api/v1/health", "/api/retrieve", "/api/v1/retrieve", "/api/chat", "/api/v1/chat", "/api/compliance/guide", "/api/v1/compliance/guide", "/api/documents/{source_filename}", "/api/v1/documents/{source_filename}"}
+        self.assertTrue(expected <= set(paths))
+        self.assertFalse({"/api/v1/standards/explain", "/api/v1/sources/{source_id}", "/api/v1/documents/{document_id}"} & set(paths))
+        operation_ids = [operation["operationId"] for path in paths.values() for operation in path.values() if isinstance(operation, dict) and "operationId" in operation]
+        self.assertEqual(len(operation_ids), len(set(operation_ids)))
 
 
 if __name__ == "__main__":

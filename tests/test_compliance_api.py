@@ -140,4 +140,15 @@ class ComplianceApiTests(unittest.TestCase):
         with patch("backend.main.ChatService.chat",return_value=SAFE), self.client() as client:
             self.assertEqual(client.post("/api/chat",json={"question":"toy standard"}).status_code,200)
 
+class VersionedComplianceApiTests(ComplianceApiTests):
+    def test_v1_compliance_guide_matches_legacy(self):
+        with patch("backend.main.ChatService.chat", return_value=SAFE), self.client() as client:
+            legacy = client.post("/api/compliance/guide", json=BASE)
+            versioned = client.post("/api/v1/compliance/guide", json=BASE)
+        self.assertEqual(legacy.status_code, versioned.status_code)
+        self.assertEqual(legacy.json(), versioned.json())
+        self.assertIn("x-request-id", legacy.headers)
+        self.assertIn("x-request-id", versioned.headers)
+
+
 if __name__ == "__main__": unittest.main()

@@ -3,9 +3,11 @@
 from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
 import logging
+import re
 from threading import Lock
 import time
 from typing import Any
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +39,7 @@ from backend.settings import (
     ALLOWED_HEADERS,
     ALLOWED_METHODS,
     DEFAULT_GROQ_MODEL,
+    EXPOSED_HEADERS,
     INSUFFICIENT_EVIDENCE_ANSWER,
     LEGAL_INFORMATION_DISCLAIMER,
     SERVICE_NAME,
@@ -48,6 +51,15 @@ from retrieval.search import Retriever
 logger = logging.getLogger(__name__)
 RetrieverFactory = Callable[[], Any]
 GeneratorFactory = Callable[[], GenerationProvider]
+REQUEST_ID_HEADER = "X-Request-ID"
+REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
+
+
+def select_request_id(value: str | None) -> str:
+    """Preserve only safe caller correlation IDs; otherwise issue a UUID4."""
+    if value is not None and REQUEST_ID_PATTERN.fullmatch(value):
+        return value
+    return str(uuid4())
 
 
 def compliance_query(profile: ComplianceProfile) -> str:
@@ -215,13 +227,29 @@ def create_app(
         allow_credentials=False,
         allow_methods=list(ALLOWED_METHODS),
         allow_headers=list(ALLOWED_HEADERS),
+        expose_headers=list(EXPOSED_HEADERS),
     )
+
+    @application.middleware("http")
+    async def request_correlation_id(request: Request, call_next: Callable[..., Any]) -> Any:
+        request_id = select_request_id(request.headers.get(REQUEST_ID_HEADER))
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers[REQUEST_ID_HEADER] = request_id
+        return response
 
     document_registry = SourceDocumentRegistry()
 
     @application.get(
         "/api/documents/{source_filename}",
         summary="Open a registered source PDF",
+        operation_id="get_source_document",
+        responses={404: {"description": "Registered source document not found"}},
+    )
+    @application.get(
+        "/api/v1/documents/{source_filename}",
+        summary="Open a registered source PDF",
+        operation_id="get_source_document_v1",
         responses={404: {"description": "Registered source document not found"}},
     )
     def source_document(source_filename: str) -> FileResponse:
@@ -237,6 +265,13 @@ def create_app(
     @application.get(
         "/health",
         response_model=HealthResponse,
+        operation_id="get_health",
+        responses={503: {"model": HealthResponse}},
+    )
+    @application.get(
+        "/api/v1/health",
+        response_model=HealthResponse,
+        operation_id="get_health_v1",
         responses={503: {"model": HealthResponse}},
     )
     def health(request: Request) -> HealthResponse | JSONResponse:
@@ -258,6 +293,13 @@ def create_app(
     @application.post(
         "/api/retrieve",
         response_model=RetrieveResponse,
+        operation_id="retrieve_evidence",
+        responses={503: {"description": "Retrieval service unavailable"}},
+    )
+    @application.post(
+        "/api/v1/retrieve",
+        response_model=RetrieveResponse,
+        operation_id="retrieve_evidence_v1",
         responses={503: {"description": "Retrieval service unavailable"}},
     )
     def retrieve(
@@ -375,6 +417,17 @@ def create_app(
     @application.post(
         "/api/chat",
         response_model=ChatResponse,
+        operation_id="chat_with_evidence",
+        responses={
+            502: {"description": "Generation output invalid"},
+            503: {"description": "Retrieval or generation unavailable"},
+            504: {"description": "Generation timed out"},
+        },
+    )
+    @application.post(
+        "/api/v1/chat",
+        response_model=ChatResponse,
+        operation_id="chat_with_evidence_v1",
         responses={
             502: {"description": "Generation output invalid"},
             503: {"description": "Retrieval or generation unavailable"},
@@ -399,7 +452,16 @@ def create_app(
             )
         return run_chat(payload, request, routing_context=routing_context, understanding=understanding)
 
-    @application.post("/api/compliance/guide", response_model=ComplianceGuideResponse)
+    @application.post(
+        "/api/compliance/guide",
+        response_model=ComplianceGuideResponse,
+        operation_id="get_compliance_guidance",
+    )
+    @application.post(
+        "/api/v1/compliance/guide",
+        response_model=ComplianceGuideResponse,
+        operation_id="get_compliance_guidance_v1",
+    )
     def compliance_guide(profile: ComplianceProfile, request: Request) -> ComplianceGuideResponse:
         """Grounded manufacturer guide; submitted profile is untrusted query context."""
         audience = "consumer" if profile.role == "consumer" else "manufacturer"
