@@ -14,7 +14,8 @@ ALLOWED_ORIGINS = (
 )
 
 ALLOWED_METHODS = ("GET", "POST")
-ALLOWED_HEADERS = ("Content-Type",)
+ALLOWED_HEADERS = ("Content-Type", "X-Request-ID")
+EXPOSED_HEADERS = ("X-Request-ID",)
 
 
 def get_allowed_origins() -> tuple[str, ...]:

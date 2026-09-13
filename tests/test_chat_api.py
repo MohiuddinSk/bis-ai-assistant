@@ -769,5 +769,24 @@ class GroundedChatApiTests(unittest.TestCase):
         self.assertNotIn(secret, response.text)
 
 
+class VersionedChatApiTests(unittest.TestCase):
+    def test_v1_chat_matches_legacy_and_rate_limit_keeps_headers(self):
+        payload = {"question": "Tell me about BIS toy regulation"}
+        legacy_app = create_app(retriever_factory=FakeRetriever, generator_factory=lambda: FakeGenerator([valid_output(["S1"])]))
+        with TestClient(legacy_app) as client:
+            legacy = client.post("/api/chat", json=payload)
+        versioned_app = create_app(retriever_factory=FakeRetriever, generator_factory=lambda: FakeGenerator([valid_output(["S1"])]))
+        with TestClient(versioned_app) as client:
+            versioned = client.post("/api/v1/chat", json=payload)
+        self.assertEqual(legacy.status_code, versioned.status_code)
+        self.assertEqual(legacy.json(), versioned.json())
+        rate_limited_app = create_app(retriever_factory=FakeRetriever, generator_factory=lambda: FakeGenerator([ProviderRateLimitError("17")]))
+        with TestClient(rate_limited_app) as client:
+            response = client.post("/api/v1/chat", json=payload)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.headers["retry-after"], "17")
+        self.assertIn("x-request-id", response.headers)
+
+
 if __name__ == "__main__":
     unittest.main()

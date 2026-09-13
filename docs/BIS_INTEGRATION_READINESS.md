@@ -50,18 +50,13 @@ The diagram is technology-neutral: BIS may retain its portal stack while the ass
 | **Temporary pilot: separate BIS subdomain** | Fastest isolated rollout and operational learning under BIS control. | Separate navigation and identity handoff need careful design. | Controlled pilot. |
 | **iframe** | Low-effort visual embedding for a narrow pilot. | Authentication, accessibility, styling, security-policy, and browser-integration limitations. | Limited pilot only; not preferred for production. |
 
-## 6. Proposed versioned API boundary
+## 6. Versioned API boundary
 
-The following routes are proposed for a future contract and do **not** currently exist:
+The following v1 aliases are implemented and preserve the existing contracts: `GET /api/v1/health`, `POST /api/v1/retrieve`, `POST /api/v1/chat`, `POST /api/v1/compliance/guide`, and `GET /api/v1/documents/{source_filename}`. Their legacy routes remain available for backward compatibility.
 
-- `GET /api/v1/health`
-- `POST /api/v1/chat`
-- `POST /api/v1/compliance/guide`
-- `POST /api/v1/standards/explain`
-- `GET /api/v1/sources/{source_id}`
-- `GET /api/v1/documents/{document_id}`
+The following future routes are **not** implemented: `POST /api/v1/standards/explain`, `GET /api/v1/sources/{source_id}`, and `GET /api/v1/documents/{document_id}`. Standard explanation remains part of chat, and document retrieval continues to use a registered source filename rather than a document ID.
 
-They should use documented JSON request and response contracts published through OpenAPI. Versioning supports controlled evolution: additive, backward-compatible changes can remain within `v1`; breaking changes require a new version with a deprecation period. A standard error format should include a stable error code, safe message, and request/correlation ID. POST operations should define idempotency behavior explicitly—especially where an endpoint can create state—while read-only guidance calls should remain side-effect free. Correlation IDs should flow from the BIS gateway through every service response and log entry.
+The API uses documented JSON request and response contracts published through OpenAPI. Versioning supports controlled evolution: additive, backward-compatible changes can remain within `v1`; breaking changes require a new version with a deprecation period. A standard error format should include a stable error code, safe message, and request/correlation ID. POST operations should define idempotency behavior explicitly—especially where an endpoint can create state—while read-only guidance calls should remain side-effect free. Correlation IDs should flow from the BIS gateway through every service response and log entry.
 
 ## 7. Authentication and authorization integration
 
