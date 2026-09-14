@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 
 from backend.main import create_app, select_request_id
+from backend.retrieval_provider import RetrievalHit
 
 
 class FakeCollection:
@@ -55,7 +56,19 @@ class FakeRetriever:
         )
         if self.error is not None:
             raise self.error
-        return self.result
+        return self._hits(self.result)
+
+    def count(self):
+        return self.collection.count()
+
+    @staticmethod
+    def _hits(result):
+        return [
+            RetrievalHit(chunk_id=chunk_id, text=text, metadata=metadata, distance=distance)
+            for chunk_id, text, metadata, distance in zip(
+                result["ids"][0], result["documents"][0], result["metadatas"][0], result["distances"][0]
+            )
+        ]
 
 
 class RetrievalApiTests(unittest.TestCase):

@@ -45,6 +45,7 @@ class ContainerConfigurationTests(unittest.TestCase):
     def test_ignore_and_compose_security_guardrails(self):
         for entry in (".git", "frontend", "ingestion", "tests", "evaluation", ".env", "credentials", "data/processed/generated_v2"):
             self.assertIn(entry, self.ignore)
+        self.assertIn("RETRIEVAL_PROVIDER: ${RETRIEVAL_PROVIDER:-chroma_local}", self.compose)
         self.assertIn("GROQ_API_KEY: ${GROQ_API_KEY:-}", self.compose)
         self.assertIn("ALLOWED_ORIGINS:", self.compose)
         self.assertIn("cap_drop:", self.compose)
@@ -56,19 +57,31 @@ class ContainerConfigurationTests(unittest.TestCase):
     def test_acceptance_status_check_enumerates_exact_paths(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
         self.assertIn("git -C $Root status --porcelain=v1 --untracked-files=all", script)
+        self.assertIn("$path = $line.Substring(3).Replace('\\', '/')", script)
+        self.assertIn("[pscustomobject]@{ Status = $status; Path = $path }", script)
         self.assertIn("$_.Path -notin $Allowed", script)
         self.assertIn("$status -match '[RD]'", script)
-        for path in ("scripts/container_healthcheck.py", "scripts/test_container.ps1"):
-            self.assertIn(path, script)
-
-    def test_acceptance_allowlist_includes_only_gateway_task_files(self):
-        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        for path in ("backend/generation_factory.py", "backend/openai_compatible_generator.py", "tests/test_generation_factory.py", "tests/test_provider_disabled_api.py"):
-            self.assertIn(path, script)
+        self.assertIn("Assert-True ($unexpected.Count -eq 0)", script)
         allowlist = script.split("$Allowed = @(", 1)[1].split(")", 1)[0]
-        self.assertEqual(allowlist.count("'tests/test_provider_disabled_api.py'"), 1)
+        self.assertNotIn("scripts/container_healthcheck.py", allowlist)
+
+    def test_acceptance_allowlist_matches_retrieval_abstraction_task_files(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        allowlist = script.split("$Allowed = @(", 1)[1].split(")", 1)[0]
+        expected = (
+            "backend/chat_service.py", "backend/main.py", "backend/service.py", "backend/settings.py",
+            "backend/retrieval_factory.py", "backend/retrieval_provider.py", "compose.yaml",
+            "docs/BIS_INTEGRATION_READINESS.md", "docs/CONTAINER_DEPLOYMENT.md",
+            "scripts/test_container.ps1", "tests/test_api.py", "tests/test_chat_api.py",
+            "tests/test_container_configuration.py", "tests/test_retrieval_disabled_api.py",
+            "tests/test_retrieval_factory.py", "tests/test_retrieval_provider_contract.py",
+        )
+        for path in expected:
+            self.assertEqual(allowlist.count(f"'{path}'"), 1)
         self.assertNotIn("'backend/'", allowlist)
         self.assertNotIn("*", allowlist)
+        self.assertNotIn("backend/generation_factory.py", allowlist)
+        self.assertNotIn("tests/test_provider_disabled_api.py", allowlist)
 
     def test_acceptance_unexpected_paths_are_joined_from_path_values(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
@@ -97,6 +110,8 @@ class ContainerConfigurationTests(unittest.TestCase):
         self.assertNotIn("Write-Output $groqValue", script)
         self.assertIn("$historyGroqMatches = @(docker history", script)
         self.assertNotIn("Select-String -Pattern 'GROQ_API_KEY=.+'", script)
+        self.assertIn("$historyLlmMatches = @(docker history", script)
+        self.assertNotIn("Select-String -Pattern 'LLM_API_KEY=.+'", script)
         self.assertIn("docker stop --timeout 20", script)
         self.assertNotIn("docker stop --time 20", script)
 
@@ -113,6 +128,28 @@ class ContainerConfigurationTests(unittest.TestCase):
         self.assertIn("$nonEmptyLlmEntries -eq 0", script)
         self.assertNotIn("Write-Host $llmValue", script)
         self.assertNotIn("Write-Output $llmValue", script)
+
+    def test_acceptance_container_runs_with_exact_local_retrieval_provider(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        run_command = script.split("docker run --detach", 1)[1].split("| Out-Null", 1)[0]
+        self.assertIn("-e RETRIEVAL_PROVIDER=chroma_local", run_command)
+        self.assertIn("$retrievalProviderEntries -eq 1 -and $localRetrieverEntries -eq 1", script)
+        self.assertIn("StartsWith('RETRIEVAL_PROVIDER=', [System.StringComparison]::Ordinal)", script)
+        self.assertIn("$llmProviderEntries -eq 1 -and $disabledProviderEntries -eq 1", script)
+
+    def test_acceptance_provider_environment_checks_reject_missing_duplicate_and_conflicting_entries(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        self.assertIn("$retrievalProviderEntries++", script)
+        self.assertIn("$localRetrieverEntries++", script)
+        self.assertIn("$retrievalProviderEntries -eq 1 -and $localRetrieverEntries -eq 1", script)
+        self.assertIn("$llmProviderEntries++", script)
+        self.assertIn("$llmProviderEntries -eq 1 -and $disabledProviderEntries -eq 1", script)
+
+    def test_acceptance_checks_legacy_and_versioned_retrieval_routes(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        self.assertIn("/api/retrieve", script)
+        self.assertIn("/api/v1/retrieve", script)
+        self.assertIn("Legacy/v1 retrieval behavior differs.", script)
 
     def test_healthcheck_and_versioned_paths_are_preserved(self):
         health = (ROOT / "scripts/container_healthcheck.py").read_text(encoding="utf-8")

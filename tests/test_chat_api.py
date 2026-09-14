@@ -17,6 +17,7 @@ from backend.generation import (
     ProviderUnavailableError,
 )
 from backend.main import create_app
+from backend.retrieval_provider import RetrievalHit
 from backend.prompts import SYSTEM_PROMPT, build_user_prompt
 from backend.settings import GenerationSettings, INSUFFICIENT_EVIDENCE_ANSWER, get_generation_settings
 
@@ -75,7 +76,19 @@ class FakeRetriever:
                 "include_guidance": include_guidance,
             }
         )
-        return self.result
+        return self._hits(self.result)
+
+    def count(self):
+        return self.collection.count()
+
+    @staticmethod
+    def _hits(result):
+        return [
+            RetrievalHit(chunk_id=chunk_id, text=text, metadata=metadata, distance=distance)
+            for chunk_id, text, metadata, distance in zip(
+                result["ids"][0], result["documents"][0], result["metadatas"][0], result["distances"][0]
+            )
+        ]
 
 
 class FakeGenerator:
@@ -195,7 +208,7 @@ class GroundedChatApiTests(unittest.TestCase):
                 if question == "electric toy applicable primary standard IS 15644":
                     result["documents"][0][:2] = [primary, secondary]
                     result["ids"][0][:2] = ["coverage-primary", "coverage-secondary"]
-                return result
+                return self._hits(result)
 
         answer = "The primary standard is IS 15644:2006; IS 9873 Parts 2 and 3 are secondary standards."
         generated = valid_output(citations=[
