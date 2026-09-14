@@ -70,7 +70,7 @@ The final design must not depend on Netlify, Groq, ChromaDB, or Cloudflare Quick
 
 ## 9. AI and retrieval portability
 
-**Current implementation:** Groq is accessed through the generator layer, and ChromaDB is the retrieval store.
+**Current implementation:** generation is selected through a provider factory supporting Groq, a controlled OpenAI-compatible endpoint, or disabled mode; ChromaDB remains the retrieval store. Provider output is untrusted and backend evidence/citation validation remains authoritative.
 
 **Proposed production architecture:** a provider-independent model gateway and a retrieval interface independent of ChromaDB. This enables BIS-approved or government-hosted language models and potential migration to PostgreSQL/pgvector or OpenSearch. Embedding-model selection should be benchmark-driven. Deterministic policy rules, retrieval, and language generation should remain separate, avoiding vendor lock-in and allowing each layer to be independently assessed.
 

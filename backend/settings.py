@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 import os
+import re
+import unicodedata
 from urllib.parse import urlsplit
 
 SERVICE_NAME = "bis-toys-retrieval-api"
@@ -68,16 +70,31 @@ class GenerationSettings:
     model: str
     timeout_seconds: float
     max_completion_tokens: int
+    base_url: str | None = None
+    allowed_hosts: tuple[str, ...] = ()
+    structured_output_mode: str = "json_schema"
 
 
 def get_generation_settings() -> GenerationSettings:
     provider = os.getenv("LLM_PROVIDER", DEFAULT_LLM_PROVIDER).strip().lower()
-    model = os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip()
+    if provider == "openai_compatible":
+        model = os.getenv("LLM_MODEL", "").strip()
+        api_key = os.getenv("LLM_API_KEY") or None
+        raw_completion_tokens = os.getenv("LLM_MAX_COMPLETION_TOKENS", str(DEFAULT_GROQ_MAX_COMPLETION_TOKENS))
+        # Preserve the configured spelling so the gateway can reject leading or
+        # trailing whitespace instead of normalizing an ambiguous URL into one.
+        base_url = os.getenv("LLM_BASE_URL", "") or None
+        structured_output_mode = os.getenv("LLM_STRUCTURED_OUTPUT_MODE", "json_schema").strip().lower()
+        allowed_hosts = _get_allowed_model_hosts(os.getenv("LLM_ALLOWED_HOSTS", ""))
+    else:
+        model = os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip()
+        api_key = os.getenv("GROQ_API_KEY") or None
+        raw_completion_tokens = os.getenv("GROQ_MAX_COMPLETION_TOKENS", str(DEFAULT_GROQ_MAX_COMPLETION_TOKENS))
+        base_url = None
+        structured_output_mode = "json_schema"
+        allowed_hosts = ()
     timeout_seconds = float(
         os.getenv("LLM_TIMEOUT_SECONDS", str(DEFAULT_LLM_TIMEOUT_SECONDS))
-    )
-    raw_completion_tokens = os.getenv(
-        "GROQ_MAX_COMPLETION_TOKENS", str(DEFAULT_GROQ_MAX_COMPLETION_TOKENS)
     )
     if timeout_seconds <= 0:
         raise ValueError("LLM timeout must be positive")
@@ -89,8 +106,33 @@ def get_generation_settings() -> GenerationSettings:
         max_completion_tokens = DEFAULT_GROQ_MAX_COMPLETION_TOKENS
     return GenerationSettings(
         provider=provider,
-        api_key=os.getenv("GROQ_API_KEY") or None,
+        api_key=api_key,
         model=model,
         timeout_seconds=timeout_seconds,
         max_completion_tokens=max_completion_tokens,
+        base_url=base_url,
+        allowed_hosts=allowed_hosts,
+        structured_output_mode=structured_output_mode,
     )
+
+
+def _get_allowed_model_hosts(raw_hosts: str) -> tuple[str, ...]:
+    hosts: list[str] = []
+    for raw in raw_hosts.split(","):
+        host = raw.strip().lower()
+        # Spaces around comma-separated tokens are harmless normalization; all
+        # other URL syntax is rejected here and revalidated by the gateway.
+        if (
+            not host
+            or "*" in host
+            or host.endswith(".")
+            or not host.isascii()
+            or any(unicodedata.category(char)[0] in {"C", "Z"} for char in host)
+            or any(char in host for char in "/?#@[]")
+            or "://" in host
+            or not re.fullmatch(r"[a-z0-9][a-z0-9.:-]*", host)
+        ):
+            continue
+        if host not in hosts:
+            hosts.append(host)
+    return tuple(hosts)

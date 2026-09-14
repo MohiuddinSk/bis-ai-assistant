@@ -61,6 +61,23 @@ class ContainerConfigurationTests(unittest.TestCase):
         for path in ("scripts/container_healthcheck.py", "scripts/test_container.ps1"):
             self.assertIn(path, script)
 
+    def test_acceptance_allowlist_includes_only_gateway_task_files(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        for path in ("backend/generation_factory.py", "backend/openai_compatible_generator.py", "tests/test_generation_factory.py", "tests/test_provider_disabled_api.py"):
+            self.assertIn(path, script)
+        allowlist = script.split("$Allowed = @(", 1)[1].split(")", 1)[0]
+        self.assertEqual(allowlist.count("'tests/test_provider_disabled_api.py'"), 1)
+        self.assertNotIn("'backend/'", allowlist)
+        self.assertNotIn("*", allowlist)
+
+    def test_acceptance_unexpected_paths_are_joined_from_path_values(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        self.assertIn("$unexpectedPaths = @(", script)
+        self.assertIn("ForEach-Object { $_.Path }", script)
+        self.assertIn("$unexpectedPaths -join ', '", script)
+        self.assertIn("$unexpected.Count -eq 0", script)
+        self.assertNotIn("$unexpected -join ', '", script)
+
     def test_acceptance_request_id_check_handles_header_collections(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
         self.assertIn("$responseRequestIds = @($response.Headers['X-Request-ID'])", script)
@@ -82,6 +99,20 @@ class ContainerConfigurationTests(unittest.TestCase):
         self.assertNotIn("Select-String -Pattern 'GROQ_API_KEY=.+'", script)
         self.assertIn("docker stop --timeout 20", script)
         self.assertNotIn("docker stop --time 20", script)
+
+    def test_acceptance_container_runs_with_disabled_provider_and_empty_runtime_keys(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        run_command = script.split("docker run --detach", 1)[1].split("| Out-Null", 1)[0]
+        self.assertIn("-e LLM_PROVIDER=disabled", run_command)
+        self.assertIn("-e GROQ_API_KEY=", run_command)
+        self.assertIn("-e LLM_API_KEY=", run_command)
+        self.assertNotIn("LLM_BASE_URL", run_command)
+        self.assertNotIn("LLM_MODEL", run_command)
+        self.assertNotIn("LLM_ALLOWED_HOSTS", run_command)
+        self.assertIn("$disabledProviderEntries -eq 1", script)
+        self.assertIn("$nonEmptyLlmEntries -eq 0", script)
+        self.assertNotIn("Write-Host $llmValue", script)
+        self.assertNotIn("Write-Output $llmValue", script)
 
     def test_healthcheck_and_versioned_paths_are_preserved(self):
         health = (ROOT / "scripts/container_healthcheck.py").read_text(encoding="utf-8")
