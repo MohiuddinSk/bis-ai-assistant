@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $Image = 'bis-saarthi-backend:prototype'
 $Name = "bis-saarthi-container-test-$PID"
 $Root = Split-Path -Parent $PSScriptRoot
-$Allowed = @('Dockerfile', '.dockerignore', 'compose.yaml', 'scripts/container_healthcheck.py', 'scripts/test_container.ps1', 'docs/CONTAINER_DEPLOYMENT.md', 'tests/test_container_configuration.py')
+$Allowed = @('Dockerfile', '.dockerignore', 'compose.yaml', 'backend/settings.py', 'backend/main.py', 'backend/generation_factory.py', 'backend/openai_compatible_generator.py', 'scripts/container_healthcheck.py', 'scripts/test_container.ps1', 'docs/CONTAINER_DEPLOYMENT.md', 'docs/BIS_INTEGRATION_READINESS.md', 'tests/test_container_configuration.py', 'tests/test_generation_factory.py', 'tests/test_openai_compatible_generator.py', 'tests/test_provider_disabled_api.py')
 
 function Assert-True([bool]$Value, [string]$Message) { if (-not $Value) { throw $Message } }
 function Get-Json([string]$Path, [hashtable]$Headers = @{}) {
@@ -35,14 +35,18 @@ try {
         [pscustomobject]@{ Status = $status; Path = $path }
     })
     $unexpected = @($changes | Where-Object { $_.Path -notin $Allowed })
-    Assert-True ($unexpected.Count -eq 0) "Unexpected working-tree modifications: $($unexpected -join ', ')"
+    $unexpectedPaths = @(
+        $unexpected |
+        ForEach-Object { $_.Path }
+    )
+    Assert-True ($unexpected.Count -eq 0) "Unexpected working-tree modifications: $($unexpectedPaths -join ', ')"
 
     Remove-Item Env:GROQ_API_KEY -ErrorAction SilentlyContinue
     docker build --tag $Image $Root
 
     $portInUse = Get-NetTCPConnection -LocalPort $HostPort -State Listen -ErrorAction SilentlyContinue
     Assert-True ($null -eq $portInUse) "Host port $HostPort is already listening; choose -HostPort."
-    docker run --detach --name $Name --init --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:rw,nosuid,nodev,size=64m -p "${HostPort}:8000" -e GROQ_API_KEY= $Image | Out-Null
+    docker run --detach --name $Name --init --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:rw,nosuid,nodev,size=64m -p "${HostPort}:8000" -e LLM_PROVIDER=disabled -e GROQ_API_KEY= -e LLM_API_KEY= $Image | Out-Null
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
@@ -81,17 +85,28 @@ try {
     }
     try { Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/v1/chat" -ContentType 'application/json' -Body '{"question":"Tell me about BIS toy regulation"}'; throw 'Provider request unexpectedly succeeded.' } catch { Assert-True ($_.Exception.Response.StatusCode.value__ -eq 503) 'Provider-free request was not safely rejected.' }
     Assert-True ((docker exec $Name id -u) -eq '10001') 'Container does not run as the non-root application user.'
+    $disabledProviderEntries = 0
     $nonEmptyGroqEntries = 0
+    $nonEmptyLlmEntries = 0
     foreach ($target in @($Name, $Image)) {
         $environmentEntries = @(docker inspect $target --format '{{json .Config.Env}}' | ConvertFrom-Json)
         foreach ($environmentEntry in $environmentEntries) {
+            if ($target -eq $Name -and $environmentEntry -ceq 'LLM_PROVIDER=disabled') {
+                $disabledProviderEntries++
+            }
             if ($environmentEntry -is [string] -and $environmentEntry.StartsWith('GROQ_API_KEY=', [System.StringComparison]::Ordinal)) {
                 $groqValue = $environmentEntry.Substring('GROQ_API_KEY='.Length)
                 if ($groqValue.Length -gt 0) { $nonEmptyGroqEntries++ }
             }
+            if ($environmentEntry -is [string] -and $environmentEntry.StartsWith('LLM_API_KEY=', [System.StringComparison]::Ordinal)) {
+                $llmValue = $environmentEntry.Substring('LLM_API_KEY='.Length)
+                if ($llmValue.Length -gt 0) { $nonEmptyLlmEntries++ }
+            }
         }
     }
+    Assert-True ([bool]($disabledProviderEntries -eq 1)) 'Container does not have exactly one disabled LLM provider entry.'
     Assert-True ([bool]($nonEmptyGroqEntries -eq 0)) 'A non-empty GROQ_API_KEY was configured.'
+    Assert-True ([bool]($nonEmptyLlmEntries -eq 0)) 'A non-empty LLM_API_KEY was configured.'
     $historyGroqMatches = @(docker history --no-trunc $Image | Select-String -Pattern 'GROQ_API_KEY=')
     Assert-True ([bool]($historyGroqMatches.Count -eq 0)) 'Image history references GROQ_API_KEY.'
     docker restart $Name | Out-Null

@@ -28,9 +28,15 @@ docker compose down
 Compose supplies only non-secret defaults. Optional runtime variables, with no values shown here, are:
 
 - `GROQ_API_KEY`
+- `LLM_PROVIDER` (`groq`, `openai_compatible`, or `disabled`)
+- `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_MAX_COMPLETION_TOKENS`
+- `LLM_STRUCTURED_OUTPUT_MODE` (`json_schema` or `json_object`)
+- `LLM_ALLOWED_HOSTS`
 - `ALLOWED_ORIGINS`
 
 `GROQ_API_KEY` is interpolated only at runtime and is intentionally empty by default. Do not put credentials in `compose.yaml`, the Dockerfile, image labels, or build arguments. The Compose syntax does not set CPU or memory limits because ordinary local Compose runs do not consistently enforce `deploy.resources`; apply platform-controlled limits in a managed target if needed.
+
+Groq remains the compatible default. `disabled` keeps retrieval and deterministic answers available but returns the existing sanitized generation-unavailable response only for questions that genuinely require model generation. An OpenAI-compatible endpoint is administrator configuration only: its absolute base URL must be allowlisted by exact `LLM_ALLOWED_HOSTS`; HTTPS is required except explicit allowlisted loopback development hosts. No provider URL or key is accepted from callers. Use network egress allowlisting in BIS/NIC deployment; DNS-rebinding and network routing controls remain deployment responsibilities. Provider portability does not make Chroma or the prototype data infrastructure production-ready, and this remains neither BIS nor NIC approval.
 
 ## Health and acceptance
 

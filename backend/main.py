@@ -18,13 +18,13 @@ from backend.documents import SourceDocumentRegistry
 from backend.question_understanding import QuestionUnderstanding, understand_question
 from backend.generation import (
     GenerationProvider,
-    GroqGenerator,
     MalformedGenerationError,
     ProviderRateLimitError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from backend.generation_factory import from_environment as generation_provider_from_environment
 from backend.schemas import (
     ChatRequest,
     ChatResponse,
@@ -169,7 +169,7 @@ def enforce_compliance_invariants(
 
 def create_app(
     retriever_factory: RetrieverFactory = Retriever,
-    generator_factory: GeneratorFactory = GroqGenerator.from_environment,
+    generator_factory: GeneratorFactory = generation_provider_from_environment,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> Iterator[None]:
