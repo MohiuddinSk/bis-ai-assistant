@@ -23,7 +23,8 @@ from backend.schemas import (
     RetrieveRequest,
     RetrievalResult,
 )
-from backend.service import RetrievalService, RetrieverProtocol
+from backend.retrieval_provider import RetrieverProtocol
+from backend.service import RetrievalService
 from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
 from backend.settings import (
     INSUFFICIENT_EVIDENCE_ANSWER,
@@ -1458,14 +1459,14 @@ class ChatService:
             if "artisans" not in result.text.lower():
                 continue
             for item in adjacent(result.chunk_id, result.source_id, result.page_start):
-                if item["chunk_id"] in known_ids:
+                if item.chunk_id in known_ids:
                     continue
-                known_ids.add(item["chunk_id"])
+                known_ids.add(item.chunk_id)
                 merged.append(RetrievalResult(
-                    rank=0, chunk_id=item["chunk_id"], text=item["text"],
-                    source_id=item["source_id"], source_filename=item["source_filename"],
-                    page_start=item["page_start"], page_end=item["page_end"],
-                    chunk_type=item["chunk_type"], distance=result.distance,
+                    rank=0, chunk_id=item.chunk_id, text=item.text,
+                    source_id=item.metadata.get("source_id"), source_filename=item.metadata.get("source_filename"),
+                    page_start=item.metadata.get("page_start"), page_end=item.metadata.get("page_end"),
+                    chunk_type=item.metadata.get("chunk_type"), distance=result.distance,
                     similarity=result.similarity,
                 ))
         merged.sort(key=lambda item: (

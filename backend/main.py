@@ -25,6 +25,7 @@ from backend.generation import (
     ProviderUnavailableError,
 )
 from backend.generation_factory import from_environment as generation_provider_from_environment
+from backend.retrieval_factory import from_environment as retrieval_provider_from_environment
 from backend.schemas import (
     ChatRequest,
     ChatResponse,
@@ -45,7 +46,6 @@ from backend.settings import (
     SERVICE_NAME,
     get_allowed_origins,
 )
-from retrieval.search import Retriever
 
 
 logger = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ def enforce_compliance_invariants(
 
 
 def create_app(
-    retriever_factory: RetrieverFactory = Retriever,
+    retriever_factory: RetrieverFactory = retrieval_provider_from_environment,
     generator_factory: GeneratorFactory = generation_provider_from_environment,
 ) -> FastAPI:
     @asynccontextmanager
@@ -185,16 +185,25 @@ def create_app(
 
         try:
             retriever = retriever_factory()
-            collection_count = int(retriever.collection.count())
-            application.state.retriever = retriever
-            application.state.collection_count = collection_count
-            logger.info(
-                "Retriever initialized successfully; collection_count=%d",
-                collection_count,
-            )
         except Exception:
             application.state.startup_error = "Retrieval service is unavailable."
-            logger.exception("Retriever initialization failed")
+            logger.error("Retrieval failure; event=retrieval_initialization_failed")
+        else:
+            if retriever is None:
+                application.state.startup_error = "Retrieval service is unavailable."
+            else:
+                try:
+                    collection_count = int(retriever.count())
+                except Exception:
+                    application.state.startup_error = "Retrieval service is unavailable."
+                    logger.error("Retrieval failure; event=retrieval_count_failed")
+                else:
+                    application.state.retriever = retriever
+                    application.state.collection_count = collection_count
+                    logger.info(
+                        "Retriever initialized successfully; collection_count=%d",
+                        collection_count,
+                    )
 
         try:
             generator = generator_factory()
@@ -318,7 +327,10 @@ def create_app(
             with request.app.state.retrieval_lock:
                 response = RetrievalService(retriever).retrieve(payload)
         except Exception:
-            logger.exception("Retrieval request failed")
+            logger.error(
+                "Retrieval failure; event=retrieval_request_failed request_id=%s",
+                request.state.request_id,
+            )
             raise HTTPException(
                 status_code=500,
                 detail="Retrieval request failed.",

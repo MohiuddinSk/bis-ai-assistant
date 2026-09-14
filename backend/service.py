@@ -1,24 +1,11 @@
 """Mapping layer between the existing Retriever and the public API."""
 
-from collections.abc import Mapping
-from typing import Any, Protocol
+from collections.abc import Mapping, Sequence
+import math
+from typing import Any
 
+from backend.retrieval_provider import RetrievalHit, RetrieverProtocol
 from backend.schemas import RetrieveRequest, RetrieveResponse, RetrievalResult
-
-
-class RetrieverProtocol(Protocol):
-    def search(
-        self,
-        question: str,
-        k: int = 5,
-        include_guidance: bool = False,
-    ) -> Mapping[str, Any]: ...
-
-
-def _first_result_row(value: Any) -> list[Any]:
-    if isinstance(value, list) and value and isinstance(value[0], list):
-        return value[0]
-    return []
 
 
 class RetrievalService:
@@ -26,40 +13,47 @@ class RetrievalService:
         self._retriever = retriever
 
     def retrieve(self, request: RetrieveRequest) -> RetrieveResponse:
-        raw = self._retriever.search(
+        hits = self._retriever.search(
             question=request.question,
             k=request.top_k,
             include_guidance=request.include_guidance,
         )
 
-        ids = _first_result_row(raw.get("ids"))
-        documents = _first_result_row(raw.get("documents"))
-        metadatas = _first_result_row(raw.get("metadatas"))
-        distances = _first_result_row(raw.get("distances"))
-
-        if not ids and not documents:
+        if not isinstance(hits, Sequence) or isinstance(hits, (str, bytes)):
+            raise ValueError("Retriever returned invalid results")
+        if not hits:
             return RetrieveResponse(
                 question=request.question,
                 result_count=0,
                 results=[],
             )
 
-        if not (len(ids) == len(documents) == len(metadatas) == len(distances)):
-            raise ValueError("Retriever returned inconsistent result lengths")
-
         results: list[RetrievalResult] = []
-        for rank, (chunk_id, document, metadata, distance_value) in enumerate(
-            zip(ids, documents, metadatas, distances),
-            start=1,
-        ):
-            if not isinstance(chunk_id, str) or not isinstance(document, str):
-                raise ValueError("Retriever returned an invalid chunk ID or document")
+        for rank, hit in enumerate(hits, start=1):
+            if not isinstance(hit, RetrievalHit):
+                raise ValueError("Retriever returned invalid results")
+            chunk_id = hit.chunk_id
+            document = hit.text
+            metadata = hit.metadata
+            distance_value = hit.distance
+            if not isinstance(chunk_id, str) or not chunk_id or not isinstance(document, str) or not document:
+                raise ValueError("Retriever returned invalid results")
             if not isinstance(metadata, Mapping):
-                raise ValueError("Retriever returned invalid metadata")
+                raise ValueError("Retriever returned invalid results")
             if not isinstance(distance_value, (int, float)) or isinstance(distance_value, bool):
-                raise ValueError("Retriever returned an invalid distance")
+                raise ValueError("Retriever returned invalid results")
 
             distance = float(distance_value)
+            if not math.isfinite(distance):
+                raise ValueError("Retriever returned invalid results")
+            for name in ("source_id", "source_filename", "chunk_type"):
+                if metadata.get(name) is not None and not isinstance(metadata.get(name), str):
+                    raise ValueError("Retriever returned invalid results")
+            for name in ("page_start", "page_end"):
+                if metadata.get(name) is not None and (not isinstance(metadata.get(name), int) or isinstance(metadata.get(name), bool) or metadata.get(name) < 1):
+                    raise ValueError("Retriever returned invalid results")
+            if metadata.get("page_start") is not None and metadata.get("page_end") is not None and metadata["page_end"] < metadata["page_start"]:
+                raise ValueError("Retriever returned invalid results")
             results.append(
                 RetrievalResult(
                     rank=rank,

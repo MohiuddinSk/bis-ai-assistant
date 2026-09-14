@@ -48,6 +48,7 @@ def get_allowed_origins() -> tuple[str, ...]:
 
 DEFAULT_LLM_PROVIDER = "groq"
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+DEFAULT_RETRIEVAL_PROVIDER = "chroma_local"
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 DEFAULT_GROQ_MAX_COMPLETION_TOKENS = 2048
 MIN_GROQ_MAX_COMPLETION_TOKENS = 256
@@ -73,6 +74,17 @@ class GenerationSettings:
     base_url: str | None = None
     allowed_hosts: tuple[str, ...] = ()
     structured_output_mode: str = "json_schema"
+
+
+@dataclass(frozen=True)
+class RetrievalSettings:
+    provider: str
+
+
+def get_retrieval_settings() -> RetrievalSettings:
+    return RetrievalSettings(
+        provider=os.getenv("RETRIEVAL_PROVIDER", DEFAULT_RETRIEVAL_PROVIDER).strip().lower(),
+    )
 
 
 def get_generation_settings() -> GenerationSettings:
