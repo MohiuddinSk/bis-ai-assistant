@@ -2,7 +2,7 @@
 import unittest
 from fastapi.testclient import TestClient
 from backend.main import create_app
-from retrieval.search import Retriever
+from backend.retrieval_provider import LocalChromaRetriever
 
 class InvalidGenerator:
     model="fake-no-key"
@@ -13,7 +13,7 @@ BASE={"role":"manufacturer","product_description":"Toy","power_type":"not_sure",
 class ComplianceRealDataTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client=TestClient(create_app(retriever_factory=Retriever,generator_factory=InvalidGenerator)); cls.client.__enter__()
+        cls.client=TestClient(create_app(retriever_factory=LocalChromaRetriever,generator_factory=InvalidGenerator)); cls.client.__enter__()
     @classmethod
     def tearDownClass(cls): cls.client.__exit__(None,None,None)
     def guide(self,**values): return self.client.post("/api/compliance/guide",json={**BASE,**values}).json()["guidance"]

@@ -9,7 +9,7 @@ from backend.chat_service import ChatService
 from backend.main import create_app
 from backend.question_understanding import understand_question
 from backend.schemas import ChatRequest
-from retrieval.search import Retriever
+from backend.retrieval_provider import LocalChromaRetriever
 from tests.test_chat_api import FakeGenerator, FakeRetriever, valid_output
 
 
@@ -162,7 +162,7 @@ class StandardExplanationApiTests(unittest.TestCase):
 class StandardExplanationRealIndexTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.retriever = Retriever()
+        cls.retriever = LocalChromaRetriever()
 
     def service(self):
         class RejectingGenerator:

@@ -9,9 +9,19 @@ from backend.service import RetrievalService
 
 
 class RawLocalRetriever:
-    def __init__(self, result):
+    def __init__(self, result, chunks_by_id=None):
         self.result = result
         self.collection = type("Collection", (), {"count": lambda _: 917})()
+        self.chunks_by_id = chunks_by_id if chunks_by_id is not None else {
+            "first": {
+                "document": "first text",
+                "metadata": {"source_id": "source", "source_filename": "source.pdf", "page_start": 1},
+            },
+            "second": {
+                "document": "second text",
+                "metadata": {"source_id": "source", "source_filename": "source.pdf", "page_start": 2},
+            },
+        }
 
     def search(self, question, k=5, include_guidance=False):
         return self.result
@@ -41,6 +51,29 @@ class RetrievalProviderContractTests(unittest.TestCase):
         self.assertEqual([hit.distance for hit in hits], [0.1, 0.2])
         self.assertEqual(adapter.count(), 917)
         self.assertEqual(adapter.adjacent_chunks("first", "source", 1)[0].chunk_id, "adjacent")
+
+    def test_local_adapter_normalizes_indexed_chunks_without_exposing_raw_records(self):
+        adapter = LocalChromaRetriever(RawLocalRetriever(raw_result()))
+        chunks = adapter.indexed_chunks()
+        self.assertEqual([chunk.chunk_id for chunk in chunks], ["first", "second"])
+        self.assertEqual(chunks[0].text, "first text")
+        self.assertEqual(dict(chunks[0].metadata), {"source_id": "source", "source_filename": "source.pdf", "page_start": 1})
+        self.assertEqual([chunk.distance for chunk in chunks], [0.0, 0.0])
+        with self.assertRaises(TypeError):
+            chunks[0].metadata["source_id"] = "changed"
+        self.assertFalse(hasattr(adapter, "chunks_by_id"))
+
+    def test_local_adapter_rejects_malformed_indexed_chunks(self):
+        malformed_containers = (
+            [],
+            {"": {"document": "text", "metadata": {}}},
+            {"chunk": []},
+            {"chunk": {"document": "", "metadata": {}}},
+            {"chunk": {"document": "text", "metadata": []}},
+        )
+        for chunks_by_id in malformed_containers:
+            with self.subTest(chunks_by_id=repr(chunks_by_id)), self.assertRaisesRegex(ValueError, "invalid indexed chunks"):
+                LocalChromaRetriever(RawLocalRetriever(raw_result(), chunks_by_id)).indexed_chunks()
 
     def test_local_adapter_empty_and_malformed_results_fail_closed(self):
         empty = {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}

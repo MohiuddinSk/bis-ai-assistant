@@ -81,6 +81,9 @@ class FakeRetriever:
     def count(self):
         return self.collection.count()
 
+    def indexed_chunks(self):
+        return tuple(self._hits(self.result))
+
     @staticmethod
     def _hits(result):
         return [

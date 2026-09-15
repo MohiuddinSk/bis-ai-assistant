@@ -159,6 +159,76 @@ class ContainerConfigurationTests(unittest.TestCase):
         for path in ("/health", "/api/v1/health", "/api/chat", "/api/v1/chat", "/api/documents/{source_filename}", "/api/v1/documents/{source_filename}"):
             self.assertIn(path, main)
 
+    def test_read_only_real_index_acceptance_contract(self):
+        script_path = ROOT / "scripts/test_real_index.ps1"
+        self.assertTrue(script_path.is_file())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("[CmdletBinding()]", script)
+        self.assertIn("$PSScriptRoot", script)
+        self.assertIn("[int]$ExpectedCollectionCount = 917", script)
+        self.assertIn('$ErrorActionPreference = "Stop"', script)
+        for marker in (
+            '"RETRIEVAL_PROVIDER", "chroma_local", "Process"',
+            '"LLM_PROVIDER", "disabled", "Process"',
+            '"GROQ_API_KEY", "", "Process"',
+            '"LLM_API_KEY", "", "Process"',
+            '"TRANSFORMERS_OFFLINE", "1", "Process"',
+            '"HF_HUB_OFFLINE", "1", "Process"',
+            "scripts/check_ci_artifacts.py",
+            "create_retrieval_provider",
+            "LocalChromaRetriever, RetrievalHit",
+            "provider.count() != int(sys.argv[1])",
+            "len(hits) != 5",
+            "math.isfinite(hit.distance)",
+            "$BeforeHashes = Get-ProtectedHashes $ProtectedDirectories",
+            "$AfterHashes = Get-ProtectedHashes $ProtectedDirectories",
+            "Assert-HashesUnchanged $BeforeHashes $AfterHashes",
+            "$RealIndexTargets = @(",
+            "foreach ($Target in $RealIndexTargets)",
+            'Write-Output "Real-index test failed: $Target"',
+            "$HasTestFailure = $true",
+            "finally {",
+            "Read-only real-index acceptance passed.",
+        ):
+            self.assertIn(marker, script)
+        expected_targets = (
+            "tests.test_compliance_real_data_integration",
+            "tests.test_question_understanding_real_data",
+            "tests.test_real_data_integration",
+            "tests.test_standard_explanation.StandardExplanationRealIndexTests",
+        )
+        for target in expected_targets:
+            self.assertEqual(script.count(target), 1)
+        self.assertLess(
+            script.index('Write-Output "Real-index test failed: $Target"'),
+            script.index("$AfterHashes = Get-ProtectedHashes $ProtectedDirectories"),
+        )
+        self.assertLess(
+            script.index("Assert-HashesUnchanged $BeforeHashes $AfterHashes"),
+            script.index("$Succeeded = -not $HasTestFailure"),
+        )
+        for forbidden in (
+            "retrieval/test_retrieval.py", "ingestion/", "build_chroma", "validate_data", "docker",
+            "pip install", "remove-item", "git reset", "git checkout", "git clean",
+        ):
+            self.assertNotIn(forbidden, script.lower())
+        self.assertNotIn("Write-Output $OriginalEnvironment", script)
+        self.assertNotIn("Write-Output $SmokeCheck", script)
+
+    def test_controlled_evidence_uses_the_provider_neutral_indexed_chunk_contract(self):
+        provider = (ROOT / "backend/retrieval_provider.py").read_text(encoding="utf-8")
+        service = (ROOT / "backend/chat_service.py").read_text(encoding="utf-8")
+        self.assertIn("def indexed_chunks(self) -> Sequence[RetrievalHit]", provider)
+        self.assertIn("def adjacent_chunks(", provider)
+        self.assertIn("MappingProxyType(dict(metadata))", provider)
+        self.assertIn("indexed_chunks = getattr(self._retriever, \"indexed_chunks\", None)", service)
+        self.assertIn("rows = indexed_chunks()", service)
+        controlled_candidates = service.split("def _controlled_role_candidates", 1)[1].split("def _role_matches", 1)[0]
+        self.assertIn("except (TypeError, ValueError):", controlled_candidates)
+        self.assertNotIn("except Exception:", controlled_candidates)
+        self.assertNotIn("chunks_by_id", controlled_candidates)
+        self.assertNotIn("self._retriever.collection", controlled_candidates)
+
 
 if __name__ == "__main__":
     unittest.main()

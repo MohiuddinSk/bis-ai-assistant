@@ -5,7 +5,7 @@ import unittest
 
 from backend.chat_service import ChatService
 from backend.schemas import ChatRequest
-from retrieval.search import Retriever
+from backend.retrieval_provider import LocalChromaRetriever
 
 
 class InvalidTwiceGenerator:
@@ -22,7 +22,7 @@ class InvalidTwiceGenerator:
 class RealDataGroundingIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.retriever = Retriever()
+        cls.retriever = LocalChromaRetriever()
 
     def service(self):
         return ChatService(
