@@ -79,6 +79,15 @@ class CiArtifactTests(unittest.TestCase):
         (root / check_ci_artifacts.CHUNKS_PATH).write_text('{"id":"changed"}\n', encoding="utf-8")
         self.assert_invalid(root)
 
+    def test_lf_and_crlf_chunks_match_the_manifest_hash(self):
+        root = self.make_fixture()
+        chunks = root / check_ci_artifacts.CHUNKS_PATH
+        expected_hash = json.loads((root / check_ci_artifacts.MANIFEST_PATH).read_text(encoding="utf-8"))["chunks_sha256"]
+        self.assertEqual(check_ci_artifacts._chunk_sha256(chunks), expected_hash)
+        chunks.write_bytes(chunks.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertEqual(check_ci_artifacts._chunk_sha256(chunks), expected_hash)
+        check_ci_artifacts.validate(root)
+
     def test_missing_or_changed_raw_pdf_fails(self):
         root = self.make_fixture()
         (root / "data/raw/example.pdf").unlink()

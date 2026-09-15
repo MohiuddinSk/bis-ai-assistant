@@ -70,6 +70,16 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _chunk_sha256(path: Path) -> str:
+    """Hash text chunks in the LF form committed by the manifest.
+
+    Git may check this JSONL file out with CRLF on Windows.  The manifest was
+    generated from LF bytes, so only CRLF sequences are normalized before
+    hashing; binary source files continue through ``_sha256`` unchanged.
+    """
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def validate(root: Path = ROOT) -> None:
     """Validate committed artifact metadata without modifying repository files."""
     root = root.resolve()
@@ -87,7 +97,7 @@ def validate(root: Path = ROOT) -> None:
     chunk_hash = manifest.get("chunks_sha256")
     if not isinstance(chunk_hash, str) or len(chunk_hash) != 64:
         _fail("invalid chunk hash")
-    if _sha256(chunks) != chunk_hash:
+    if _chunk_sha256(chunks) != chunk_hash:
         _fail("chunk hash mismatch")
 
     if not isinstance(registry, list) or not registry:
