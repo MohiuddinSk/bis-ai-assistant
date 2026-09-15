@@ -3,7 +3,7 @@ PyMuPDF==1.26.6
 chromadb==0.5.23
 numpy==1.26.4
 sentence-transformers==3.4.1
-transformers==4.46.3
+transformers==4.57.6
 posthog==3.25.0
 torch==2.5.1
 tokenizers==0.20.3
