@@ -143,7 +143,14 @@ class CiConfigurationTests(unittest.TestCase):
         expected_schedule = {
             "interval": "weekly", "day": "monday", "time": "04:00", "timezone": "Asia/Kolkata",
         }
-        forbidden = {"registries", "credentials", "secrets", "reviewers", "assignees", "labels", "groups", "allow", "ignore"}
+        forbidden = {
+            "registries", "credentials", "secrets", "reviewers", "assignees", "labels", "groups", "allow",
+            "auto-merge", "automerge", "insecure-external-code-execution",
+        }
+        major_only_ignore = [{
+            "dependency-name": "*",
+            "update-types": ["version-update:semver-major"],
+        }]
         for entry in updates:
             self.assertIsInstance(entry, dict)
             key = (entry["package-ecosystem"], entry["directory"])
@@ -152,6 +159,7 @@ class CiConfigurationTests(unittest.TestCase):
             self.assertEqual(entry.get("schedule"), expected_schedule)
             self.assertEqual(entry.get("open-pull-requests-limit"), expected_limits[key])
             self.assertEqual(entry.get("commit-message"), {"prefix": "deps"})
+            self.assertEqual(entry.get("ignore"), major_only_ignore)
             self.assertTrue(forbidden.isdisjoint(entry))
             self.assertNotIn("rebase-strategy", entry)
             self.assertNotIn("pull-request-branch-name", entry)

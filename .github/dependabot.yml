@@ -11,6 +11,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: deps
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: npm
     directory: "/frontend"
     target-branch: main
@@ -22,6 +26,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: deps
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: github-actions
     directory: "/"
     target-branch: main
@@ -33,3 +41,7 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: deps
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
