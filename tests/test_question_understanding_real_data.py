@@ -5,7 +5,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from backend.main import create_app
-from retrieval.search import Retriever
+from backend.retrieval_provider import LocalChromaRetriever
 
 
 class InvalidGenerator:
@@ -19,7 +19,7 @@ class QuestionUnderstandingRealDataTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.context = TestClient(create_app(
-            retriever_factory=Retriever,
+            retriever_factory=LocalChromaRetriever,
             generator_factory=InvalidGenerator,
         ))
         cls.client = cls.context.__enter__()

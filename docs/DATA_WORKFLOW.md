@@ -40,6 +40,18 @@ The builder validates its input, requires exact collection membership, and does 
 
 `.gitattributes` enforces LF line endings for JSONL files (`*.jsonl text eol=lf`). Preserve LF when generating or editing JSONL output.
 
+## Read-only real-index acceptance
+
+Use this local, manual acceptance harness only when the local Chroma index, the cached pinned E5 model, and a working Python 3.11 environment are already available:
+
+```powershell
+.\scripts\test_real_index.ps1
+```
+
+It is intentionally excluded from hosted PR CI. The harness uses the existing index and artifacts; it does not rebuild, ingest, regenerate, or modify data. It hashes protected raw, processed, evaluation, and local Chroma files before and after execution, and fails if any protected hash differs.
+
+If Python is missing, repair the local Python 3.11 environment before running it. If the index is missing, build it through the documented local data workflow before attempting acceptance. If the offline E5 model cache is missing, populate the pinned model cache through the approved local setup before running this offline check.
+
 ## Source and retrieval policy
 
 Hardcoded structured summaries from v2 are not part of active retrieval. Source excerpts retain conditions and actual page references. Table rows preserve left-to-right cells without guessing continuation headers; consult the PDF for merged cells, continuation tables, and ambiguous layouts. No text is deleted merely because it repeats across pages. Oversized passages split at whitespace and do not silently truncate inside the encoder.

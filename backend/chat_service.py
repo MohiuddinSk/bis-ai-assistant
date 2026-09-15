@@ -1,6 +1,6 @@
 """Grounded chat orchestration and backend-controlled citation mapping."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import logging
 import re
@@ -23,7 +23,7 @@ from backend.schemas import (
     RetrieveRequest,
     RetrievalResult,
 )
-from backend.retrieval_provider import RetrieverProtocol
+from backend.retrieval_provider import RetrievalHit, RetrieverProtocol
 from backend.service import RetrievalService
 from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
 from backend.settings import (
@@ -1149,10 +1149,27 @@ class ChatService:
         if not any((electric_standard_intent, non_electric_standard_intent, explanation_intent, certification_intent, exemption_intent,
                     document_intent, commencement_intent, transition_intent, roadmap_intent)):
             return []
-        rows = getattr(self._retriever, "chunks_by_id", {}).values()
+        indexed_chunks = getattr(self._retriever, "indexed_chunks", None)
+        if not callable(indexed_chunks):
+            return []
+        try:
+            rows = indexed_chunks()
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(rows, Sequence):
+            return []
         candidates: list[RetrievalResult] = []
         for row in rows:
-            text, metadata = row["document"], row["metadata"]
+            if (
+                not isinstance(row, RetrievalHit)
+                or not isinstance(row.chunk_id, str)
+                or not row.chunk_id.strip()
+                or not isinstance(row.text, str)
+                or not row.text.strip()
+                or not isinstance(row.metadata, Mapping)
+            ):
+                return []
+            text, metadata = row.text, row.metadata
             if not metadata.get("retrieval_enabled"):
                 continue
             is_electric_standard_role = self._is_normative_primary(text) or self._is_normative_secondary(text)
@@ -1193,7 +1210,7 @@ class ChatService:
                                            or is_certification_role or is_document_role or is_exemption_role))):
                 continue
             candidates.append(RetrievalResult(
-                rank=0, chunk_id=row["id"], text=text,
+                rank=0, chunk_id=row.chunk_id, text=text,
                 source_id=metadata.get("source_id"), source_filename=metadata.get("source_filename"),
                 page_start=metadata.get("page_start"), page_end=metadata.get("page_end"),
                 chunk_type=metadata.get("chunk_type"),

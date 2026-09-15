@@ -83,9 +83,19 @@ class CiArtifactTests(unittest.TestCase):
     def test_lf_and_crlf_chunks_match_the_manifest_hash(self):
         root = self.make_fixture()
         chunks = root / check_ci_artifacts.CHUNKS_PATH
-        expected_hash = hashlib.sha256(b'{"id":"chunk-1"}\r\n').hexdigest()
+        lf_content = (
+            b'{"chunk_id":"one"}\n'
+            b'{"chunk_id":"two"}\n'
+        )
+        crlf_content = lf_content.replace(b"\n", b"\r\n")
+        expected_hash = hashlib.sha256(crlf_content).hexdigest()
+        manifest_path = root / check_ci_artifacts.MANIFEST_PATH
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["chunks_sha256"] = expected_hash
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        chunks.write_bytes(lf_content)
         self.assertEqual(check_ci_artifacts._chunk_sha256(chunks), expected_hash)
-        chunks.write_bytes(chunks.read_bytes().replace(b"\n", b"\r\n"))
+        chunks.write_bytes(crlf_content)
         self.assertEqual(check_ci_artifacts._chunk_sha256(chunks), expected_hash)
         check_ci_artifacts.validate(root)
 
