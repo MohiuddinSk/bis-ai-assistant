@@ -4,6 +4,6 @@ groq==1.7.0
 httpx==0.28.1
 pydantic==2.13.5
 pypdf==6.10.0
-PyMuPDF==1.26.6
+PyMuPDF==1.28.2
 PyYAML==6.0.3
 starlette==1.6.0
