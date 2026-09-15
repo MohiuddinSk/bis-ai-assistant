@@ -7,6 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github/workflows/quality-gates.yml"
+DEPENDABOT_PATH = ROOT / ".github/dependabot.yml"
 BACKEND_TESTS = [
     "tests.test_api", "tests.test_chat_api", "tests.test_chat_understanding_api",
     "tests.test_compliance_api", "tests.test_container_configuration", "tests.test_cors_settings",
@@ -121,6 +122,40 @@ class CiConfigurationTests(unittest.TestCase):
                     self.assertEqual(configured.get("cache-dependency-path"), "requirements-ci-light.txt")
                 if configured.get("cache") == "npm":
                     self.assertEqual(configured.get("cache-dependency-path"), "frontend/package-lock.json")
+
+    def test_dependabot_configuration_is_limited_and_independently_reviewable(self):
+        self.assertTrue(DEPENDABOT_PATH.is_file())
+        dependabot = yaml.safe_load(DEPENDABOT_PATH.read_text(encoding="utf-8"))
+        self.assertIsInstance(dependabot, dict)
+        self.assertEqual(dependabot.get("version"), 2)
+        updates = dependabot.get("updates")
+        self.assertIsInstance(updates, list)
+        expected_limits = {
+            ("pip", "/"): 5,
+            ("npm", "/frontend"): 5,
+            ("github-actions", "/"): 3,
+        }
+        self.assertEqual(
+            {(entry.get("package-ecosystem"), entry.get("directory")) for entry in updates if isinstance(entry, dict)},
+            set(expected_limits),
+        )
+        self.assertEqual(len(updates), len(expected_limits))
+        expected_schedule = {
+            "interval": "weekly", "day": "monday", "time": "04:00", "timezone": "Asia/Kolkata",
+        }
+        forbidden = {"registries", "credentials", "secrets", "reviewers", "assignees", "labels", "groups", "allow", "ignore"}
+        for entry in updates:
+            self.assertIsInstance(entry, dict)
+            key = (entry["package-ecosystem"], entry["directory"])
+            self.assertIn(key, expected_limits)
+            self.assertEqual(entry.get("target-branch"), "main")
+            self.assertEqual(entry.get("schedule"), expected_schedule)
+            self.assertEqual(entry.get("open-pull-requests-limit"), expected_limits[key])
+            self.assertEqual(entry.get("commit-message"), {"prefix": "deps"})
+            self.assertTrue(forbidden.isdisjoint(entry))
+            self.assertNotIn("rebase-strategy", entry)
+            self.assertNotIn("pull-request-branch-name", entry)
+        self.assertTrue(forbidden.isdisjoint(dependabot))
 
 
 if __name__ == "__main__":
