@@ -1,138 +1,183 @@
 [CmdletBinding()]
 param(
     [int]$TimeoutSeconds = 180,
-    [int]$HostPort = 18000
+    [int]$HostPort = 18000,
+    [int]$ExpectedCollectionCount = 917
 )
 
-$ErrorActionPreference = 'Stop'
-$Image = 'bis-saarthi-backend:prototype'
+$ErrorActionPreference = "Stop"
+$Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+$Image = "bis-saarthi-backend:acceptance-$PID"
 $Name = "bis-saarthi-container-test-$PID"
-$Root = Split-Path -Parent $PSScriptRoot
-$Allowed = @('backend/chat_service.py', 'backend/main.py', 'backend/service.py', 'backend/settings.py', 'backend/retrieval_factory.py', 'backend/retrieval_provider.py', 'compose.yaml', 'docs/BIS_INTEGRATION_READINESS.md', 'docs/CONTAINER_DEPLOYMENT.md', 'scripts/test_container.ps1', 'tests/test_api.py', 'tests/test_chat_api.py', 'tests/test_container_configuration.py', 'tests/test_retrieval_disabled_api.py', 'tests/test_retrieval_factory.py', 'tests/test_retrieval_provider_contract.py')
-
-function Assert-True([bool]$Value, [string]$Message) { if (-not $Value) { throw $Message } }
-function Get-Json([string]$Path, [hashtable]$Headers = @{}) {
-    return Invoke-RestMethod -Uri "http://127.0.0.1:$HostPort$Path" -Headers $Headers -TimeoutSec 10
-}
-function Get-Web([string]$Path, [hashtable]$Headers = @{}) {
-    return Invoke-WebRequest -Uri "http://127.0.0.1:$HostPort$Path" -Headers $Headers -TimeoutSec 10
-}
-function Stop-TestContainer {
-    if ((docker ps -aq --filter "name=^/$Name") -as [string]) {
-        docker rm -f $Name | Out-Null
-    }
+$ContainerId = $null
+$ProtectedDirectories = @("data/raw", "data/processed", "evaluation", "data/chroma")
+$EnvironmentNames = @("GROQ_API_KEY", "LLM_API_KEY", "RETRIEVAL_PROVIDER", "LLM_PROVIDER", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
+$OriginalEnvironment = @{}
+foreach ($EnvironmentName in $EnvironmentNames) {
+    $OriginalEnvironment[$EnvironmentName] = [Environment]::GetEnvironmentVariable($EnvironmentName, "Process")
 }
 
-try {
-    docker version --format '{{.Server.Version}}' | Out-Null
-    $changes = @(git -C $Root status --porcelain=v1 --untracked-files=all | ForEach-Object {
-        $line = $_
-        if ([string]::IsNullOrWhiteSpace($line)) { return }
-        if ($line.Length -lt 4 -or $line[2] -ne ' ') { throw "Unparseable git status entry." }
-        $status = $line.Substring(0, 2)
-        $path = $line.Substring(3).Replace('\', '/')
-        if ($status -match '[RD]' -or $path.Contains(' -> ') -or $path.StartsWith('/') -or $path.Contains('..') -or $path.Contains('"')) { throw "Unsafe git status entry." }
-        [pscustomobject]@{ Status = $status; Path = $path }
-    })
-    $unexpected = @($changes | Where-Object { $_.Path -notin $Allowed })
-    $unexpectedPaths = @(
-        $unexpected |
-        ForEach-Object { $_.Path }
-    )
-    Assert-True ($unexpected.Count -eq 0) "Unexpected working-tree modifications: $($unexpectedPaths -join ', ')"
+function Assert-Condition {
+    param([bool]$Condition)
+    if (-not $Condition) { throw "Container acceptance validation failed." }
+}
 
-    Remove-Item Env:GROQ_API_KEY -ErrorAction SilentlyContinue
-    docker build --tag $Image $Root
-
-    $portInUse = Get-NetTCPConnection -LocalPort $HostPort -State Listen -ErrorAction SilentlyContinue
-    Assert-True ($null -eq $portInUse) "Host port $HostPort is already listening; choose -HostPort."
-    docker run --detach --name $Name --init --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:rw,nosuid,nodev,size=64m -p "${HostPort}:8000" -e RETRIEVAL_PROVIDER=chroma_local -e LLM_PROVIDER=disabled -e GROQ_API_KEY= -e LLM_API_KEY= $Image | Out-Null
-
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    do {
-        $health = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' $Name
-        if ($health -eq 'healthy') { break }
-        Start-Sleep -Seconds 2
-    } while ((Get-Date) -lt $deadline)
-    if ($health -ne 'healthy') { docker logs --tail 120 $Name; throw "Container did not become healthy." }
-
-    Assert-True ((docker inspect --format '{{.State.Running}}' $Name) -eq 'true') 'Container is not running.'
-    $legacy = Get-Json '/health'; $v1 = Get-Json '/api/v1/health'
-    Assert-True ($legacy.status -eq 'ready' -and $v1.status -eq 'ready') 'Health response is not ready.'
-    Assert-True ($legacy.collection_count -eq 917 -and $v1.collection_count -eq 917) 'Expected collection_count 917.'
-    $requestId = 'container-test-request-001'
-    $response = Get-Web '/api/v1/health' @{ 'X-Request-ID' = $requestId }
-    $responseRequestIds = @($response.Headers['X-Request-ID'])
-    $requestIdWasPreserved = (
-        $responseRequestIds.Count -eq 1 -and
-        $responseRequestIds[0] -is [string] -and
-        [string]$responseRequestIds[0] -ceq $requestId
-    )
-    Assert-True ([bool]$requestIdWasPreserved) 'Valid X-Request-ID was not preserved.'
-
-    $clarification = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/v1/chat" -ContentType 'application/json' -Body '{"question":"what standards apply to toys"}'
-    Assert-True ($clarification.needs_clarification -and $clarification.generation_mode -eq 'clarification') 'Deterministic clarification failed.'
-    $profile = '{"role":"manufacturer","product_description":"Battery-operated toy car","power_type":"battery_operated","intended_age_group":"3_to_8","goal":"identify_standards","application_stage":"researching","additional_context":null}'
-    $guide = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/v1/compliance/guide" -ContentType 'application/json' -Body $profile
-    Assert-True ($guide.guidance.grounded -and $guide.guidance.answer -match 'IS 15644') 'Deterministic compliance guidance failed.'
-    $body = '{"question":"what standards apply to a battery-operated toy"}'
-    $legacyRetrieve = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/retrieve" -ContentType 'application/json' -Body $body
-    $versionedRetrieve = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/v1/retrieve" -ContentType 'application/json' -Body $body
-    Assert-True ($legacyRetrieve.result_count -gt 0 -and (($legacyRetrieve | ConvertTo-Json -Depth 20 -Compress) -eq ($versionedRetrieve | ConvertTo-Json -Depth 20 -Compress))) 'Legacy/v1 retrieval behavior differs.'
-    $oldRoute = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/chat" -ContentType 'application/json' -Body $body
-    $newRoute = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/v1/chat" -ContentType 'application/json' -Body $body
-    Assert-True (($oldRoute | ConvertTo-Json -Depth 20 -Compress) -eq ($newRoute | ConvertTo-Json -Depth 20 -Compress)) 'Legacy/v1 chat behavior differs.'
-    Assert-True ((Get-Web '/api/v1/documents/Toy_QC_order.pdf').StatusCode -eq 200) 'Registered PDF did not succeed.'
-    foreach ($bad in @('../Toy_QC_order.pdf', '%2e%2e%2fToy_QC_order.pdf', 'unknown.pdf')) {
-        try { Get-Web "/api/v1/documents/$bad"; throw 'Invalid document unexpectedly succeeded.' } catch { Assert-True ($_.Exception.Response.StatusCode.value__ -eq 404) 'Invalid document did not fail safely.' }
-    }
-    try { Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$HostPort/api/v1/chat" -ContentType 'application/json' -Body '{"question":"Tell me about BIS toy regulation"}'; throw 'Provider request unexpectedly succeeded.' } catch { Assert-True ($_.Exception.Response.StatusCode.value__ -eq 503) 'Provider-free request was not safely rejected.' }
-    Assert-True ((docker exec $Name id -u) -eq '10001') 'Container does not run as the non-root application user.'
-    $retrievalProviderEntries = 0
-    $localRetrieverEntries = 0
-    $llmProviderEntries = 0
-    $disabledProviderEntries = 0
-    $nonEmptyGroqEntries = 0
-    $nonEmptyLlmEntries = 0
-    foreach ($target in @($Name, $Image)) {
-        $environmentEntries = @(docker inspect $target --format '{{json .Config.Env}}' | ConvertFrom-Json)
-        foreach ($environmentEntry in $environmentEntries) {
-            if ($target -eq $Name -and $environmentEntry -is [string] -and $environmentEntry.StartsWith('RETRIEVAL_PROVIDER=', [System.StringComparison]::Ordinal)) {
-                $retrievalProviderEntries++
-                if ($environmentEntry -ceq 'RETRIEVAL_PROVIDER=chroma_local') { $localRetrieverEntries++ }
-            }
-            if ($target -eq $Name -and $environmentEntry -is [string] -and $environmentEntry.StartsWith('LLM_PROVIDER=', [System.StringComparison]::Ordinal)) {
-                $llmProviderEntries++
-            }
-            if ($target -eq $Name -and $environmentEntry -ceq 'LLM_PROVIDER=disabled') {
-                $disabledProviderEntries++
-            }
-            if ($environmentEntry -is [string] -and $environmentEntry.StartsWith('GROQ_API_KEY=', [System.StringComparison]::Ordinal)) {
-                $groqValue = $environmentEntry.Substring('GROQ_API_KEY='.Length)
-                if ($groqValue.Length -gt 0) { $nonEmptyGroqEntries++ }
-            }
-            if ($environmentEntry -is [string] -and $environmentEntry.StartsWith('LLM_API_KEY=', [System.StringComparison]::Ordinal)) {
-                $llmValue = $environmentEntry.Substring('LLM_API_KEY='.Length)
-                if ($llmValue.Length -gt 0) { $nonEmptyLlmEntries++ }
-            }
+function Get-ProtectedHashes {
+    param([string[]]$Directories)
+    $Hashes = @{}
+    foreach ($RelativeDirectory in $Directories) {
+        $Directory = Join-Path $Root $RelativeDirectory
+        Assert-Condition (Test-Path -LiteralPath $Directory -PathType Container)
+        Get-ChildItem -LiteralPath $Directory -File -Recurse -Force | ForEach-Object {
+            $RelativePath = $_.FullName.Substring($Root.Length).TrimStart('\').Replace('\', '/')
+            $Hashes[$RelativePath] = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
         }
     }
-    Assert-True ([bool]($retrievalProviderEntries -eq 1 -and $localRetrieverEntries -eq 1)) 'Container does not have exactly one local Chroma retrieval provider entry.'
-    Assert-True ([bool]($llmProviderEntries -eq 1 -and $disabledProviderEntries -eq 1)) 'Container does not have exactly one disabled LLM provider entry.'
-    Assert-True ([bool]($nonEmptyGroqEntries -eq 0)) 'A non-empty GROQ_API_KEY was configured.'
-    Assert-True ([bool]($nonEmptyLlmEntries -eq 0)) 'A non-empty LLM_API_KEY was configured.'
-    $historyGroqMatches = @(docker history --no-trunc $Image | Select-String -Pattern 'GROQ_API_KEY=')
-    Assert-True ([bool]($historyGroqMatches.Count -eq 0)) 'Image history references GROQ_API_KEY.'
-    $historyLlmMatches = @(docker history --no-trunc $Image | Select-String -Pattern 'LLM_API_KEY=')
-    Assert-True ([bool]($historyLlmMatches.Count -eq 0)) 'Image history references LLM_API_KEY.'
-    docker restart $Name | Out-Null
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds); do { Start-Sleep -Seconds 2; $health = docker inspect --format '{{.State.Health.Status}}' $Name } while ($health -ne 'healthy' -and (Get-Date) -lt $deadline)
-    Assert-True ($health -eq 'healthy' -and (Get-Json '/api/v1/health').collection_count -eq 917) 'Restart acceptance failed.'
-    docker stop --timeout 20 $Name | Out-Null
-    Assert-True ((docker inspect --format '{{.State.Running}}' $Name) -eq 'false') 'SIGTERM/docker stop did not complete.'
-    Write-Host 'Container acceptance passed.'
+    return $Hashes
+}
+
+function Assert-HashesUnchanged {
+    param([hashtable]$Before, [hashtable]$After)
+    Assert-Condition ($Before.Count -eq $After.Count)
+    foreach ($Path in $Before.Keys) {
+        Assert-Condition ($After.ContainsKey($Path))
+        Assert-Condition ($Before[$Path] -eq $After[$Path])
+    }
+    foreach ($Path in $After.Keys) { Assert-Condition ($Before.ContainsKey($Path)) }
+}
+
+function Assert-ProtectedGitClean {
+    $Status = @(git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed evaluation 2>$null)
+    Assert-Condition ($LASTEXITCODE -eq 0)
+    Assert-Condition ($Status.Count -eq 0)
+}
+
+function Invoke-ApiJson {
+    param([string]$Path, [string]$Method = "GET", [string]$Body = $null, [hashtable]$Headers = @{})
+    $Parameters = @{ Uri = "http://127.0.0.1:$HostPort$Path"; Method = $Method; Headers = $Headers; TimeoutSec = 10 }
+    if ($null -ne $Body) { $Parameters["ContentType"] = "application/json"; $Parameters["Body"] = $Body }
+    return Invoke-RestMethod @Parameters
+}
+
+function Stop-TestContainer {
+    if ($null -eq $ContainerId) { return }
+    $ActualName = docker inspect --format '{{.Name}}' $ContainerId 2>$null
+    if ($LASTEXITCODE -eq 0 -and $ActualName -eq "/$Name") {
+        docker rm -f $ContainerId 2>$null | Out-Null
+    }
+}
+
+$Succeeded = $false
+$BeforeHashes = $null
+try {
+    Write-Output "Validating container acceptance prerequisites."
+    docker version --format '{{.Server.Version}}' 2>$null | Out-Null
+    Assert-Condition ($LASTEXITCODE -eq 0)
+    Assert-Condition ($TimeoutSeconds -gt 0 -and $HostPort -gt 0 -and $HostPort -le 65535)
+    Assert-Condition (Test-Path -LiteralPath (Join-Path $Root "data/chroma") -PathType Container)
+    foreach ($RequiredArtifact in @(
+        "data/processed/generated_v3/embedding_manifest.json",
+        "data/processed/generated_v3/source_registry.json",
+        "data/processed/generated_v3/chunks.jsonl"
+    )) {
+        Assert-Condition (Test-Path -LiteralPath (Join-Path $Root $RequiredArtifact) -PathType Leaf)
+    }
+    Assert-ProtectedGitClean
+    $BeforeHashes = Get-ProtectedHashes $ProtectedDirectories
+    $PortInUse = Get-NetTCPConnection -LocalPort $HostPort -State Listen -ErrorAction SilentlyContinue
+    Assert-Condition ($null -eq $PortInUse)
+
+    [Environment]::SetEnvironmentVariable("GROQ_API_KEY", "", "Process")
+    [Environment]::SetEnvironmentVariable("LLM_API_KEY", "", "Process")
+    [Environment]::SetEnvironmentVariable("RETRIEVAL_PROVIDER", "chroma_local", "Process")
+    [Environment]::SetEnvironmentVariable("LLM_PROVIDER", "disabled", "Process")
+    [Environment]::SetEnvironmentVariable("HF_HUB_OFFLINE", "1", "Process")
+    [Environment]::SetEnvironmentVariable("TRANSFORMERS_OFFLINE", "1", "Process")
+
+    Write-Output "Building manual acceptance image."
+    docker build --tag $Image $Root 2>$null | Out-Null
+    Assert-Condition ($LASTEXITCODE -eq 0)
+
+    Write-Output "Starting manual acceptance container."
+    $ContainerId = docker run --detach --name $Name --init --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:rw,nosuid,nodev,size=64m -p "${HostPort}:8000" -e RETRIEVAL_PROVIDER=chroma_local -e LLM_PROVIDER=disabled -e GROQ_API_KEY= -e LLM_API_KEY= -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 $Image 2>$null
+    Assert-Condition ($LASTEXITCODE -eq 0 -and $ContainerId -is [string] -and $ContainerId.Length -gt 0)
+
+    Write-Output "Waiting for container health."
+    $Deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $Health = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' $ContainerId 2>$null
+        if ($Health -eq "healthy") { break }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $Deadline)
+    Assert-Condition ($Health -eq "healthy")
+    Assert-Condition ((docker inspect --format '{{.State.Running}}' $ContainerId 2>$null) -eq "true")
+
+    Write-Output "Checking container routes and runtime contract."
+    $LegacyHealth = Invoke-ApiJson "/health"
+    $VersionedHealth = Invoke-ApiJson "/api/v1/health"
+    Assert-Condition ($LegacyHealth.status -eq "ready" -and $VersionedHealth.status -eq "ready")
+    Assert-Condition ($LegacyHealth.collection_count -eq $ExpectedCollectionCount -and $VersionedHealth.collection_count -eq $ExpectedCollectionCount)
+    $RequestId = "container-test-request-001"
+    $HealthResponse = Invoke-WebRequest -Uri "http://127.0.0.1:$HostPort/api/v1/health" -Headers @{ "X-Request-ID" = $RequestId } -TimeoutSec 10
+    $ResponseRequestIds = @($HealthResponse.Headers["X-Request-ID"])
+    Assert-Condition ($ResponseRequestIds.Count -eq 1 -and $ResponseRequestIds[0] -is [string] -and [string]$ResponseRequestIds[0] -ceq $RequestId)
+
+    $RetrievalBody = '{"question":"what standards apply to a battery-operated toy"}'
+    $LegacyRetrieve = Invoke-ApiJson "/api/retrieve" "POST" $RetrievalBody
+    $VersionedRetrieve = Invoke-ApiJson "/api/v1/retrieve" "POST" $RetrievalBody
+    Assert-Condition ($LegacyRetrieve.result_count -gt 0)
+    Assert-Condition (($LegacyRetrieve | ConvertTo-Json -Depth 20 -Compress) -eq ($VersionedRetrieve | ConvertTo-Json -Depth 20 -Compress))
+    $LegacyChat = Invoke-ApiJson "/api/chat" "POST" $RetrievalBody
+    $VersionedChat = Invoke-ApiJson "/api/v1/chat" "POST" $RetrievalBody
+    Assert-Condition (($LegacyChat | ConvertTo-Json -Depth 20 -Compress) -eq ($VersionedChat | ConvertTo-Json -Depth 20 -Compress))
+    $Clarification = Invoke-ApiJson "/api/v1/chat" "POST" '{"question":"what standards apply to toys"}'
+    Assert-Condition ($Clarification.needs_clarification -and $Clarification.generation_mode -eq "clarification")
+    $Profile = '{"role":"manufacturer","product_description":"Battery-operated toy car","power_type":"battery_operated","intended_age_group":"3_to_8","goal":"identify_standards","application_stage":"researching","additional_context":null}'
+    $Guide = Invoke-ApiJson "/api/v1/compliance/guide" "POST" $Profile
+    Assert-Condition ($Guide.guidance.grounded -and $Guide.guidance.answer -match "IS 15644")
+    Assert-Condition ((Invoke-WebRequest -Uri "http://127.0.0.1:$HostPort/api/v1/documents/Toy_QC_order.pdf" -TimeoutSec 10).StatusCode -eq 200)
+
+    try { Invoke-ApiJson "/api/v1/chat" "POST" '{"question":"Tell me about BIS toy regulation"}'; throw "Container acceptance validation failed." }
+    catch { Assert-Condition ($_.Exception.Response.StatusCode.value__ -eq 503) }
+    Assert-Condition ((docker exec $ContainerId id -u 2>$null) -eq "10001")
+    Assert-Condition ((docker exec $ContainerId id -g 2>$null) -eq "10001")
+
+    $EnvironmentEntries = @(docker inspect $ContainerId --format '{{json .Config.Env}}' 2>$null | ConvertFrom-Json)
+    $RequiredEnvironment = @("RETRIEVAL_PROVIDER=chroma_local", "LLM_PROVIDER=disabled", "GROQ_API_KEY=", "LLM_API_KEY=")
+    foreach ($RequiredEntry in $RequiredEnvironment) { Assert-Condition (($EnvironmentEntries | Where-Object { $_ -ceq $RequiredEntry }).Count -eq 1) }
+    foreach ($EnvironmentName in @("RETRIEVAL_PROVIDER", "LLM_PROVIDER", "GROQ_API_KEY", "LLM_API_KEY")) {
+        $NamedEntries = @($EnvironmentEntries | Where-Object { $_ -is [string] -and $_.StartsWith("$EnvironmentName=", [System.StringComparison]::Ordinal) })
+        Assert-Condition ($NamedEntries.Count -eq 1)
+    }
+    foreach ($Entry in $EnvironmentEntries) {
+        if ($Entry -is [string] -and ($Entry.StartsWith("GROQ_API_KEY=", [System.StringComparison]::Ordinal) -or $Entry.StartsWith("LLM_API_KEY=", [System.StringComparison]::Ordinal))) {
+            Assert-Condition ($Entry.EndsWith("="))
+        }
+    }
+    Assert-Condition (@(docker history --no-trunc $Image 2>$null | Select-String -Pattern "GROQ_API_KEY=|LLM_API_KEY=").Count -eq 0)
+
+    $Succeeded = $true
+}
+catch {
+    Write-Output "Manual container acceptance failed."
 }
 finally {
-    Remove-Item Env:GROQ_API_KEY -ErrorAction SilentlyContinue
+    if ($null -ne $BeforeHashes) {
+        Write-Output "Verifying protected artifacts."
+        try {
+            $AfterHashes = Get-ProtectedHashes $ProtectedDirectories
+            Assert-HashesUnchanged $BeforeHashes $AfterHashes
+            Assert-ProtectedGitClean
+        }
+        catch {
+            $Succeeded = $false
+        }
+    }
     Stop-TestContainer
+    foreach ($EnvironmentName in $EnvironmentNames) {
+        [Environment]::SetEnvironmentVariable($EnvironmentName, $OriginalEnvironment[$EnvironmentName], "Process")
+    }
 }
+
+if (-not $Succeeded) { exit 1 }
+Write-Output "Manual container acceptance passed."

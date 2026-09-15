@@ -48,10 +48,10 @@ Docker runs `scripts/container_healthcheck.py`, a standard-library probe of `/ap
 Run the portable local acceptance suite from PowerShell:
 
 ```powershell
-./scripts/test_container.ps1
+.\scripts\test_container.ps1
 ```
 
-It builds `bis-saarthi-backend:prototype`, removes `GROQ_API_KEY` from its test process, starts an isolated named container, waits for Docker health, validates the current count of 917 and deterministic provider-free routes, checks PDF traversal handling, restarts, and verifies normal `docker stop`. It always removes only the container it created; it does not remove the image, volumes, host data, or unrelated Docker resources. It cannot establish future registry, orchestration, or nationwide data-store suitability.
+This manual-only acceptance command requires Docker Desktop, the local read-only Chroma index, the committed generated-v3 artifacts, and the pinned E5 model assets required by the image build. It builds an isolated acceptance-tagged image and starts one uniquely named container. It validates health, legacy and versioned routes, retrieval, UID/GID `10001:10001`, disabled generation, and empty provider-key entries. Before and after execution it hashes `data/raw`, `data/processed`, `evaluation`, and `data/chroma`; any difference fails acceptance. It restores its process environment and removes only the container it created. It never deletes Docker volumes, unrelated containers, images, or repository data. This is intentionally manual and is not part of hosted pull-request CI.
 
 For the narrow local image cleanup only:
 

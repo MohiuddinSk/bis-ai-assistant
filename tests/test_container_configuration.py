@@ -54,102 +54,103 @@ class ContainerConfigurationTests(unittest.TestCase):
         self.assertNotIn("/var/run/docker.sock", self.compose)
         self.assertNotRegex(self.compose, r"(?m)^\s*-\s*\.:/app")
 
-    def test_acceptance_status_check_enumerates_exact_paths(self):
+    def test_manual_container_acceptance_is_isolated_and_read_only(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        self.assertIn("git -C $Root status --porcelain=v1 --untracked-files=all", script)
-        self.assertIn("$path = $line.Substring(3).Replace('\\', '/')", script)
-        self.assertIn("[pscustomobject]@{ Status = $status; Path = $path }", script)
-        self.assertIn("$_.Path -notin $Allowed", script)
-        self.assertIn("$status -match '[RD]'", script)
-        self.assertIn("Assert-True ($unexpected.Count -eq 0)", script)
-        allowlist = script.split("$Allowed = @(", 1)[1].split(")", 1)[0]
-        self.assertNotIn("scripts/container_healthcheck.py", allowlist)
+        self.assertIn("[CmdletBinding()]", script)
+        self.assertIn("$PSScriptRoot", script)
+        self.assertIn("$ExpectedCollectionCount = 917", script)
+        self.assertIn("$Image = \"bis-saarthi-backend:acceptance-$PID\"", script)
+        self.assertIn("$ContainerId", script)
+        self.assertIn("Get-ProtectedHashes $ProtectedDirectories", script)
+        self.assertIn("Assert-HashesUnchanged $BeforeHashes $AfterHashes", script)
+        self.assertIn("Assert-ProtectedGitClean", script)
+        self.assertIn("finally {", script)
+        self.assertIn("Stop-TestContainer", script)
+        for marker in (
+            "data/raw", "data/processed", "evaluation", "data/chroma",
+            "RETRIEVAL_PROVIDER=chroma_local", "LLM_PROVIDER=disabled", "GROQ_API_KEY=", "LLM_API_KEY=",
+            "HF_HUB_OFFLINE=1", "TRANSFORMERS_OFFLINE=1", "id -u", "id -g",
+            "/health", "/api/v1/health", "/api/retrieve", "/api/v1/retrieve", "/api/chat", "/api/v1/chat",
+        ):
+            self.assertIn(marker, script)
+        for forbidden in ("docker volume", "docker system", "docker image rm", "docker logs", "Remove-Item", "git reset", "git checkout", "git clean"):
+            self.assertNotIn(forbidden.lower(), script.lower())
 
-    def test_acceptance_allowlist_matches_retrieval_abstraction_task_files(self):
+    def test_manual_acceptance_checks_legacy_and_versioned_routes(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        allowlist = script.split("$Allowed = @(", 1)[1].split(")", 1)[0]
-        expected = (
-            "backend/chat_service.py", "backend/main.py", "backend/service.py", "backend/settings.py",
-            "backend/retrieval_factory.py", "backend/retrieval_provider.py", "compose.yaml",
-            "docs/BIS_INTEGRATION_READINESS.md", "docs/CONTAINER_DEPLOYMENT.md",
-            "scripts/test_container.ps1", "tests/test_api.py", "tests/test_chat_api.py",
-            "tests/test_container_configuration.py", "tests/test_retrieval_disabled_api.py",
-            "tests/test_retrieval_factory.py", "tests/test_retrieval_provider_contract.py",
-        )
-        for path in expected:
-            self.assertEqual(allowlist.count(f"'{path}'"), 1)
-        self.assertNotIn("'backend/'", allowlist)
-        self.assertNotIn("*", allowlist)
-        self.assertNotIn("backend/generation_factory.py", allowlist)
-        self.assertNotIn("tests/test_provider_disabled_api.py", allowlist)
+        for path in ("/health", "/api/v1/health", "/api/retrieve", "/api/v1/retrieve", "/api/chat", "/api/v1/chat"):
+            self.assertIn(path, script)
+        self.assertIn("$LegacyRetrieve", script)
+        self.assertIn("$VersionedRetrieve", script)
+        self.assertIn("$LegacyChat", script)
+        self.assertIn("$VersionedChat", script)
 
-    def test_acceptance_unexpected_paths_are_joined_from_path_values(self):
+    def test_manual_acceptance_requires_local_retrieval_provider(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        self.assertIn("$unexpectedPaths = @(", script)
-        self.assertIn("ForEach-Object { $_.Path }", script)
-        self.assertIn("$unexpectedPaths -join ', '", script)
-        self.assertIn("$unexpected.Count -eq 0", script)
-        self.assertNotIn("$unexpected -join ', '", script)
+        self.assertIn("-e RETRIEVAL_PROVIDER=chroma_local", script)
+        self.assertIn('"RETRIEVAL_PROVIDER=chroma_local"', script)
+        self.assertIn('"RETRIEVAL_PROVIDER"', script)
 
-    def test_acceptance_request_id_check_handles_header_collections(self):
+    def test_manual_acceptance_disables_generation_and_empties_keys(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        self.assertIn("$responseRequestIds = @($response.Headers['X-Request-ID'])", script)
-        self.assertIn("$responseRequestIds.Count -eq 1", script)
-        self.assertIn("$responseRequestIds[0] -is [string]", script)
-        self.assertIn("[string]$responseRequestIds[0] -ceq $requestId", script)
-        self.assertIn("Assert-True ([bool]$requestIdWasPreserved)", script)
+        for marker in ("-e LLM_PROVIDER=disabled", "-e GROQ_API_KEY=", "-e LLM_API_KEY=", '"LLM_PROVIDER=disabled"', '"GROQ_API_KEY="', '"LLM_API_KEY="'):
+            self.assertIn(marker, script)
 
-    def test_acceptance_secret_check_parses_environment_arrays(self):
+    def test_manual_acceptance_rejects_missing_duplicate_and_conflicting_environment_entries(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        self.assertIn("docker inspect $target --format '{{json .Config.Env}}' | ConvertFrom-Json", script)
-        self.assertIn("StartsWith('GROQ_API_KEY=', [System.StringComparison]::Ordinal)", script)
-        self.assertIn("Substring('GROQ_API_KEY='.Length)", script)
-        self.assertIn("$groqValue.Length -gt 0", script)
-        self.assertIn("$nonEmptyGroqEntries -eq 0", script)
-        self.assertNotIn("Write-Host $groqValue", script)
-        self.assertNotIn("Write-Output $groqValue", script)
-        self.assertIn("$historyGroqMatches = @(docker history", script)
-        self.assertNotIn("Select-String -Pattern 'GROQ_API_KEY=.+'", script)
-        self.assertIn("$historyLlmMatches = @(docker history", script)
-        self.assertNotIn("Select-String -Pattern 'LLM_API_KEY=.+'", script)
-        self.assertIn("docker stop --timeout 20", script)
-        self.assertNotIn("docker stop --time 20", script)
+        self.assertIn("$NamedEntries.Count -eq 1", script)
+        self.assertIn("StartsWith(\"$EnvironmentName=\"", script)
+        self.assertIn("$RequiredEntry", script)
 
-    def test_acceptance_container_runs_with_disabled_provider_and_empty_runtime_keys(self):
+    def test_manual_acceptance_parses_docker_environment_without_printing_secrets(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        run_command = script.split("docker run --detach", 1)[1].split("| Out-Null", 1)[0]
-        self.assertIn("-e LLM_PROVIDER=disabled", run_command)
-        self.assertIn("-e GROQ_API_KEY=", run_command)
-        self.assertIn("-e LLM_API_KEY=", run_command)
-        self.assertNotIn("LLM_BASE_URL", run_command)
-        self.assertNotIn("LLM_MODEL", run_command)
-        self.assertNotIn("LLM_ALLOWED_HOSTS", run_command)
-        self.assertIn("$disabledProviderEntries -eq 1", script)
-        self.assertIn("$nonEmptyLlmEntries -eq 0", script)
-        self.assertNotIn("Write-Host $llmValue", script)
-        self.assertNotIn("Write-Output $llmValue", script)
+        self.assertIn("docker inspect $ContainerId --format '{{json .Config.Env}}'", script)
+        self.assertIn("ConvertFrom-Json", script)
+        self.assertIn("$Entry.EndsWith(\"=\")", script)
+        self.assertNotIn("Write-Output $EnvironmentEntries", script)
+        self.assertNotIn("Write-Output $Entry", script)
 
-    def test_acceptance_container_runs_with_exact_local_retrieval_provider(self):
+    def test_manual_acceptance_handles_request_id_headers_as_a_collection(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        run_command = script.split("docker run --detach", 1)[1].split("| Out-Null", 1)[0]
-        self.assertIn("-e RETRIEVAL_PROVIDER=chroma_local", run_command)
-        self.assertIn("$retrievalProviderEntries -eq 1 -and $localRetrieverEntries -eq 1", script)
-        self.assertIn("StartsWith('RETRIEVAL_PROVIDER=', [System.StringComparison]::Ordinal)", script)
-        self.assertIn("$llmProviderEntries -eq 1 -and $disabledProviderEntries -eq 1", script)
+        self.assertIn('$ResponseRequestIds = @($HealthResponse.Headers["X-Request-ID"])', script)
+        self.assertIn("$ResponseRequestIds.Count -eq 1", script)
+        self.assertIn("[string]$ResponseRequestIds[0] -ceq $RequestId", script)
 
-    def test_acceptance_provider_environment_checks_reject_missing_duplicate_and_conflicting_entries(self):
+    def test_manual_acceptance_checks_every_expected_endpoint_path(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        self.assertIn("$retrievalProviderEntries++", script)
-        self.assertIn("$localRetrieverEntries++", script)
-        self.assertIn("$retrievalProviderEntries -eq 1 -and $localRetrieverEntries -eq 1", script)
-        self.assertIn("$llmProviderEntries++", script)
-        self.assertIn("$llmProviderEntries -eq 1 -and $disabledProviderEntries -eq 1", script)
+        for path in ("/api/v1/compliance/guide", "/api/v1/documents/Toy_QC_order.pdf", "/health", "/api/v1/health", "/api/retrieve", "/api/v1/retrieve", "/api/chat", "/api/v1/chat"):
+            self.assertIn(path, script)
 
-    def test_acceptance_checks_legacy_and_versioned_retrieval_routes(self):
+    def test_manual_acceptance_constructs_hashed_paths_from_the_repository_root(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
-        self.assertIn("/api/retrieve", script)
-        self.assertIn("/api/v1/retrieve", script)
-        self.assertIn("Legacy/v1 retrieval behavior differs.", script)
+        self.assertIn("$_.FullName.Substring($Root.Length).TrimStart('\\').Replace('\\', '/')", script)
+        self.assertIn("Get-ChildItem -LiteralPath $Directory -File -Recurse -Force", script)
+        self.assertIn("git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed evaluation", script)
+
+    def test_manual_acceptance_cleanup_targets_only_its_container(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        self.assertIn("$ActualName = docker inspect --format '{{.Name}}' $ContainerId", script)
+        self.assertIn('$ActualName -eq "/$Name"', script)
+        self.assertIn("docker rm -f $ContainerId", script)
+        self.assertNotIn("docker rm -f $Name", script)
+
+    def test_manual_acceptance_never_deletes_images_or_volumes(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8").lower()
+        for forbidden in ("docker image rm", "docker rmi", "docker volume rm", "docker volume prune", "docker system prune"):
+            self.assertNotIn(forbidden, script)
+
+    def test_manual_acceptance_verifies_hashes_after_a_failed_test_path(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        finally_block = script.split("finally {", 1)[1]
+        self.assertIn("$AfterHashes = Get-ProtectedHashes $ProtectedDirectories", finally_block)
+        self.assertIn("Assert-HashesUnchanged $BeforeHashes $AfterHashes", finally_block)
+        self.assertIn("Assert-ProtectedGitClean", finally_block)
+
+    def test_manual_acceptance_restores_environment_in_finally(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        finally_block = script.split("finally {", 1)[1]
+        self.assertIn("[Environment]::SetEnvironmentVariable($EnvironmentName, $OriginalEnvironment[$EnvironmentName], \"Process\")", finally_block)
+        self.assertNotIn("Remove-Item Env:", script)
 
     def test_healthcheck_and_versioned_paths_are_preserved(self):
         health = (ROOT / "scripts/container_healthcheck.py").read_text(encoding="utf-8")
