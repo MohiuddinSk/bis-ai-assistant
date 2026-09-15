@@ -71,13 +71,15 @@ def _sha256(path: Path) -> str:
 
 
 def _chunk_sha256(path: Path) -> str:
-    """Hash text chunks in the LF form committed by the manifest.
+    """Hash text chunks in the CRLF form committed by the manifest.
 
-    Git may check this JSONL file out with CRLF on Windows.  The manifest was
-    generated from LF bytes, so only CRLF sequences are normalized before
-    hashing; binary source files continue through ``_sha256`` unchanged.
+    Git may check this JSONL file out with LF on Ubuntu. Normalize all common
+    text line endings to LF first, then make the manifest's CRLF representation;
+    binary source files continue through ``_sha256`` unchanged.
     """
-    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+    lf_bytes = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    canonical_crlf_bytes = lf_bytes.replace(b"\n", b"\r\n")
+    return hashlib.sha256(canonical_crlf_bytes).hexdigest()
 
 
 def validate(root: Path = ROOT) -> None:

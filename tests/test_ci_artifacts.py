@@ -20,9 +20,10 @@ class CiArtifactTests(unittest.TestCase):
         source.write_bytes(b"synthetic pdf bytes")
         chunks = generated / "chunks.jsonl"
         chunks.write_text('{"id":"chunk-1"}\n', encoding="utf-8")
+        canonical_chunk_bytes = b'{"id":"chunk-1"}\r\n'
         manifest = {
             **check_ci_artifacts.EXPECTED_MANIFEST,
-            "chunks_sha256": hashlib.sha256(chunks.read_bytes()).hexdigest(),
+            "chunks_sha256": hashlib.sha256(canonical_chunk_bytes).hexdigest(),
         }
         (generated / "embedding_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         registry = [{
@@ -82,7 +83,7 @@ class CiArtifactTests(unittest.TestCase):
     def test_lf_and_crlf_chunks_match_the_manifest_hash(self):
         root = self.make_fixture()
         chunks = root / check_ci_artifacts.CHUNKS_PATH
-        expected_hash = json.loads((root / check_ci_artifacts.MANIFEST_PATH).read_text(encoding="utf-8"))["chunks_sha256"]
+        expected_hash = hashlib.sha256(b'{"id":"chunk-1"}\r\n').hexdigest()
         self.assertEqual(check_ci_artifacts._chunk_sha256(chunks), expected_hash)
         chunks.write_bytes(chunks.read_bytes().replace(b"\n", b"\r\n"))
         self.assertEqual(check_ci_artifacts._chunk_sha256(chunks), expected_hash)
