@@ -60,6 +60,22 @@ it('renders one coherent grounded roadmap with profile, categories, and verified
   expect(screen.getByRole('heading', { name: /Verified sources/i })).toBeInTheDocument(); expect(screen.getByRole('link', { name: /manual.pdf.*page 4/i })).toBeInTheDocument();
 });
 
+it('prints a grounded compliance action report with visible source and disclaimer content', async () => {
+  const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+  const report = { ...response, guidance: { ...guidance, answer_sections: [...guidance.answer_sections, { type: 'next_steps' as const, title: 'Your next action', content: null, items: ['Open the cited primary standard.'], citation_ids: ['S1'] }] } };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(report))); const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
+  expect(await screen.findByRole('button', { name: 'Download or print compliance action report' })).toBeInTheDocument();
+  for (const text of ['BIS Saarthi', 'Informational compliance guidance', 'Generated', 'Toy car', 'IS 15644 applies.', 'The evidence covers this product.', 'Review the cited source.', 'Open the cited primary standard.', 'Verify before relying on guidance.', 'This is informational guidance, not a BIS licence, certificate, legal opinion, or complete official application package.']) expect(screen.getByText(text, { exact: text !== 'Generated' })).toBeInTheDocument();
+  expect(screen.getAllByText('manual.pdf')).toHaveLength(2);
+  expect(screen.queryByText('c1')).not.toBeInTheDocument(); expect(document.querySelector('.evidence-panel')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Download or print compliance action report' })); expect(print).toHaveBeenCalledTimes(1);
+});
+
+it('does not offer a report for ungrounded or clarification guidance', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ ...response, guidance: { ...guidance, grounded: false, insufficient_evidence: true } }))); const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
+  expect(await screen.findByText('Evidence insufficient')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Download or print compliance action report' })).not.toBeInTheDocument();
+});
+
 it('renders battery, mains-powered and non-electric guidance through the same grounded result path', async () => {
   for (const power_type of ['battery_operated', 'mains_electric', 'non_electric']) {
     cleanup(); vi.restoreAllMocks(); vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ ...response, profile: { ...profile, power_type } }))); const user = await reachFinal(userEvent.setup(), 'Manufacturer', power_type === 'battery_operated' ? undefined : power_type === 'mains_electric' ? 'Mains-powered' : 'Non-electric');
@@ -76,7 +92,7 @@ it('prevents duplicate submission, exposes retry, and starts over', async () => 
 it('shows a friendly clarification without an empty roadmap and supports editing the requested answer', async () => {
   const clarification = { ...response, guidance: { ...guidance, answer: 'Which power source does the toy use?', grounded: false, insufficient_evidence: false, needs_clarification: true, generation_mode: 'clarification' as const, citations: [], answer_sections: [{ type: 'clarification' as const, title: 'Need power type', content: 'Which power source does the toy use?', items: [], citation_ids: [] }], assistant_context: { expected_slots: ['power_type'] } } };
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(clarification))); const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
-  expect(await screen.findByRole('heading', { name: 'We need one more detail' })).toBeInTheDocument(); expect(screen.queryByText('Your personalized checklist and next action')).not.toBeInTheDocument(); await user.click(screen.getByRole('button', { name: 'Edit this answer' })); expect(screen.getByText('Step 2 of 5')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'We need one more detail' })).toBeInTheDocument(); expect(screen.queryByText('Your personalized checklist and next action')).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Download or print compliance action report' })).not.toBeInTheDocument(); await user.click(screen.getByRole('button', { name: 'Edit this answer' })); expect(screen.getByText('Step 2 of 5')).toBeInTheDocument();
 });
 
 it('is keyboard-accessible and aborts an active request on unmount', async () => {
