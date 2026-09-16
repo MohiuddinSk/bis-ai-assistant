@@ -33,6 +33,31 @@ it('presents guided sections before the trusted sources', () => {
   expect(screen.getByRole('heading', { name: /sources 2/i })).toBeInTheDocument();
 });
 
+it('groups a compliance journey once per category without losing distinct backend sections', () => {
+  const journeyResponse = { ...response, answer_sections: [
+    { type: 'direct_answer' as const, title: 'Primary standard', content: 'IS 15644 is primary.', items: [], citation_ids: ['S1'] },
+    { type: 'direct_answer' as const, title: 'Secondary standard', content: 'IS 9873 may apply.', items: [], citation_ids: ['S2'] },
+    { type: 'direct_answer' as const, title: 'Primary standard', content: 'IS 15644 is primary.', items: [], citation_ids: ['S1'] },
+    { type: 'explanation' as const, title: 'Why it applies', content: 'The cited material covers electric toys.', items: [], citation_ids: ['S1'] },
+    { type: 'explanation' as const, title: 'Where this fits in your journey', content: 'This is user-provided context, not BIS evidence.', items: [], citation_ids: [] },
+    { type: 'next_steps' as const, title: 'Preparation steps', content: 'Keep this subsection separate.', items: ['First checklist item.'], citation_ids: ['S1'] },
+    { type: 'next_steps' as const, title: 'Documents to prepare', content: null, items: ['Second checklist item.'], citation_ids: ['S2'] },
+    { type: 'next_steps' as const, title: 'Your next action', content: null, items: ['Open the cited primary standard.'], citation_ids: ['S1'] },
+    { type: 'important' as const, title: 'Important condition', content: 'Evidence is limited to the cited material.', items: [], citation_ids: ['S1'] },
+    { type: 'important' as const, title: 'Another condition', content: 'Verify before relying on this guidance.', items: [], citation_ids: ['S2'] },
+  ] };
+  render(<ChatMessage role="assistant" text={journeyResponse.answer} response={journeyResponse} presentation="compliance-journey" />);
+  for (const heading of ['Applicable standards', 'Why these standards apply', 'Your compliance checklist', 'Important conditions', 'Recommended next action']) expect(screen.getAllByRole('heading', { name: heading })).toHaveLength(1);
+  expect(screen.getAllByRole('heading', { name: /Verified sources 2/i })).toHaveLength(1);
+  expect(screen.getAllByText('IS 15644 is primary.')).toHaveLength(1);
+  for (const text of ['IS 9873 may apply.', 'The cited material covers electric toys.', 'This is user-provided context, not BIS evidence.', 'Preparation steps', 'Documents to prepare', 'First checklist item.', 'Second checklist item.', 'Open the cited primary standard.', 'Evidence is limited to the cited material.', 'Verify before relying on this guidance.']) expect(screen.getByText(text)).toBeInTheDocument();
+  expect(document.querySelector('.journey-next-action')).toHaveTextContent('Open the cited primary standard.');
+  expect(document.querySelector('.journey-checklist')).toHaveTextContent('Preparation steps');
+  expect(document.querySelector('.journey-checklist')).toHaveTextContent('Documents to prepare');
+  expect(screen.getByRole('link', { name: 'Page 4' })).toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: /View evidence/i })).toHaveLength(2);
+});
+
 it('renders harmless accessible suggested replies and submits one once', async () => {
   const reply = vi.fn();
   render(<ChatMessage role="assistant" text="Choose" response={{

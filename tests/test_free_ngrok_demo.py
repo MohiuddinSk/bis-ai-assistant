@@ -35,13 +35,30 @@ class FreeNgrokDemoTests(unittest.TestCase):
         self.assertNotRegex(self.start + self.docs, r"(?i)trycloudflare")
 
     def test_start_verifies_local_agent_and_orders_readiness_checks(self):
+        public_health_reasons = (
+            "public-health-non-json-response",
+            "public-health-network-timeout",
+            "public-health-not-ready",
+        )
+        for reason in public_health_reasons:
+            self.assertIn(f'"{reason}"', self.start)
+        self.assertIn("{{.State.Health.Status}}", self.start)
+        self.assertIn('"backend-health-timeout"', self.start)
+        self.assertIn('$TunnelProcess.HasExited', self.start)
+        self.assertIn('"ngrok-exited-early"', self.start)
         self.assertIn('http://127.0.0.1:4040/api/tunnels', self.start)
         self.assertIn('Invoke-RestMethod -Uri $AgentApiUri', self.start)
+        self.assertIn('$_.public_url -ceq $ExpectedPublicUrl', self.start)
         self.assertIn('$Tunnel.config.addr -cne "http://127.0.0.1:8000"', self.start)
         self.assertNotIn('Write-Output $Agent', self.start)
+        self.assertIn('Wait-ForCondition', self.start)
+        self.assertIn('-TimeoutSec 2', self.start)
+        self.assertIn('Start-Sleep -Milliseconds 500', self.start)
         self.assertLess(self.start.index('"backend-health-timeout"'), self.start.index('ArgumentList.Add("http")'))
         self.assertLess(self.start.index('ArgumentList.Add("http://127.0.0.1:8000")'), self.start.index('"expected-tunnel-not-registered"'))
-        self.assertLess(self.start.index('"expected-tunnel-not-registered"'), self.start.index('"public-health-timeout"'))
+        public_health_call = 'Wait-ForPublicHealth "$ExpectedPublicUrl/health" $TimeoutSeconds'
+        self.assertIn(public_health_call, self.start)
+        self.assertLess(self.start.index('"expected-tunnel-not-registered"'), self.start.index(public_health_call))
         self.assertIn('Stop-OwnedResources $TunnelProcess', self.start)
 
     def test_check_uses_required_inputs_agent_api_and_bounded_retries(self):

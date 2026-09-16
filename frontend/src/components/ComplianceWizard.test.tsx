@@ -49,19 +49,21 @@ it('does not turn untrusted profile text into displayed evidence or citations', 
   const untrustedText = 'Profile says IS 99999 applies without evidence.';
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ ...response, profile: { ...profile, product_description: untrustedText } })));
   const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
-  expect(await screen.findByText('IS 15644 applies.')).toBeInTheDocument(); expect(screen.queryByText(untrustedText)).not.toBeInTheDocument(); expect(screen.getByRole('link', { name: /manual.pdf.*page 4/i })).toBeInTheDocument();
+  expect(await screen.findByText('IS 15644 applies.')).toBeInTheDocument(); expect(screen.getByRole('region', { name: 'Your product profile' })).toHaveTextContent(untrustedText); expect(screen.queryByText('IS 99999 applies.', { exact: true })).not.toBeInTheDocument(); expect(screen.getByRole('link', { name: /manual.pdf.*page 4/i })).toBeInTheDocument();
 });
 
-it('renders grounded standards, explanation, checklist, conditions, and verified sources', async () => {
+it('renders one coherent grounded roadmap with profile, categories, and verified sources', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(response))); const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
-  for (const heading of ['Applicable standards', 'Why each standard applies', 'Your personalized checklist and next action', 'Important conditions or limitations']) expect(await screen.findByText(heading)).toBeInTheDocument();
+  for (const heading of ['Your product profile', 'Applicable standards', 'Why these standards apply', 'Your compliance checklist', 'Important conditions']) expect(await screen.findAllByRole('heading', { name: heading })).toHaveLength(1);
+  expect(await screen.findAllByRole('heading', { name: /Verified sources 1/i })).toHaveLength(1);
+  expect(screen.getByText(/not verified BIS evidence/i)).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /Verified sources/i })).toBeInTheDocument(); expect(screen.getByRole('link', { name: /manual.pdf.*page 4/i })).toBeInTheDocument();
 });
 
 it('renders battery, mains-powered and non-electric guidance through the same grounded result path', async () => {
   for (const power_type of ['battery_operated', 'mains_electric', 'non_electric']) {
     cleanup(); vi.restoreAllMocks(); vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ ...response, profile: { ...profile, power_type } }))); const user = await reachFinal(userEvent.setup(), 'Manufacturer', power_type === 'battery_operated' ? undefined : power_type === 'mains_electric' ? 'Mains-powered' : 'Non-electric');
-    await user.click(screen.getByRole('button', { name: 'Generate my guidance' })); expect(await screen.findByText('Applicable standards')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Generate my guidance' })); expect(await screen.findByRole('heading', { name: 'Applicable standards' })).toBeInTheDocument();
   }
 });
 
