@@ -6,8 +6,27 @@ import {
   chatTimeoutMs,
   getHealth,
   HEALTH_TIMEOUT_MS,
+  isFreeNgrokApiBase,
+  ngrokBypassHeadersForBase,
   parseChatTimeoutMs,
 } from './api';
+
+it('adds the ngrok bypass header only for exact approved free development origins', () => {
+  for (const base of ['https://demo-account.ngrok-free.app', 'https://demo-account.ngrok-free.dev']) {
+    expect(isFreeNgrokApiBase(base)).toBe(true);
+    expect(ngrokBypassHeadersForBase(base)).toEqual({ 'ngrok-skip-browser-warning': '1' });
+  }
+  for (const base of [
+    '', 'http://demo-account.ngrok-free.dev', 'https://localhost:8000', 'https://example.com',
+    'https://demo-account.ngrok-free.dev/path', 'https://demo-account.ngrok-free.dev?x=1',
+    'https://demo-account.ngrok-free.dev#fragment', 'https://demo-account.ngrok-free.dev:443',
+    'https://demo-account.ngrok-free.dev.evil.example', 'https://notngrok-free.dev',
+    'https://demo-account.ngrok-free.dev@evil.example', 'https://ngrok-free.dev',
+  ]) {
+    expect(isFreeNgrokApiBase(base)).toBe(false);
+    expect(ngrokBypassHeadersForBase(base)).toEqual({});
+  }
+});
 
 const chatPayload = {
   answer: 'IS 15644 is the primary standard.',

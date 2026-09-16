@@ -2,6 +2,26 @@ import type { AssistantContext, Audience, ChatResponse, HealthResponse } from '.
 import type { ComplianceGuideResponse, ComplianceProfile } from '../types/compliance';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const NGROK_SKIP_BROWSER_WARNING = 'ngrok-skip-browser-warning';
+
+export function isFreeNgrokApiBase(value: string): boolean {
+  try {
+    if (!/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.ngrok-free\.(?:app|dev)$/i.test(value)) return false;
+    const url = new URL(value);
+    return url.protocol === 'https:'
+      && !url.username && !url.password && !url.port
+      && url.pathname === '/' && !url.search && !url.hash
+      && /.+\.ngrok-free\.(?:app|dev)$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function ngrokBypassHeadersForBase(value: string): Record<string, string> {
+  return isFreeNgrokApiBase(value) ? { [NGROK_SKIP_BROWSER_WARNING]: '1' } : {};
+}
+
+const ngrokBypassHeaders = ngrokBypassHeadersForBase(base);
 export const HEALTH_TIMEOUT_MS = 8_000;
 export const CHAT_DEFAULT_TIMEOUT_MS = 90_000;
 
@@ -33,7 +53,7 @@ async function request<T>(path: string, timeout: number, init: RequestInit = {})
     const response = await fetch(`${base}${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...init.headers },
+      headers: { 'Content-Type': 'application/json', ...ngrokBypassHeaders, ...init.headers },
     });
     let body: unknown;
     try {

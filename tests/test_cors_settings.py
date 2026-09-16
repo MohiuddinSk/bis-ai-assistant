@@ -4,10 +4,12 @@ import os
 import unittest
 from unittest.mock import patch
 
-from backend.settings import ALLOWED_ORIGINS, get_allowed_origins
+from backend.settings import ALLOWED_HEADERS, ALLOWED_ORIGINS, get_allowed_origins
 
 
 class CorsOriginSettingsTests(unittest.TestCase):
+    def test_ngrok_interstitial_bypass_header_is_explicitly_allowed(self):
+        self.assertIn("ngrok-skip-browser-warning", ALLOWED_HEADERS)
     def test_defaults_to_localhost_origins(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(get_allowed_origins(), ALLOWED_ORIGINS)

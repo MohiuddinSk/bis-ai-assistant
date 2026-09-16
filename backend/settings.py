@@ -16,7 +16,7 @@ ALLOWED_ORIGINS = (
 )
 
 ALLOWED_METHODS = ("GET", "POST")
-ALLOWED_HEADERS = ("Content-Type", "X-Request-ID")
+ALLOWED_HEADERS = ("Content-Type", "X-Request-ID", "ngrok-skip-browser-warning")
 EXPOSED_HEADERS = ("X-Request-ID",)
 
 
