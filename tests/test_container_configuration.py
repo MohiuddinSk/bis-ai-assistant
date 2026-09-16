@@ -125,7 +125,7 @@ class ContainerConfigurationTests(unittest.TestCase):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
         self.assertIn("$_.FullName.Substring($Root.Length).TrimStart('\\').Replace('\\', '/')", script)
         self.assertIn("Get-ChildItem -LiteralPath $Directory -File -Recurse -Force", script)
-        self.assertIn("git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed evaluation", script)
+        self.assertIn("git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed data/chroma evaluation", script)
 
     def test_manual_acceptance_cleanup_targets_only_its_container(self):
         script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
@@ -151,6 +151,24 @@ class ContainerConfigurationTests(unittest.TestCase):
         finally_block = script.split("finally {", 1)[1]
         self.assertIn("[Environment]::SetEnvironmentVariable($EnvironmentName, $OriginalEnvironment[$EnvironmentName], \"Process\")", finally_block)
         self.assertNotIn("Remove-Item Env:", script)
+
+    def test_manual_acceptance_allows_ordinary_worktree_edits_but_reports_protected_prerequisite_failures(self):
+        script = (ROOT / "scripts/test_container.ps1").read_text(encoding="utf-8")
+        self.assertIn("function Assert-Prerequisite", script)
+        self.assertIn('$script:PrerequisiteFailureReason = $Reason', script)
+        self.assertIn('Assert-ProtectedGitClean -Prerequisite', script)
+        self.assertIn('Manual container acceptance prerequisite failed: $PrerequisiteFailureReason', script)
+        for reason in (
+            "docker-daemon-unavailable", "invalid-acceptance-parameters",
+            "chroma-index-directory-missing", "required-index-artifact-missing",
+            "protected-path-status-unavailable", "protected-paths-dirty",
+            "acceptance-host-port-in-use",
+        ):
+            self.assertIn(f'"{reason}"', script)
+        protected_command = "git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed data/chroma evaluation"
+        self.assertIn(protected_command, script)
+        self.assertNotIn("allowlist", script.lower())
+        self.assertNotIn("deploy/secure-sih-demo", script)
 
     def test_healthcheck_and_versioned_paths_are_preserved(self):
         health = (ROOT / "scripts/container_healthcheck.py").read_text(encoding="utf-8")
