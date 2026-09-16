@@ -22,6 +22,14 @@ function Assert-Condition {
     if (-not $Condition) { throw "Container acceptance validation failed." }
 }
 
+function Assert-Prerequisite {
+    param([bool]$Condition, [string]$Reason)
+    if (-not $Condition) {
+        $script:PrerequisiteFailureReason = $Reason
+        throw "Container acceptance prerequisite failed."
+    }
+}
+
 function Get-ProtectedHashes {
     param([string[]]$Directories)
     $Hashes = @{}
@@ -47,7 +55,13 @@ function Assert-HashesUnchanged {
 }
 
 function Assert-ProtectedGitClean {
-    $Status = @(git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed evaluation 2>$null)
+    param([switch]$Prerequisite)
+    $Status = @(git -C $Root status --porcelain=v1 --untracked-files=all -- data/raw data/processed data/chroma evaluation 2>$null)
+    if ($Prerequisite) {
+        Assert-Prerequisite ($LASTEXITCODE -eq 0) "protected-path-status-unavailable"
+        Assert-Prerequisite ($Status.Count -eq 0) "protected-paths-dirty"
+        return
+    }
     Assert-Condition ($LASTEXITCODE -eq 0)
     Assert-Condition ($Status.Count -eq 0)
 }
@@ -69,23 +83,26 @@ function Stop-TestContainer {
 
 $Succeeded = $false
 $BeforeHashes = $null
+$PrerequisitesComplete = $false
+$PrerequisiteFailureReason = "unknown-prerequisite"
 try {
     Write-Output "Validating container acceptance prerequisites."
     docker version --format '{{.Server.Version}}' 2>$null | Out-Null
-    Assert-Condition ($LASTEXITCODE -eq 0)
-    Assert-Condition ($TimeoutSeconds -gt 0 -and $HostPort -gt 0 -and $HostPort -le 65535)
-    Assert-Condition (Test-Path -LiteralPath (Join-Path $Root "data/chroma") -PathType Container)
+    Assert-Prerequisite ($LASTEXITCODE -eq 0) "docker-daemon-unavailable"
+    Assert-Prerequisite ($TimeoutSeconds -gt 0 -and $HostPort -gt 0 -and $HostPort -le 65535) "invalid-acceptance-parameters"
+    Assert-Prerequisite (Test-Path -LiteralPath (Join-Path $Root "data/chroma") -PathType Container) "chroma-index-directory-missing"
     foreach ($RequiredArtifact in @(
         "data/processed/generated_v3/embedding_manifest.json",
         "data/processed/generated_v3/source_registry.json",
         "data/processed/generated_v3/chunks.jsonl"
     )) {
-        Assert-Condition (Test-Path -LiteralPath (Join-Path $Root $RequiredArtifact) -PathType Leaf)
+        Assert-Prerequisite (Test-Path -LiteralPath (Join-Path $Root $RequiredArtifact) -PathType Leaf) "required-index-artifact-missing"
     }
-    Assert-ProtectedGitClean
+    Assert-ProtectedGitClean -Prerequisite
     $BeforeHashes = Get-ProtectedHashes $ProtectedDirectories
     $PortInUse = Get-NetTCPConnection -LocalPort $HostPort -State Listen -ErrorAction SilentlyContinue
-    Assert-Condition ($null -eq $PortInUse)
+    Assert-Prerequisite ($null -eq $PortInUse) "acceptance-host-port-in-use"
+    $PrerequisitesComplete = $true
 
     [Environment]::SetEnvironmentVariable("GROQ_API_KEY", "", "Process")
     [Environment]::SetEnvironmentVariable("LLM_API_KEY", "", "Process")
@@ -159,7 +176,12 @@ try {
     $Succeeded = $true
 }
 catch {
-    Write-Output "Manual container acceptance failed."
+    if (-not $PrerequisitesComplete) {
+        Write-Output "Manual container acceptance prerequisite failed: $PrerequisiteFailureReason"
+    }
+    else {
+        Write-Output "Manual container acceptance failed."
+    }
 }
 finally {
     if ($null -ne $BeforeHashes) {
