@@ -1,65 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { askQuestion, getComplianceGuide } from '../services/api';
-import { audienceForRole, type ComplianceGuideResponse, type ComplianceProfile } from '../types/compliance';
+import { getComplianceGuide } from '../services/api';
+import type { ComplianceGuideResponse, ComplianceProfile, Role } from '../types/compliance';
 import { ChatMessage } from './ChatMessage';
 
-const steps = ['Who are you?', 'Describe your product', 'How is the product powered?', 'Intended age group', 'What guidance do you need?', 'Application stage', 'Review and generate guidance'];
+const steps = ['Your product', 'Power type', 'Intended age group', 'Current stage', 'What you need'];
+const editStep = { product_description: 0, power_type: 1, age_group: 2, application_stage: 3, goal: 4 } as const;
 export const initialProfile: ComplianceProfile = { role: 'manufacturer', product_description: '', power_type: 'not_sure', intended_age_group: 'not_sure', goal: 'identify_standards', application_stage: 'not_sure', additional_context: null };
-const choices = {
-  role: ['manufacturer', 'importer', 'artisan', 'consumer', 'not_sure'],
-  power_type: ['battery_operated', 'mains_electric', 'non_electric', 'not_sure'],
-  intended_age_group: ['under_3', '3_to_8', 'over_8', 'multiple', 'not_sure'],
-  goal: ['identify_standards', 'new_licence', 'add_new_series', 'check_exemption', 'understand_transition', 'complete_roadmap', 'not_sure'],
-  application_stage: ['researching', 'preparing_application', 'existing_licence', 'scope_extension', 'not_sure'],
-} as const;
-const labels: Record<string, string> = { manufacturer: 'Manufacturer', importer: 'Importer', artisan: 'Artisan', consumer: 'Consumer', not_sure: 'Not sure', battery_operated: 'Battery-operated', mains_electric: 'Mains electric', non_electric: 'Non-electric', under_3: 'Under 3', '3_to_8': '3 to 8', over_8: 'Over 8', multiple: 'Multiple age groups', identify_standards: 'Identify applicable standards', new_licence: 'Apply for a new licence', add_new_series: 'Add a new toy series', check_exemption: 'Check a possible exemption', understand_transition: 'Understand a transition order', complete_roadmap: 'Guide me through the complete process', researching: 'Researching', preparing_application: 'Preparing an application', existing_licence: 'Existing licence', scope_extension: 'Extending licence scope' };
+const choices = { power_type: ['battery_operated', 'mains_electric', 'non_electric', 'not_sure'], intended_age_group: ['under_3', '3_to_8', 'over_8', 'multiple', 'not_sure'], application_stage: ['researching', 'preparing_application', 'existing_licence', 'scope_extension', 'not_sure'], goal: ['identify_standards', 'new_licence', 'add_new_series', 'check_exemption', 'understand_transition', 'complete_roadmap', 'not_sure'] } as const;
+const labels: Record<string, string> = { manufacturer: 'Manufacturer', consumer: 'Consumer', not_sure: 'Not sure', battery_operated: 'Battery-operated', mains_electric: 'Mains-powered', non_electric: 'Non-electric', under_3: 'Under 3', '3_to_8': '3 to 8', over_8: 'Over 8', multiple: 'More than one age group', identify_standards: 'Identify applicable standards', new_licence: 'Apply for a new licence', add_new_series: 'Add a new toy series', check_exemption: 'Check a possible exemption', understand_transition: 'Understand a transition order', complete_roadmap: 'Build my compliance roadmap', researching: 'Researching', preparing_application: 'Preparing an application', existing_licence: 'Already licensed', scope_extension: 'Adding to an existing licence' };
+const help = ['Describe the toy in plain words. This helps us search the right BIS material.', 'Choose how the toy works. If you do not know, choose Not sure.', 'Choose the age group the toy is made for. If you do not know, choose Not sure.', 'Tell us where you are in the process. A licence is BIS permission to make or sell covered products.', 'Choose the outcome you want from this short journey.'];
 
 export function ComplianceWizard() {
-  const [step, setStep] = useState(0);
-  const [profile, setProfile] = useState<ComplianceProfile>(initialProfile);
-  const [result, setResult] = useState<ComplianceGuideResponse | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [touched, setTouched] = useState(false);
-  const controller = useRef<AbortController | null>(null);
+  const [role, setRole] = useState<Role | null>(null); const [step, setStep] = useState(0); const [profile, setProfile] = useState<ComplianceProfile>(initialProfile); const [result, setResult] = useState<ComplianceGuideResponse | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [touched, setTouched] = useState(false); const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
-
   const descriptionValid = profile.product_description.trim().length >= 2 && profile.product_description.trim().length <= 300;
+  const chooseRole = (next: Role) => { setRole(next); setProfile(current => ({ ...current, role: next })); setStep(0); setError(''); };
   const setChoice = (field: keyof typeof choices, value: string) => setProfile(current => ({ ...current, [field]: value }));
-  const reset = () => { controller.current?.abort(); setProfile(initialProfile); setStep(0); setResult(null); setError(''); setBusy(false); setTouched(false); };
-  const generate = async () => {
-    if (busy || !descriptionValid) return;
-    controller.current?.abort();
-    controller.current = new AbortController();
-    setBusy(true); setError('');
-    try { setResult(await getComplianceGuide({ ...profile, product_description: profile.product_description.trim() }, controller.current.signal)); }
-    catch (reason) { if (!controller.current?.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to generate guidance.'); }
-    finally { if (!controller.current?.signal.aborted) setBusy(false); }
-  };
-  const continueGuidance = async (reply: string) => {
-    const context = result?.guidance.assistant_context;
-    if (busy || !result || !context) return;
-    controller.current?.abort(); controller.current = new AbortController();
-    setBusy(true); setError('');
-    try {
-      const guidance = await askQuestion(reply, audienceForRole(profile.role), context, controller.current.signal);
-      if (!controller.current.signal.aborted) setResult(current => current ? { ...current, guidance } : current);
-    } catch (reason) {
-      if (!controller.current?.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to generate guidance.');
-    } finally {
-      if (!controller.current?.signal.aborted) setBusy(false);
-    }
-  };
-  const choiceStep = (field: keyof typeof choices) => <fieldset><legend>{steps[step]}</legend>{choices[field].map(value => <label className="wizard-choice" key={value}><input type="radio" name={field} checked={profile[field] === value} onChange={() => setChoice(field, value)} />{labels[value]}</label>)}</fieldset>;
+  const reset = () => { controller.current?.abort(); setRole(null); setProfile(initialProfile); setStep(0); setResult(null); setError(''); setBusy(false); setTouched(false); };
+  const generate = async () => { if (busy || !descriptionValid || !role) return; controller.current?.abort(); controller.current = new AbortController(); setBusy(true); setError(''); try { setResult(await getComplianceGuide({ ...profile, role, product_description: profile.product_description.trim() }, controller.current.signal)); } catch (reason) { if (!controller.current?.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to generate guidance.'); } finally { if (!controller.current?.signal.aborted) setBusy(false); } };
+  const edit = (field: keyof typeof editStep) => { setResult(null); setStep(editStep[field]); setError(''); };
+  const choiceStep = (field: keyof typeof choices) => <fieldset><legend>{steps[step]}</legend><p className="wizard-help">{help[step]}</p>{choices[field].map(value => <label className="wizard-choice" key={value}><input type="radio" name={field} checked={profile[field] === value} onChange={() => setChoice(field, value)} />{labels[value]}</label>)}</fieldset>;
+  const clarificationField = result?.guidance.assistant_context?.expected_slots?.[0]; const clarificationCanEdit = clarificationField && clarificationField in editStep;
 
-  if (result) return <section className="wizard" aria-label="Compliance Wizard result"><button type="button" onClick={reset}>Start over</button><ChatMessage role="assistant" text={result.guidance.answer} response={result.guidance} busy={busy} onSuggestedReply={result.guidance.assistant_context ? (reply) => void continueGuidance(reply) : undefined} />{error && <p role="alert" className="error">{error}</p>}<p className="wizard-disclaimer">{result.guidance.disclaimer}</p></section>;
-  return <section className="wizard" aria-label="Compliance Wizard">
-    <h2>Compliance Wizard</h2><p aria-live="polite">Step {step + 1} of 7: {steps[step]}</p><progress aria-label={`Step ${step + 1} of 7`} value={step + 1} max={7} />
-    {step === 0 && choiceStep('role')}
-    {step === 1 && <div><label htmlFor="wizard-product">Describe your product</label><textarea id="wizard-product" aria-describedby="wizard-product-help wizard-product-error" maxLength={300} value={profile.product_description} onBlur={() => setTouched(true)} onChange={event => setProfile(current => ({ ...current, product_description: event.target.value }))} /><small id="wizard-product-help">Use a short description, such as “battery-operated toy car”.</small>{touched && !descriptionValid && <p id="wizard-product-error" role="alert">Enter between 2 and 300 characters.</p>}</div>}
-    {step === 2 && choiceStep('power_type')}{step === 3 && choiceStep('intended_age_group')}{step === 4 && choiceStep('goal')}{step === 5 && choiceStep('application_stage')}
-    {step === 6 && <div className="wizard-review"><h3>Review your answers</h3><dl><dt>Role</dt><dd>{labels[profile.role]}</dd><dt>Product</dt><dd>{profile.product_description}</dd><dt>Power</dt><dd>{labels[profile.power_type]}</dd><dt>Age group</dt><dd>{labels[profile.intended_age_group]}</dd><dt>Guidance</dt><dd>{labels[profile.goal]}</dd><dt>Application stage</dt><dd>{labels[profile.application_stage]}</dd></dl><label htmlFor="wizard-context">Anything else? (optional)</label><textarea id="wizard-context" maxLength={500} value={profile.additional_context ?? ''} onChange={event => setProfile(current => ({ ...current, additional_context: event.target.value || null }))} /></div>}
-    <div className="wizard-actions"><button type="button" onClick={() => setStep(current => current - 1)} disabled={step === 0 || busy}>Previous</button>{step < 6 ? <button type="button" onClick={() => { if (step === 1) setTouched(true); if (step !== 1 || descriptionValid) setStep(current => current + 1); }} disabled={busy || (step === 1 && !descriptionValid)}>Next</button> : <button type="button" onClick={() => void generate()} disabled={busy || !descriptionValid}>{busy ? 'Generating guidance…' : 'Generate guidance'}</button>}<button type="button" className="secondary" onClick={reset} disabled={busy}>Start over</button></div>
-    {error && <p role="alert" className="error">{error} <button type="button" onClick={() => void generate()}>Retry</button></p>}
-  </section>;
+  if (!role) return <section className="wizard journey-entry" aria-label="Guided compliance journey"><p className="eyebrow">GUIDED COMPLIANCE JOURNEY</p><h2>Compliance Wizard</h2><p className="journey-title">Start with the guidance that fits you</p><p>Answer a few simple questions to receive cited BIS guidance. You can choose Not sure whenever you need to.</p><div className="journey-cards"><button type="button" className="journey-card consumer-card" aria-label="Consumer" onClick={() => chooseRole('consumer')}><span>Consumer</span><strong>Understand toy standards before you buy or compare a product.</strong></button><button type="button" className="journey-card manufacturer-card" aria-label="Manufacturer" onClick={() => chooseRole('manufacturer')}><span>Manufacturer</span><strong>Build a personalized, evidence-backed compliance path for your product.</strong><em>Recommended journey</em></button></div></section>;
+  if (result && result.guidance.needs_clarification) return <section className="wizard journey-result clarification-result" aria-label="Compliance journey clarification"><p className="eyebrow">ONE MORE DETAIL</p><h2>We need one more detail</h2><p>We will not create a roadmap until the product details are clear enough.</p><ChatMessage role="assistant" text={result.guidance.answer} response={result.guidance} journey />{clarificationCanEdit && <button type="button" onClick={() => edit(clarificationField as keyof typeof editStep)}>Edit this answer</button>}<button type="button" className="secondary" onClick={reset}>Start over</button></section>;
+  if (result) return <section className="wizard journey-result" aria-label="Compliance journey result"><div className="result-heading"><div><p className="eyebrow">YOUR GROUNDED GUIDANCE</p><h2>Compliance journey</h2><p>Use the verified sources below to review the evidence behind this guidance.</p></div><button type="button" className="secondary" onClick={reset}>Start over</button></div><ChatMessage role="assistant" text={result.guidance.answer} response={result.guidance} journey sourceHeading="Verified sources" />{error && <p role="alert" className="error">{error} <button type="button" onClick={() => void generate()}>Retry</button></p>}<p className="wizard-disclaimer">{result.guidance.disclaimer}</p></section>;
+
+  return <section className="wizard journey-form" aria-label={`${labels[role]} compliance journey`}><div className="journey-form-heading"><div><p className="eyebrow">{labels[role]} JOURNEY</p><h2>{steps[step]}</h2></div><button type="button" className="secondary" onClick={reset} disabled={busy}>Start over</button></div><p aria-live="polite" className="progress-label">Step {step + 1} of 5</p><progress aria-label={`Step ${step + 1} of 5`} value={step + 1} max={5} />{step === 0 && <div><label htmlFor="wizard-product">Product description or type</label><p className="wizard-help">{help[0]}</p><textarea id="wizard-product" aria-describedby="wizard-product-error" maxLength={300} value={profile.product_description} onBlur={() => setTouched(true)} onChange={event => setProfile(current => ({ ...current, product_description: event.target.value }))} />{touched && !descriptionValid && <p id="wizard-product-error" role="alert">Enter between 2 and 300 characters.</p>}</div>}{step === 1 && choiceStep('power_type')}{step === 2 && choiceStep('intended_age_group')}{step === 3 && choiceStep('application_stage')}{step === 4 && choiceStep('goal')}{step === 4 && <section className="wizard-review" aria-label="Review your answers"><h3>Review before generating</h3><dl>{([['product_description', 'Product', profile.product_description], ['power_type', 'Power type', labels[profile.power_type]], ['age_group', 'Intended age group', labels[profile.intended_age_group]], ['application_stage', 'Current stage', labels[profile.application_stage]], ['goal', 'Guidance goal', labels[profile.goal]]] as const).map(([field, label, value]) => <div key={field}><dt>{label}</dt><dd>{value || 'Not answered'}</dd><button type="button" className="text-button" onClick={() => setStep(editStep[field])} disabled={busy}>Edit {label.toLowerCase()}</button></div>)}</dl></section>}<div className="wizard-actions"><button type="button" onClick={() => setStep(current => current - 1)} disabled={step === 0 || busy}>Back</button>{step < 4 ? <button type="button" onClick={() => { if (step === 0) setTouched(true); if (step !== 0 || descriptionValid) setStep(current => current + 1); }} disabled={busy || (step === 0 && !descriptionValid)}>Continue</button> : <button type="button" onClick={() => void generate()} disabled={busy || !descriptionValid}>{busy ? 'Preparing grounded guidance…' : 'Generate my guidance'}</button>}</div>{error && <p role="alert" className="error">{error} <button type="button" onClick={() => void generate()}>Retry</button></p>}</section>;
 }
