@@ -9,6 +9,7 @@ __pycache__/
 !.env.example
 .cloudflared/
 deploy/.secure-sih-demo-runtime/
+deploy/free-ngrok-demo/.runtime/
 data/chroma/
 data/chroma_test/
 *.db
