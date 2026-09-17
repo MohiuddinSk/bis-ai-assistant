@@ -59,7 +59,7 @@ class StandardExplanationApiTests(unittest.TestCase):
         self.assertTrue(body["grounded"])
         self.assertIn("IS 15644", body["answer"])
         self.assertIn("primary", body["answer"].lower())
-        self.assertTrue(any(section["title"] == "What this standard means" for section in body["answer_sections"]))
+        self.assertTrue(any(section["title"] == "In simple terms" for section in body["answer_sections"]))
         self.assertEqual(self.generator.calls, [])
 
     def test_hyphenated_simple_words_explanation(self):

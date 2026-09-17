@@ -638,6 +638,60 @@ class ChatService:
             normalized.append(section.model_copy(update={"citation_ids": citation_ids}))
         return normalized
 
+    @staticmethod
+    def _plain_language_sections(sections: list[AnswerSection]) -> list[AnswerSection]:
+        """Apply conservative presentation rules without rewriting evidence claims.
+
+        The deterministic plans already choose every claim and its supporting
+        citation.  This pass changes only section labels and removes literal
+        repetition, so it cannot turn a conditional fact into a requirement or
+        create a new claim from routing context.
+        """
+        headings = {
+            "direct_answer": "In simple terms",
+            "explanation": "What this means for you",
+            "next_steps": "What to do next",
+            "important": "Important to know",
+        }
+        finalized: list[AnswerSection] = []
+        section_identities: set[tuple[str, str, str, tuple[str, ...]]] = set()
+        visible_fragments: set[str] = set()
+        direct_answer_seen = False
+        for section in sections:
+            if section.type == "clarification":
+                finalized.append(section)
+                continue
+            if section.type == "direct_answer":
+                if direct_answer_seen:
+                    continue
+                direct_answer_seen = True
+            title = section.title if section.title.strip().lower() == "your next action" else headings.get(section.type, section.title)
+            content = section.content.strip() if section.content and section.content.strip() else None
+            items = [item.strip() for item in section.items if item and item.strip()]
+            identity = (
+                section.type, section.title.strip(), re.sub(r"\s+", " ", content or "").casefold(),
+                tuple(re.sub(r"\s+", " ", item).casefold() for item in items),
+            )
+            if identity in section_identities:
+                continue
+            section_identities.add(identity)
+            if content:
+                normalized_content = re.sub(r"\s+", " ", content).casefold()
+                if normalized_content in visible_fragments:
+                    content = None
+                else:
+                    visible_fragments.add(normalized_content)
+            visible_items: list[str] = []
+            for item in items:
+                normalized_item = re.sub(r"\s+", " ", item).casefold()
+                if normalized_item not in visible_fragments:
+                    visible_fragments.add(normalized_item)
+                    visible_items.append(item)
+            if content is None and not visible_items:
+                continue
+            finalized.append(section.model_copy(update={"title": title, "content": content, "items": visible_items}))
+        return finalized
+
     @classmethod
     def _guided_response(
         cls,
@@ -660,7 +714,9 @@ class ChatService:
         of the user-visible guided sections; no earlier fact or PDF fragment may
         bypass this final boundary.
         """
-        finalized_sections = cls._deduplicate_section_citations(sections)
+        finalized_sections = cls._deduplicate_section_citations(
+            cls._plain_language_sections(sections) if grounded else sections
+        )
         return ChatResponse(
             answer=cls._join_sections(finalized_sections),
             grounded=grounded,
@@ -773,43 +829,39 @@ class ChatService:
             secondary_role = "secondary_standard" if electric else "non_electric_secondary"
             primary_id = selected_by_role[primary_role][0].citation_id
             secondary_id = selected_by_role[secondary_role][0].citation_id
-            power_label = {
-                "battery_operated": "battery-operated", "mains_electric": "mains-powered",
-                "non_electric": "non-electric",
-            }[routing_context.power_type]
-            age_label = {
-                "under_3": "under 3", "3_to_8": "3–8", "over_8": "over 8",
-                "multiple": "multiple age groups", "not_sure": "not specified",
-            }[routing_context.age_group]
-            stage_label = {
-                "researching": "researching requirements",
-                "preparing_application": "preparing a new application",
-                "existing_licence": "holding an existing licence",
-                "scope_extension": "extending an existing licence scope",
-                "not_sure": "with an unspecified application stage",
-            }[routing_context.application_stage]
-            role_article = "an" if routing_context.role in {"artisan", "importer"} else "a"
             standard_text = (
                 "IS 15644 is the primary standard. The cited IS 9873 parts are secondary requirements where applicable."
                 if electric else
                 "IS 9873 Part 1 is the primary standard. The cited additional IS 9873 parts are secondary requirements where applicable."
             )
+            power_context = {
+                "battery_operated": "You described the toy as battery-operated.",
+                "mains_electric": "You described the toy as mains-powered.",
+                "non_electric": "You described the toy as non-electric.",
+            }[routing_context.power_type]
             sections = [
-                AnswerSection(
-                    type="explanation", title="Your profile",
-                    content=(f"You described yourself as {role_article} {routing_context.role} working with {power_label} toys "
-                             f"for the {age_label} age group and said you are {stage_label}. "
-                             "This is user-provided information, not verified BIS evidence."),
-                ),
                 AnswerSection(
                     type="direct_answer", title="Applicable standard", content=standard_text,
                     citation_ids=[primary_id, secondary_id],
                 ),
                 AnswerSection(
-                    type="explanation", title="Certification position",
-                    content=f"Your selected application stage is: {stage_label}. This describes where you said you are in the process; it is not a BIS finding.",
+                    type="explanation", title="Selected power type",
+                    content=f"{power_context} This is user-provided context, not BIS evidence.",
                 ),
             ]
+            next_item = (
+                "Start by reviewing the cited primary standard and the secondary parts that may apply."
+                if routing_context.application_stage == "researching" else
+                "Use the cited Manakonline and application-detail steps while checking the current complete application requirements with BIS."
+                if routing_context.application_stage == "preparing_application" else
+                "Use the cited partial series checklist to prepare the scope change, then verify the complete current submission requirements with BIS."
+            )
+            next_ids = [primary_id, secondary_id]
+            if routing_context.application_stage != "researching" and "certification_portal" in selected_by_role:
+                next_ids.append(selected_by_role["certification_portal"][0].citation_id)
+            sections.append(AnswerSection(
+                type="next_steps", title="Your next action", items=[next_item], citation_ids=next_ids,
+            ))
             if "certification_standard_selection" in selected_by_role:
                 certification_ids = [
                     selected_by_role[role][0].citation_id for role in (
@@ -861,24 +913,11 @@ class ChatService:
                 type="important", title="What the indexed documents do not establish",
                 content="The selected evidence does not establish exact current fees, a guaranteed timeline, a recommended laboratory, every current form, or every remaining certification step.",
             ))
-            next_item = (
-                "Start by reviewing the cited primary standard and the secondary parts that may apply."
-                if routing_context.application_stage == "researching" else
-                "Use the cited Manakonline and application-detail steps while checking the current complete application requirements with BIS."
-                if routing_context.application_stage == "preparing_application" else
-                "Use the cited partial series checklist to prepare the scope change, then verify the complete current submission requirements with BIS."
-            )
-            next_ids = [primary_id, secondary_id]
-            if routing_context.application_stage != "researching" and "certification_portal" in selected_by_role:
-                next_ids.append(selected_by_role["certification_portal"][0].citation_id)
-            sections.append(AnswerSection(
-                type="next_steps", title="Your next action", items=[next_item], citation_ids=next_ids,
-            ))
         elif plan.category == "certification":
             sections = [
                 AnswerSection(
                     type="direct_answer", title="Direct answer",
-                    content="The indexed BIS guidance supports the opening steps for a new toy-licence application.",
+                    content="Start with the cited opening steps for a new toy-licence application.",
                     citation_ids=[item.citation_id for item, _ in selected],
                 ),
                 AnswerSection(
@@ -898,14 +937,9 @@ class ChatService:
                 ),
             ]
         elif plan.category == "exemption":
-            scope = re.sub(
-                r"^provided further that nothing in this order shall apply to\s+",
-                "", selected[0][1], flags=re.I,
-            ).rstrip(".:")
-            registration = selected[1][1].rstrip(".:")
             sections = [
                 AnswerSection(type="direct_answer", title="Direct answer", content="No, not all handmade toys are automatically exempt.", citation_ids=[selected[0][0].citation_id]),
-                AnswerSection(type="explanation", title="What this means", content=f"The exception applies to {scope} {registration}.", citation_ids=[item.citation_id for item, _ in selected]),
+                AnswerSection(type="explanation", title="What this means", content="This may apply only to goods manufactured and sold by artisans who are registered with the Office of the Development Commissioner (Handicrafts), under the Ministry of Textiles, Government of India.", citation_ids=[item.citation_id for item, _ in selected]),
                 AnswerSection(type="important", title="Important condition", content="Handmade alone does not establish this exemption; the manufacture, sale, registration, and authority conditions all matter.", citation_ids=[item.citation_id for item, _ in selected]),
             ]
         elif plan.category == "documents":
@@ -921,19 +955,10 @@ class ChatService:
             ]
         else:
             sections = [
-                AnswerSection(type="direct_answer", title="Direct answer", content="The 2026 Transition Facilitation Order can allow permission for covered goods or articles, but approval is not automatic.", citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id]),
+                AnswerSection(type="direct_answer", title="Direct answer", content="The 2026 Transition Facilitation Order may allow permission for covered goods or articles, but approval is not automatic.", citation_ids=[selected[0][0].citation_id, selected[1][0].citation_id]),
                 AnswerSection(type="explanation", title="What this means", content="The Department for Promotion of Industry and Internal Trade (DPIIT) may grant permission to a company incorporated under the Companies Act, 2013, based on the Implementation Committee’s risk assessment.", citation_ids=[selected[1][0].citation_id]),
                 AnswerSection(type="important", title="Important condition", content="Permission may be granted only under the order’s stated conditions.", citation_ids=[selected[1][0].citation_id]),
             ]
-        if routing_context is not None and not plan.category.startswith("roadmap_"):
-            stage = routing_context.application_stage.replace("_", " ")
-            goal = routing_context.goal.replace("_", " ")
-            sections.append(AnswerSection(
-                type="explanation",
-                title="Where this fits in your journey",
-                content=(f"You selected the {stage} stage and asked for {goal}. "
-                         "These are profile details you provided, not verified BIS evidence."),
-            ))
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
         self._validate_sections(sections, fact_plan, citations)
