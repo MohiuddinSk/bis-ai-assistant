@@ -1,2 +1,2 @@
-const questions=['Which standard applies to a battery-operated toy?','Are all handmade toys exempt?','What documents are required for a new toy series?','What does the 2026 transition order do?'];
-export function SuggestedQuestions({onSelect}:{onSelect:(q:string)=>void}){return <section className="suggestions"><h2>Suggested questions</h2>{questions.map(q=><button key={q} onClick={()=>onSelect(q)}>{q}</button>)}</section>}
+import type { SuggestedAction } from '../suggestedActions';
+export function SuggestedQuestions({actions,onSelect,busy}:{actions:SuggestedAction[];onSelect:(action:SuggestedAction)=>void;busy:boolean}){return <section className="suggestions"><h2>Suggested questions</h2>{actions.map(action=><button key={action.label} disabled={busy} onClick={()=>onSelect(action)}>{action.label}</button>)}</section>}

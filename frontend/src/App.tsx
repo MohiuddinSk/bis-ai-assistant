@@ -8,8 +8,10 @@ import { SuggestedQuestions } from './components/SuggestedQuestions';
 import { LoadingMessage } from './components/LoadingMessage';
 import { ErrorMessage } from './components/ErrorMessage';
 import { ComplianceWizard } from './components/ComplianceWizard';
+import { builtInSuggestedActions, normalizeSuggestedActions, questionForSuggestedAction } from './suggestedActions';
+import type { SuggestedAction } from './suggestedActions';
 
-type Message = { role: 'user' | 'assistant'; text: string; response?: ChatResponse };
+type Message = { role: 'user' | 'assistant'; text: string; response?: ChatResponse; suggestedActions?: SuggestedAction[] };
 
 function isIndependentQuestion(value: string): boolean {
   const text = value.trim();
@@ -18,15 +20,6 @@ function isIndependentQuestion(value: string): boolean {
 
 function isStandardFollowUp(value: string): boolean {
   return /\b(?:this|that|the)\s+standards?\b|\bprimary standard\b|\bsimpler language\b|\bin simple(?:r)?(?:\s+words|\s+language)?\b|\bmore simply\b|\bafter identifying\b|\btell me about the is\b/i.test(value);
-}
-
-function standardSelectionQuestion(reply: string, response?: ChatResponse): string {
-  const context = response?.assistant_context;
-  const isStandardSelection = response?.needs_clarification
-    && context?.expected_slots.includes('standard_reference')
-    && context.referenced_standards?.includes(reply)
-    && /^IS\s+\d+(?:\s+Part\s+\d+)?$/i.test(reply);
-  return isStandardSelection ? `Explain ${reply} in simple words.` : reply;
 }
 
 export default function App() {
@@ -43,6 +36,7 @@ export default function App() {
   const end = useRef<HTMLDivElement>(null);
   const chatController = useRef<AbortController | null>(null);
   const requestPending = useRef(false);
+  const wizardEntry = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,6 +58,13 @@ export default function App() {
 
   useEffect(() => () => chatController.current?.abort(), []);
 
+  useEffect(() => {
+    if (mode === 'wizard') {
+      wizardEntry.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      wizardEntry.current?.focus({ preventScroll: true });
+    }
+  }, [mode]);
+
   const send = async (question: string, suppliedContext?: AssistantContext) => {
     if (busy || requestPending.current) return;
     requestPending.current = true;
@@ -80,7 +81,7 @@ export default function App() {
     chatController.current = controller;
     try {
       const response = await askQuestion(question, audience, assistantContext, controller.signal);
-      setMessages((items) => [...items, { role: 'assistant', text: response.answer, response }]);
+      setMessages((items) => [...items, { role: 'assistant', text: response.answer, response, suggestedActions: normalizeSuggestedActions(response) }]);
       setSessionContext(response.assistant_context ?? undefined);
       setPendingContext(response.needs_clarification
         ? (response.assistant_context ?? { original_question: assistantContext?.original_question ?? question, expected_slots: [] })
@@ -108,20 +109,29 @@ export default function App() {
     setMode(next);
   };
 
+  const dispatchSuggestedAction = (action: SuggestedAction, context?: AssistantContext) => {
+    if (action.kind === 'open_compliance_wizard') {
+      switchMode('wizard');
+      return;
+    }
+    const question = questionForSuggestedAction(action);
+    if (question) void send(question, context);
+  };
+
   return <main>
     <ChatHeader status={status} />
     <nav aria-label="Guidance mode">
       <button onClick={() => switchMode('chat')} aria-pressed={mode === 'chat'}>Ask a question</button>
       <button onClick={() => switchMode('wizard')} aria-pressed={mode === 'wizard'}>Compliance Wizard</button>
     </nav>
-    {mode === 'wizard' ? <ComplianceWizard /> : <>
+    {mode === 'wizard' ? <div ref={wizardEntry} tabIndex={-1}><ComplianceWizard /></div> : <>
       <section className="hero">
         <h2>Practical standards guidance, with evidence</h2>
         <p>AI-generated informational guidance grounded in indexed BIS documents. Verify final compliance requirements with BIS or a qualified professional.</p>
       </section>
-      {messages.length === 0 && <SuggestedQuestions onSelect={send} />}
+      {messages.length === 0 && <SuggestedQuestions actions={builtInSuggestedActions} busy={busy} onSelect={action => dispatchSuggestedAction(action)} />}
       <section className="chat" aria-live="polite">
-        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedReply={message.role === 'assistant' && (pendingContext || (message.response?.suggested_replies?.length ?? 0) > 0) ? (reply) => void send(standardSelectionQuestion(reply, message.response), pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
+        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedAction={message.role === 'assistant' && (message.suggestedActions?.length ?? 0) > 0 ? action => dispatchSuggestedAction(action, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
         {busy && <LoadingMessage />}
         {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext)} />}
         <div ref={end} />

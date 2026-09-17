@@ -78,6 +78,16 @@ it('renders accessible suggested standard replies and sends the chosen standard 
  expect(f).toHaveBeenCalledTimes(3);
 });
 
+it('opens the Compliance Wizard for a roadmap action without submitting chat',async()=>{
+ const roadmap={...a,suggested_replies:['Show my complete compliance roadmap'],assistant_context:{expected_slots:[]}};
+ const f=vi.fn((url:string)=>Promise.resolve(rep(url.includes('health')?{status:'ready'}:roadmap)));vi.stubGlobal('fetch',f);render(<App/>);const u=userEvent.setup();
+ await u.type(screen.getByLabelText(/ask a question/i),'Which standard applies to a battery-operated toy?{Enter}');
+ const action=await screen.findByRole('button',{name:'Show my complete compliance roadmap'});const callsBefore=f.mock.calls.length;
+ await u.click(action);
+ const heading=await screen.findByRole('heading',{name:'Compliance Wizard'});
+ expect(f).toHaveBeenCalledTimes(callsBefore);expect(screen.queryByText('Show my complete compliance roadmap',{selector:'.message.user'})).toBeNull();expect(screen.queryByRole('alert')).toBeNull();expect(heading.parentElement?.parentElement as HTMLElement).toContainElement(document.activeElement as HTMLElement);
+});
+
 it('expands any selected standard-reference chip but leaves ordinary and typed questions unchanged',async()=>{
  const context={expected_slots:['standard_reference' as const],referenced_standards:['IS 15644','IS 9873 Part 2']};
  const clarification={...a,answer:'Which of the previously mentioned Indian Standards would you like me to explain?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['IS 15644','IS 9873 Part 2'],assistant_context:context,answer_sections:[{type:'clarification' as const,title:'Need more details',content:'Which of the previously mentioned Indian Standards would you like me to explain?',items:[],citation_ids:[]}]};

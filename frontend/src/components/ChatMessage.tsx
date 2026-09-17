@@ -1,5 +1,6 @@
 import type { AnswerSection, ChatResponse, Citation } from '../types/chat';
 import { CitationCard } from './CitationCard';
+import type { SuggestedAction } from '../suggestedActions';
 
 type Presentation = 'chat' | 'compliance-journey';
 type JourneyCategory = 'standards' | 'why' | 'checklist' | 'important' | 'next-action';
@@ -67,14 +68,14 @@ function JourneySources({ citations }: { citations: Citation[] }) {
   return <section className="sources journey-sources" aria-label={`Verified sources (${citations.length})`}><h2>Verified sources <span>{citations.length}</span></h2><details open><summary>View verified source details</summary>{[...byDocument].map(([document, documentCitations], documentIndex) => <section className="journey-source-document" key={document}><h3>{document}</h3><div className="source-page-chips" aria-label={`Referenced pages in ${document}`}>{documentCitations.map((citation, citationIndex) => <a key={`${citation.citation_id}-${citation.chunk_id}`} href={`#journey-source-${documentIndex}-${citationIndex}`}>{citation.page_start === citation.page_end ? `Page ${citation.page_start ?? 'not available'}` : `Pages ${citation.page_start ?? '?'}–${citation.page_end ?? '?'}`}</a>)}</div><div className="citation-list">{documentCitations.map((citation, citationIndex) => <div id={`journey-source-${documentIndex}-${citationIndex}`} key={`${citation.citation_id}-${citation.chunk_id}`}><CitationCard citation={citation} /></div>)}</div></section>)}</details></section>;
 }
 
-export function ChatMessage({ role, text, response, onSuggestedReply, busy = false, presentation = 'chat', sourceHeading = 'Sources' }: { role: 'user' | 'assistant'; text: string; response?: ChatResponse; onSuggestedReply?: (reply: string) => void; busy?: boolean; presentation?: Presentation; sourceHeading?: string }) {
+export function ChatMessage({ role, text, response, suggestedActions, onSuggestedAction, busy = false, presentation = 'chat', sourceHeading = 'Sources' }: { role: 'user' | 'assistant'; text: string; response?: ChatResponse; suggestedActions?: SuggestedAction[]; onSuggestedAction?: (action: SuggestedAction) => void; busy?: boolean; presentation?: Presentation; sourceHeading?: string }) {
   const citations = Array.from(new Map((response?.citations ?? []).map((citation) => [citation.chunk_id, citation])).values());
   const sections = response?.answer_sections ?? [];
   const journey = presentation === 'compliance-journey';
   return <article className={`message ${role}`}>
     {role === 'assistant' && response && <span className={`answer-status ${response.needs_clarification ? 'clarification-needed' : response.insufficient_evidence ? 'insufficient' : 'grounded'}`}>{response.needs_clarification ? 'Need more details' : response.insufficient_evidence ? 'Evidence insufficient' : 'Grounded answer'}</span>}
     {sections.length > 0 ? journey ? <JourneyGuidance sections={sections} /> : <div className="guided-answer">{sections.map((section, index) => <section key={`${section.type}-${index}`} className={`guided-section ${section.type}`}><h3>{section.title}</h3>{section.content && <p>{section.content}</p>}{section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}</section>)}</div> : <p className="answer-text">{text}</p>}
-    {(response?.suggested_replies?.length ?? 0) > 0 && onSuggestedReply && <div className="suggested-replies" role="group" aria-label="Suggested replies">{response!.suggested_replies!.map(reply => <button type="button" key={reply} disabled={busy} onClick={() => onSuggestedReply(reply)}>{reply}</button>)}</div>}
+    {(suggestedActions?.length ?? 0) > 0 && onSuggestedAction && <div className="suggested-replies" role="group" aria-label="Suggested replies">{suggestedActions!.map(action => <button type="button" key={action.label} disabled={busy} onClick={() => onSuggestedAction(action)}>{action.label}</button>)}</div>}
     {citations.length > 0 && (journey ? <JourneySources citations={citations} /> : <section className="sources" aria-label={`${sourceHeading} (${citations.length})`}><h3>{sourceHeading} <span>{citations.length}</span></h3><div className="citation-list">{citations.map(c => <CitationCard key={`${c.citation_id}-${c.chunk_id}`} citation={c} />)}</div></section>)}
   </article>;
 }
