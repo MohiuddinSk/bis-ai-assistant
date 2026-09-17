@@ -71,9 +71,30 @@ it('renders accessible suggested standard replies and sends the chosen standard 
  await u.click(screen.getByRole('button',{name:'IS 15644'}));
  await screen.findByText(/primary standard for electric toys/i);
  const payload=JSON.parse(String((f.mock.calls[2]?.[1] as RequestInit).body));
- expect(payload.question).toBe('IS 15644');
+ expect(payload.question).toBe('Explain IS 15644 in simple words.');
  expect(payload.assistant_context).toEqual(context);
+ expect(screen.getByText('Explain IS 15644 in simple words.')).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'IS 15644'})).toBeEnabled();
  expect(f).toHaveBeenCalledTimes(3);
+});
+
+it('expands any selected standard-reference chip but leaves ordinary and typed questions unchanged',async()=>{
+ const context={expected_slots:['standard_reference' as const],referenced_standards:['IS 15644','IS 9873 Part 2']};
+ const clarification={...a,answer:'Which of the previously mentioned Indian Standards would you like me to explain?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['IS 15644','IS 9873 Part 2'],assistant_context:context,answer_sections:[{type:'clarification' as const,title:'Need more details',content:'Which of the previously mentioned Indian Standards would you like me to explain?',items:[],citation_ids:[]}]};
+ let chatCall=0;const f=vi.fn((url:string,_init?:RequestInit)=>Promise.resolve(rep(url.includes('health')?{status:'ready'}:chatCall++===0?clarification:a)));vi.stubGlobal('fetch',f);render(<App/>);const u=userEvent.setup();
+ await u.type(screen.getByLabelText(/ask a question/i),'In simple terms{Enter}');await screen.findByRole('button',{name:'IS 9873 Part 2'});
+ await u.click(screen.getByRole('button',{name:'IS 9873 Part 2'}));await screen.findByText(a.answer);
+ expect(JSON.parse(String((f.mock.calls[2][1] as RequestInit).body)).question).toBe('Explain IS 9873 Part 2 in simple words.');
+ cleanup();vi.restoreAllMocks();mock();render(<App/>);const typed=userEvent.setup();await typed.type(screen.getByLabelText(/ask a question/i),'IS 15644{Enter}');await screen.findByText(a.answer);
+ const typedFetch=globalThis.fetch as ReturnType<typeof vi.fn>;expect(JSON.parse(String(typedFetch.mock.calls[1][1].body)).question).toBe('IS 15644');
+});
+
+it('disables a pending standard-selection chip, submits it once, and restores it after failure',async()=>{
+ const context={expected_slots:['standard_reference' as const],referenced_standards:['IS 15644']};
+ const clarification={...a,answer:'Which Indian Standard would you like me to explain?',grounded:false,insufficient_evidence:false,needs_clarification:true,generation_mode:'clarification' as const,citations:[],suggested_replies:['IS 15644'],assistant_context:context,answer_sections:[{type:'clarification' as const,title:'Need more details',content:'Which Indian Standard would you like me to explain?',items:[],citation_ids:[]}]};
+ let resolve!: (value: unknown) => void;let chatCall=0;const f=vi.fn((url:string,_init?:RequestInit)=>url.includes('health')?Promise.resolve(rep({status:'ready'})):chatCall++===0?Promise.resolve(rep(clarification)):new Promise(next=>{resolve=next}));vi.stubGlobal('fetch',f);render(<App/>);const u=userEvent.setup();
+ await u.type(screen.getByLabelText(/ask a question/i),'Explain that standard{Enter}');const chip=await screen.findByRole('button',{name:'IS 15644'});await u.dblClick(chip);expect(chip).toBeDisabled();expect(f).toHaveBeenCalledTimes(3);await act(async()=>resolve({ok:false,json:async()=>({})}));await screen.findByRole('alert');expect(chip).toBeEnabled();
+ await u.click(screen.getByRole('button',{name:'Retry'}));expect(f).toHaveBeenCalledTimes(4);expect(JSON.parse(String((f.mock.calls[3][1] as RequestInit).body)).question).toBe('Explain IS 15644 in simple words.');
 });
 
 it('displays ambiguous standard-reference clarification',async()=>{

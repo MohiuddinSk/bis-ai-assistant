@@ -20,6 +20,15 @@ function isStandardFollowUp(value: string): boolean {
   return /\b(?:this|that|the)\s+standards?\b|\bprimary standard\b|\bsimpler language\b|\bin simple(?:r)?(?:\s+words|\s+language)?\b|\bmore simply\b|\bafter identifying\b|\btell me about the is\b/i.test(value);
 }
 
+function standardSelectionQuestion(reply: string, response?: ChatResponse): string {
+  const context = response?.assistant_context;
+  const isStandardSelection = response?.needs_clarification
+    && context?.expected_slots.includes('standard_reference')
+    && context.referenced_standards?.includes(reply)
+    && /^IS\s+\d+(?:\s+Part\s+\d+)?$/i.test(reply);
+  return isStandardSelection ? `Explain ${reply} in simple words.` : reply;
+}
+
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [busy, setBusy] = useState(false);
@@ -33,6 +42,7 @@ export default function App() {
   const [status, setStatus] = useState<'ready' | 'degraded' | 'unavailable'>('unavailable');
   const end = useRef<HTMLDivElement>(null);
   const chatController = useRef<AbortController | null>(null);
+  const requestPending = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,7 +65,8 @@ export default function App() {
   useEffect(() => () => chatController.current?.abort(), []);
 
   const send = async (question: string, suppliedContext?: AssistantContext) => {
-    if (busy) return;
+    if (busy || requestPending.current) return;
+    requestPending.current = true;
     const continuing = Boolean(pendingContext && !isIndependentQuestion(question));
     const followUp = Boolean(sessionContext && isStandardFollowUp(question));
     const assistantContext = suppliedContext ?? (continuing ? pendingContext ?? undefined : followUp ? sessionContext : undefined);
@@ -80,12 +91,14 @@ export default function App() {
       }
     } finally {
       if (chatController.current === controller) chatController.current = null;
+      requestPending.current = false;
       setBusy(false);
     }
   };
 
   const resetConversation = () => {
     chatController.current?.abort();
+    requestPending.current = false;
     setMessages([]); setPendingContext(null); setSessionContext(undefined); setLastContext(undefined); setLast(''); setError(''); setBusy(false);
   };
 
@@ -108,7 +121,7 @@ export default function App() {
       </section>
       {messages.length === 0 && <SuggestedQuestions onSelect={send} />}
       <section className="chat" aria-live="polite">
-        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedReply={message.role === 'assistant' && (pendingContext || (message.response?.suggested_replies?.length ?? 0) > 0) ? (reply) => void send(reply, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
+        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedReply={message.role === 'assistant' && (pendingContext || (message.response?.suggested_replies?.length ?? 0) > 0) ? (reply) => void send(standardSelectionQuestion(reply, message.response), pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
         {busy && <LoadingMessage />}
         {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext)} />}
         <div ref={end} />
