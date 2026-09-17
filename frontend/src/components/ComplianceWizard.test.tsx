@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ComplianceWizard } from './ComplianceWizard';
+import { printComplianceReport } from './printComplianceReport';
 
 const guidance = { answer: 'Grounded answer.', grounded: true, insufficient_evidence: false, evidence_count: 1, citations: [{ citation_id: 'S1', source_filename: 'manual.pdf', page_start: 4, page_end: 4, chunk_id: 'c1', excerpt: 'IS 15644 applies.' }], model: 'fake', generation_mode: 'extractive_fallback' as const, disclaimer: 'Verify.', answer_sections: [
   { type: 'direct_answer' as const, title: 'Standards found', content: 'IS 15644 applies.', items: [], citation_ids: ['S1'] },
@@ -62,8 +63,14 @@ it('renders one coherent grounded roadmap with profile, categories, and verified
   expect(journey().getByRole('heading', { name: /Verified sources/i })).toBeInTheDocument(); expect(journey().getByRole('link', { name: /manual.pdf.*page 4/i })).toBeInTheDocument();
 });
 
-it('prints a separate, deduplicated compliance action report without altering the screen result', async () => {
-  const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+it('prints only the dedicated report in an isolated iframe without altering the screen result', async () => {
+  const mainPrint = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+  const iframePrint = vi.fn();
+  const appendToBody = document.body.append.bind(document.body);
+  vi.spyOn(document.body, 'append').mockImplementation((...nodes: Array<Node | string>) => {
+    appendToBody(...nodes);
+    for (const node of nodes) if (node instanceof HTMLIFrameElement) Object.defineProperty(node.contentWindow!, 'print', { configurable: true, value: iframePrint });
+  });
   const report = { ...response, guidance: { ...guidance, citations: [
     { ...guidance.citations[0], excerpt: 'Raw evidence excerpt S1', page_start: 4, page_end: 4 }, { ...guidance.citations[0], excerpt: 'Raw evidence excerpt S1', citation_id: 'S2', chunk_id: 'c2', page_start: 3, page_end: 3 }, { ...guidance.citations[0], excerpt: 'Raw evidence excerpt S1', citation_id: 'S3', chunk_id: 'c3', page_start: 4, page_end: 4 }, { ...guidance.citations[0], excerpt: 'Raw evidence excerpt S1', citation_id: 'S4', chunk_id: 'c4', source_filename: 'certification.pdf', page_start: 5, page_end: 5 },
   ], answer_sections: [...guidance.answer_sections, { type: 'explanation' as const, title: 'Your profile', content: 'Duplicate profile narrative.', items: [], citation_ids: [] }, { type: 'explanation' as const, title: 'Certification position', content: 'Duplicate stage narrative.', items: [], citation_ids: [] }, { type: 'next_steps' as const, title: 'Your next action', content: null, items: ['Open the cited primary standard.'], citation_ids: ['S1'] }] } };
@@ -75,14 +82,63 @@ it('prints a separate, deduplicated compliance action report without altering th
   expect(reportView.getByRole('heading', { name: 'Applicable standards' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Why this applies' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Compliance checklist' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Recommended next action' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Important conditions and limitations' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Verified sources' })).toBeInTheDocument();
   expect(reportView.getByText('manual.pdf')).toBeInTheDocument(); expect(reportView.getByText('3, 4')).toBeInTheDocument(); expect(reportView.getByText('certification.pdf')).toBeInTheDocument(); expect(reportView.getByText('5')).toBeInTheDocument();
   for (const absent of ['Duplicate profile narrative.', 'Duplicate stage narrative.', 'Source S1', 'c1', 'View evidence', 'Open source PDF', 'Raw evidence excerpt S1']) expect(reportView.queryByText(absent, { exact: false })).toBeNull();
-  const root = document.getElementById('root') ?? document.body.firstElementChild as HTMLElement; const rootClass = root.className; const bodyClass = document.body.className; const rootStyle = root.getAttribute('style'); const bodyStyle = document.body.getAttribute('style');
-  await user.click(screen.getByRole('button', { name: 'Download or print compliance action report' })); await user.click(screen.getByRole('button', { name: 'Download or print compliance action report' })); expect(print).toHaveBeenCalledTimes(2);
-  expect(root.className).toBe(rootClass); expect(document.body.className).toBe(bodyClass); expect(root.getAttribute('style')).toBe(rootStyle); expect(document.body.getAttribute('style')).toBe(bodyStyle); expect(journey().getByRole('heading', { name: 'Applicable standards' })).toBeInTheDocument();
+  const root = document.getElementById('root') ?? document.body.firstElementChild as HTMLElement; const rootClass = root.className; const bodyClass = document.body.className; const htmlClass = document.documentElement.className; const rootStyle = root.getAttribute('style'); const bodyStyle = document.body.getAttribute('style'); const htmlStyle = document.documentElement.getAttribute('style');
+  const button = screen.getByRole('button', { name: 'Download or print compliance action report' });
+  const unrelatedContent = document.createTextNode('Powered by Netlify unrelated body content'); document.body.append(unrelatedContent);
+  await user.click(button);
+  const frame = await waitFor(() => {
+    const next = document.querySelector<HTMLIFrameElement>('iframe.compliance-print-frame');
+    expect(next).not.toBeNull();
+    return next!;
+  });
+  await waitFor(() => expect(iframePrint).toHaveBeenCalledTimes(1));
+  expect(mainPrint).not.toHaveBeenCalled();
+  expect(iframePrint.mock.contexts[0]).toBe(frame.contentWindow);
+  const printed = frame.contentDocument!;
+  expect(printed.querySelector('.compliance-print-report')).not.toBeNull(); expect(printed.querySelector('.journey-result')).toBeNull(); expect(printed.querySelector('nav')).toBeNull(); expect(printed.body).not.toHaveTextContent('Powered by Netlify'); expect(printed.body).not.toHaveTextContent('unrelated body content');
+  expect(root.className).toBe(rootClass); expect(document.body.className).toBe(bodyClass); expect(document.documentElement.className).toBe(htmlClass); expect(root.getAttribute('style')).toBe(rootStyle); expect(document.body.getAttribute('style')).toBe(bodyStyle); expect(document.documentElement.getAttribute('style')).toBe(htmlStyle); expect(journey().getByRole('heading', { name: 'Applicable standards' })).toBeInTheDocument();
+  act(() => frame.contentWindow!.dispatchEvent(new Event('afterprint')));
+  await waitFor(() => expect(document.querySelector('iframe.compliance-print-frame')).toBeNull()); expect(document.activeElement).toBe(button);
+  await user.click(button);
+  const secondFrame = await waitFor(() => {
+    const next = document.querySelector<HTMLIFrameElement>('iframe.compliance-print-frame');
+    expect(next).not.toBeNull();
+    return next!;
+  });
+  await waitFor(() => expect(iframePrint).toHaveBeenCalledTimes(2));
+  expect(iframePrint.mock.contexts[1]).toBe(secondFrame.contentWindow);
+  act(() => secondFrame.contentWindow!.dispatchEvent(new Event('afterprint')));
+  await waitFor(() => expect(document.querySelectorAll('iframe.compliance-print-frame')).toHaveLength(0));
+  unrelatedContent.remove();
 });
 
 it('does not offer a report for ungrounded or clarification guidance', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ ...response, guidance: { ...guidance, grounded: false, insufficient_evidence: true } }))); const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
   expect(await screen.findByText('Evidence insufficient')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Download or print compliance action report' })).not.toBeInTheDocument();
+});
+
+it('uses a bounded, idempotent fallback to remove an abandoned print iframe', async () => {
+  vi.useFakeTimers();
+  const report = document.createElement('article'); report.className = 'compliance-print-report'; report.textContent = 'Only report content';
+  const origin = document.createElement('button'); document.body.append(origin);
+  const appendToBody = document.body.append.bind(document.body); const iframePrint = vi.fn();
+  vi.spyOn(document.body, 'append').mockImplementation((...nodes: Array<Node | string>) => {
+    appendToBody(...nodes);
+    for (const node of nodes) if (node instanceof HTMLIFrameElement) {
+      Object.defineProperty(node.contentWindow!, 'print', { configurable: true, value: iframePrint });
+      Object.defineProperty(node.contentWindow!, 'focus', { configurable: true, value: vi.fn() });
+    }
+  });
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => window.setTimeout(() => callback(0), 1));
+  printComplianceReport(report, origin);
+  await Promise.resolve(); await vi.advanceTimersByTimeAsync(1);
+  expect(iframePrint).toHaveBeenCalledTimes(1); expect(document.querySelectorAll('iframe.compliance-print-frame')).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(document.querySelectorAll('iframe.compliance-print-frame')).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(document.querySelectorAll('iframe.compliance-print-frame')).toHaveLength(0);
+  vi.useRealTimers();
+  origin.remove();
 });
 
 it('does not offer a report while loading, during review, or after a request error', async () => {
