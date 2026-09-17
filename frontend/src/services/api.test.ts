@@ -118,7 +118,7 @@ it('renders a successful service response before its deadline', async () => {
 it('does not mislabel an HTTP provider error as a frontend timeout', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ detail: 'provider error' }, false, 503)));
   await expect(askQuestion('question')).rejects.toMatchObject({
-    friendly: 'The guidance service is temporarily unavailable. Please try again.',
+    friendly: 'This request needs a service that is currently unavailable. Try another question or use the Compliance Wizard.',
   });
 });
 

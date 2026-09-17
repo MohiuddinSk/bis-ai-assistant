@@ -58,15 +58,15 @@ it('groups a compliance journey once per category without losing distinct backen
   expect(screen.getAllByRole('button', { name: /View evidence/i })).toHaveLength(2);
 });
 
-it('renders harmless accessible suggested replies and submits one once', async () => {
-  const reply = vi.fn();
+it('renders typed accessible suggested actions and submits one once', async () => {
+  const action = vi.fn();
   render(<ChatMessage role="assistant" text="Choose" response={{
     ...response,
     suggested_replies: ['Non-electric', '<b>Battery</b>'],
-  }} onSuggestedReply={reply} />);
+  }} suggestedActions={[{ kind: 'chat_question', label: 'Non-electric', question: 'Non-electric' }, { kind: 'chat_question', label: '<b>Battery</b>', question: '<b>Battery</b>' }]} onSuggestedAction={action} />);
   expect(screen.getByRole('group', { name: 'Suggested replies' })).toBeInTheDocument();
   expect(document.querySelector('.suggested-replies b')).toBeNull();
   await userEvent.setup().click(screen.getByRole('button', { name: 'Non-electric' }));
-  expect(reply).toHaveBeenCalledTimes(1);
-  expect(reply).toHaveBeenCalledWith('Non-electric');
+  expect(action).toHaveBeenCalledTimes(1);
+  expect(action).toHaveBeenCalledWith({ kind: 'chat_question', label: 'Non-electric', question: 'Non-electric' });
 });

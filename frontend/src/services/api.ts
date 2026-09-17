@@ -65,6 +65,8 @@ async function request<T>(path: string, timeout: number, init: RequestInit = {})
       throw new ApiError(
         response.status === 422
           ? 'Please enter a valid question.'
+          : response.status === 503
+            ? 'This request needs a service that is currently unavailable. Try another question or use the Compliance Wizard.'
           : response.status >= 500
             ? 'The guidance service is temporarily unavailable. Please try again.'
             : 'Unable to complete that request.',
