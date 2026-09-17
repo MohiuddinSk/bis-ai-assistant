@@ -76,9 +76,10 @@ class RealDataGroundingIntegrationTests(unittest.TestCase):
         self.assertEqual(response.answer, ChatService._join_sections(response.answer_sections))
         self.assertIn("development commissioner", response.answer.lower())
         self.assertNotIn("developmentcommissioner", response.answer.lower())
-        self.assertIn("manufactured and sold by artisans", response.answer.lower())
-        self.assertIn("registered with office of the development commissioner", response.answer.lower())
-        self.assertIn("ministry of textiles", response.answer.lower())
+        for concept in ("registered", "office of the development commissioner", "handicrafts", "ministry of textiles", "may apply only", "manufactured and sold"):
+            self.assertIn(concept, response.answer.lower())
+        self.assertIn("handmade alone does not establish", response.answer.lower())
+        self.assertNotIn("all handmade toys are exempt", response.answer.lower())
         self.assertIn("government of india", response.answer.lower())
         self.assertNotIn("\n", response.answer)
         self.assertNotIn("passage:", response.answer.lower())
