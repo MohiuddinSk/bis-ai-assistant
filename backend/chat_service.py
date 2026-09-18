@@ -108,6 +108,10 @@ class EvidencePlan:
             "explain_electric_standard": {"requested_standard_identity"},
             "explain_non_electric_primary": {"requested_standard_identity"},
             "explain_secondary_part": {"requested_standard_identity"},
+            "explain_secondary_part_list": {
+                "requested_standard_identity", "primary_standard",
+                "supported_secondary_part_list", "product_applicability",
+            },
             "explain_standard_relationship": {"requested_standard_identity", "compared_standard_identity"},
             "explain_is_general": {"is_meaning"},
         }.get(self.category, set())
@@ -429,6 +433,14 @@ class ChatService:
         else:
             category = ""
 
+        if (
+            category == "explain_secondary_part"
+            and ChatService._requires_supported_secondary_part_list(
+                question, routing_context, understanding
+            )
+        ):
+            category = "explain_secondary_part_list"
+
         if category in {"standards", "standards_battery", "standards_mains"}:
             primary_options: list[tuple[TrustedEvidence, str]] = []
             secondary_options: list[tuple[TrustedEvidence, str]] = []
@@ -572,6 +584,8 @@ class ChatService:
         role_facts = {
             "primary_standard": ("IS 15644 is the primary standard for electric toys.", ()),
             "secondary_standard": ("IS 9873 Parts are secondary or additional requirements where applicable.", ("where applicable",)),
+            "supported_secondary_part_list": ("The cited evidence lists the supported IS 9873 parts.", ()),
+            "secondary_applicability": ("The cited IS 9873 parts are secondary requirements where applicable.", ("where applicable",)),
             "non_electric_primary": ("IS 9873 Part 1 is the primary standard for non-electric toys.", ()),
             "non_electric_secondary": ("Other IS 9873 parts are secondary requirements where applicable.", ("where applicable",)),
             "certification_portal": ("The BIS guidance starts with creating a Manakonline account and applying through it.", ()),
@@ -665,7 +679,16 @@ class ChatService:
                 if direct_answer_seen:
                     continue
                 direct_answer_seen = True
-            title = section.title if section.title.strip().lower() == "your next action" else headings.get(section.type, section.title)
+            controlled_context = (
+                section.title.strip().lower() == "your product context"
+                and not section.citation_ids
+                and section.type == "explanation"
+            )
+            title = (
+                section.title
+                if section.title.strip().lower() == "your next action" or controlled_context
+                else headings.get(section.type, section.title)
+            )
             content = section.content.strip() if section.content and section.content.strip() else None
             items = [item.strip() for item in section.items if item and item.strip()]
             identity = (
@@ -1119,6 +1142,24 @@ class ChatService:
             )
         return ()
 
+    @staticmethod
+    def _requires_supported_secondary_part_list(
+        question: str,
+        routing_context: ComplianceRoutingContext | None = None,
+        understanding: QuestionUnderstanding | None = None,
+    ) -> bool:
+        """Recognize the narrow battery IS 9873 part-list request, not its contents."""
+        power = (
+            routing_context.power_type if routing_context is not None
+            else understanding.power if understanding is not None
+            else None
+        )
+        return (
+            power == "battery_operated"
+            and bool(re.search(r"\bis\s*9873\b", question, re.I))
+            and bool(re.search(r"\bparts?\b", question, re.I))
+        )
+
     def _controlled_role_candidates(
         self,
         question: str,
@@ -1197,7 +1238,17 @@ class ChatService:
             text, metadata = row.text, row.metadata
             if not metadata.get("retrieval_enabled"):
                 continue
-            is_electric_standard_role = self._is_normative_primary(text) or self._is_normative_secondary(text)
+            q11_part_list_request = self._requires_supported_secondary_part_list(
+                question, routing_context, understanding
+            )
+            is_electric_standard_role = (
+                self._is_normative_primary(text)
+                or self._is_normative_secondary(text)
+                or (q11_part_list_request and (
+                    self._is_exact_supported_secondary_part_list(text)
+                    or self._has_secondary_applicability(text)
+                ))
+            )
             is_non_electric_role = (
                 self._is_normative_non_electric_primary(text)
                 or self._is_normative_non_electric_secondary(text)
@@ -1224,9 +1275,15 @@ class ChatService:
             is_commencement_role = metadata.get("source_filename") == "Toys-Extension.pdf" and "come into force" in text.lower()
             is_transition_role = (metadata.get("source_filename") == "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf"
                                   and ("this order shall apply" in text.lower() or "permission under this order may be granted" in text.lower()))
+            is_part2_title = (
+                understanding is not None
+                and any(ref.number == "9873" and ref.part == 2 for ref in understanding.standard_references)
+                and "is 9873 (part 2)" in text.lower()
+                and "safety of toys part 2 flammability" in text.lower()
+            )
             if not ((electric_standard_intent and is_electric_standard_role)
                     or (non_electric_standard_intent and is_non_electric_role)
-                    or (explanation_intent and (is_electric_standard_role or is_non_electric_role))
+                    or (explanation_intent and (is_electric_standard_role or is_non_electric_role or is_part2_title))
                     or (certification_intent and is_certification_role)
                     or (exemption_intent and is_exemption_role)
                     or (document_intent and is_document_role)
@@ -1249,6 +1306,9 @@ class ChatService:
         return (
             ChatService._is_normative_primary(text) if role == "is 15644"
             else ChatService._is_normative_secondary(text) if role == "is 9873"
+            else ChatService._is_exact_supported_secondary_part_list(text) if role == "supported-secondary-part-list"
+            else ChatService._has_secondary_applicability(text) if role == "secondary-applicability"
+            else ("is 9873 (part 2)" in text.lower() and "safety of toys part 2 flammability" in text.lower()) if role == "part2-title"
             else ChatService._is_normative_non_electric_primary(text) if role == "non-electric-primary"
             else ChatService._is_normative_non_electric_secondary(text) if role == "non-electric-secondary"
             else ("i hereby declare" in text.lower() and "applying for addition" in text.lower()) if role == "i hereby declare"
@@ -1272,6 +1332,34 @@ class ChatService:
             and all(f"{part}" in lowered for part in ("part 2", "3", "4", "9", "10", "11"))
             and "test report" not in lowered
         )
+
+    @staticmethod
+    def _parsed_is_9873_part_lists(text: str) -> list[list[str]]:
+        """Parse explicit IS 9873 lists without inferring omitted part numbers."""
+        display = ChatService._display_text(text)
+        pattern = re.compile(
+            r"\bIS\s*9873\s*(?:\(\s*)?Parts?\s+"
+            r"((?:Part\s*)?\d+(?:(?:\s*,\s*|\s*,?\s+and\s+)(?:Part\s*)?\d+)+)",
+            re.I,
+        )
+        return [list(dict.fromkeys(re.findall(r"\d+", match.group(1)))) for match in pattern.finditer(display)]
+
+    @staticmethod
+    def _is_exact_supported_secondary_part_list(text: str) -> bool:
+        """Only a complete, explicit list can support the Q11 numbered answer."""
+        expected = {"2", "3", "4", "9", "10", "11"}
+        parsed = ChatService._parsed_is_9873_part_lists(text)
+        return bool(parsed) and not any(set(parts) - expected for parts in parsed) and any(
+            set(parts) == expected for parts in parsed
+        )
+
+    @staticmethod
+    def _has_secondary_applicability(text: str) -> bool:
+        lowered = ChatService._display_text(text).lower()
+        return "is 9873" in lowered and bool(re.search(
+            r"\b(?:where|as)\s+applicable\b|\bsecondary standards?\s+applicable\b",
+            lowered,
+        ))
 
     @staticmethod
     def _is_normative_non_electric_primary(text: str) -> bool:
@@ -1455,6 +1543,9 @@ class ChatService:
             score += 4 if "is 9873" in lowered_text else 0
             score += 2 if "primary" in lowered_text else 0
             score += 1 if "secondary" in lowered_text else 0
+            if ChatService._requires_supported_secondary_part_list(question, routing_context, understanding):
+                score += 12 if ChatService._is_exact_supported_secondary_part_list(text) else 0
+                score += 3 if ChatService._has_secondary_applicability(text) else 0
         if non_electric_intent:
             score += 10 if ChatService._is_normative_non_electric_primary(text) else 0
             score += 9 if ChatService._is_normative_non_electric_secondary(text) else 0
@@ -1643,6 +1734,48 @@ class ChatService:
         return excerpt if 20 <= len(excerpt) <= 500 else None
 
     @staticmethod
+    def _excerpt_for_supported_secondary_part_list(passage: str) -> str | None:
+        """Return the exact numbered list only after the strict Q11 parse succeeds."""
+        if not ChatService._is_exact_supported_secondary_part_list(passage):
+            return None
+        text = ChatService._display_text(passage)
+        match = re.search(
+            r"\bIS\s*9873\s*(?:\(\s*)?Parts?\s+"
+            r"(?:Part\s*)?\d+(?:(?:\s*,\s*|\s*,?\s+and\s+)(?:Part\s*)?\d+)+",
+            text,
+            re.I,
+        )
+        if match is None:
+            return None
+        label_start = text.lower().rfind("applicable", 0, match.start())
+        start = label_start if label_start >= 0 else match.start()
+        excerpt = text[start:match.end()].strip(" .:")
+        return excerpt if 20 <= len(excerpt) <= 500 else None
+
+    @staticmethod
+    def _excerpt_for_secondary_applicability(passage: str) -> str | None:
+        if not ChatService._has_secondary_applicability(passage):
+            return None
+        for anchor in ("where applicable", "as applicable", "secondary standards applicable"):
+            if anchor in ChatService._display_text(passage).lower():
+                return ChatService._excerpt_for_anchor(passage, anchor)
+        return None
+
+    @staticmethod
+    def _excerpt_for_electric_secondary_applicability(passage: str) -> str | None:
+        """Return applicability evidence only when it explicitly includes the electric route."""
+        text = ChatService._display_text(passage)
+        lowered = text.lower()
+        if not (
+            "electric toys" in lowered
+            and "is 15644" in lowered
+            and "is 9873" in lowered
+            and re.search(r"\b(?:where|as)\s+applicable\b|\bapplicable\b", lowered)
+        ):
+            return None
+        return ChatService._excerpt_for_anchor(text, "electric toys")
+
+    @staticmethod
     def _expand_standard_parts(excerpt: str) -> str:
         """Render a compact table list unambiguously without changing selection."""
         return re.sub(
@@ -1656,7 +1789,7 @@ class ChatService:
     @staticmethod
     def _standard_parts(excerpt: str) -> list[str]:
         """Extract only the numbered IS 9873 parts already present in evidence."""
-        match = re.search(r"IS\s*9873\s*Part\s*([\d,\s]+(?:and\s*\d+)?)", excerpt, re.I)
+        match = re.search(r"IS\s*9873\s*Parts?\s*([\d,\s]*(?:and\s*\d+)?)", excerpt, re.I)
         if not match:
             return []
         parts = re.findall(r"\d+", match.group(1))
@@ -1911,6 +2044,10 @@ class ChatService:
                 queries.append("non electric toys applicable primary standard IS 9873 Part 1")
             elif ref.number == "9873":
                 queries.append("IS 9873 secondary standards parts where applicable")
+                if understanding.power == "battery_operated":
+                    queries.append("battery operated electric toy applicable secondary standard IS 9873 Part 2 3 4 9 10 11")
+                if ref.part == 2:
+                    queries.append("IS 9873 Part 2 Safety of Toys Part 2 Flammability")
         return queries
 
     @staticmethod
@@ -1923,6 +2060,15 @@ class ChatService:
                 roles.append("non-electric-primary")
             elif ref.number == "9873":
                 roles.extend(("is 9873", "non-electric-secondary"))
+                if (
+                    understanding.power == "battery_operated"
+                    and ChatService._requires_supported_secondary_part_list(
+                        understanding.normalized_query, understanding=understanding
+                    )
+                ):
+                    roles = ["supported-secondary-part-list", "secondary-applicability", *roles]
+                if ref.part == 2:
+                    roles.append("part2-title")
         return tuple(dict.fromkeys(roles))
 
     @staticmethod
@@ -1945,6 +2091,37 @@ class ChatService:
     ) -> dict[str, tuple[TrustedEvidence, str]]:
         roles: dict[str, tuple[TrustedEvidence, str]] = {}
         refs = understanding.standard_references
+        exact_part_list = (
+            category == "explain_secondary_part_list"
+            and ChatService._requires_supported_secondary_part_list(
+                understanding.normalized_query, understanding=understanding
+            )
+        )
+        if exact_part_list:
+            # Q11 is a structured enumeration.  Reserve its complete evidence
+            # before identity/product-applicability roles choose broad tables.
+            for item in evidence:
+                excerpt = ChatService._excerpt_for_supported_secondary_part_list(item.text)
+                if excerpt:
+                    roles["supported_secondary_part_list"] = (item, excerpt)
+                    break
+            for item in evidence:
+                if (
+                    "supported_secondary_part_list" in roles
+                    and item.chunk_id == roles["supported_secondary_part_list"][0].chunk_id
+                ):
+                    continue
+                excerpt = ChatService._excerpt_for_secondary_applicability(item.text)
+                if excerpt:
+                    roles["secondary_applicability"] = (item, excerpt)
+                    break
+            # The Q11 conditional role must be tied to the electric route.  A
+            # non-electric row can neither establish that route nor qualify it.
+            for item in evidence:
+                excerpt = ChatService._excerpt_for_electric_secondary_applicability(item.text)
+                if excerpt:
+                    roles["product_applicability"] = (item, excerpt)
+                    break
         if category == "explain_is_general":
             for item in evidence:
                 if re.search(r"\bindian standard", item.text, re.I) and re.search(r"\bis\s*\d", item.text, re.I):
@@ -1970,8 +2147,9 @@ class ChatService:
                         roles.setdefault("product_applicability", match)
                         roles.setdefault("primary_standard", match)
                     else:
-                        roles.setdefault("secondary_standard", match)
-                        roles.setdefault("product_applicability", match)
+                        if not exact_part_list:
+                            roles.setdefault("secondary_standard", match)
+                            roles.setdefault("product_applicability", match)
         if identity_refs and identity_refs[0].number == "15644":
             for item in evidence:
                 if ChatService._is_normative_secondary(item.text):
@@ -1986,10 +2164,55 @@ class ChatService:
                     if excerpt:
                         roles.setdefault("secondary_standard", (item, excerpt))
                         break
+        if identity_refs and identity_refs[0].number == "9873" and understanding.power == "battery_operated":
+            for item in evidence:
+                if ChatService._is_normative_primary(item.text):
+                    excerpt = ChatService._excerpt_for_standard_role(item.text, "primary") or ChatService._excerpt_for_anchor(item.text, "is 15644")
+                    if excerpt:
+                        roles.setdefault("primary_standard", (item, excerpt))
+                        break
+        if (
+            exact_part_list
+            and "supported_secondary_part_list" in roles
+            and "primary_standard" in roles
+            and "secondary_applicability" in roles
+        ):
+            reserved_ids = {
+                roles["supported_secondary_part_list"][0].chunk_id,
+                roles["primary_standard"][0].chunk_id,
+            }
+            if roles["secondary_applicability"][0].chunk_id in reserved_ids:
+                replacement = next((
+                    (item, excerpt)
+                    for item in evidence
+                    if item.chunk_id not in reserved_ids
+                    for excerpt in [ChatService._excerpt_for_secondary_applicability(item.text)]
+                    if excerpt
+                ), None)
+                if replacement is None:
+                    roles.pop("secondary_applicability")
+                else:
+                    roles["secondary_applicability"] = replacement
         if "requested_standard_identity" in roles and "compared_standard_identity" in roles:
             roles.setdefault("relationship", roles["requested_standard_identity"])
         if "requested_standard_identity" in roles:
             roles.setdefault("next_step", roles["requested_standard_identity"])
+        if identity_refs:
+            ref = identity_refs[0]
+            for item in evidence:
+                text = ChatService._display_text(item.text)
+                if ref.number == "15644" and "safety of electric toys" in text.lower():
+                    excerpt = ChatService._excerpt_for_anchor(text, "Safety of Electric Toys")
+                    if excerpt:
+                        roles.setdefault("standard_title", (item, excerpt))
+                if ref.number == "15644" and "function dependent on electricity" in text.lower():
+                    excerpt = ChatService._excerpt_for_anchor(text, "function dependent on electricity")
+                    if excerpt:
+                        roles.setdefault("electric_function_context", (item, excerpt))
+                if ref.number == "9873" and ref.part == 2 and "safety of toys part 2 flammability" in text.lower():
+                    excerpt = ChatService._excerpt_for_anchor(text, "Safety of Toys Part 2 Flammability")
+                    if excerpt:
+                        roles.setdefault("standard_title", (item, excerpt))
         return roles
 
     @staticmethod
@@ -2086,9 +2309,37 @@ class ChatService:
                 evidence,
             )
         secondary = plan.roles.get("secondary_standard")
+        title_evidence = plan.roles.get("standard_title")
+        electric_context = plan.roles.get("electric_function_context")
         if secondary and secondary[0].citation_id not in {item.citation_id for item in citations}:
             extra = self._map_citations([(secondary[0].citation_id, secondary[1])], evidence)
             citations = citations + extra
+        if title_evidence and title_evidence[0].citation_id not in {item.citation_id for item in citations}:
+            citations += self._map_citations([(title_evidence[0].citation_id, title_evidence[1])], evidence)
+        if electric_context and electric_context[0].citation_id not in {item.citation_id for item in citations}:
+            citations += self._map_citations([(electric_context[0].citation_id, electric_context[1])], evidence)
+        primary = plan.roles.get("primary_standard")
+        if primary and primary[0].citation_id not in {item.citation_id for item in citations}:
+            citations += self._map_citations([(primary[0].citation_id, primary[1])], evidence)
+        if (
+            plan.category == "explain_secondary_part_list"
+            and ChatService._requires_supported_secondary_part_list(
+                understanding.normalized_query, understanding=understanding
+            )
+        ):
+            supported_parts = plan.roles.get("supported_secondary_part_list")
+            if not supported_parts or "product_applicability" not in plan.roles or "primary_standard" not in plan.roles:
+                return self._abstention(evidence=[], citations=[])
+            secondary = supported_parts
+            parts = self._standard_parts(secondary[1])
+            if set(parts) != {"2", "3", "4", "9", "10", "11"}:
+                return self._abstention(evidence=[], citations=[])
+            exact = self._map_citations([(secondary[0].citation_id, secondary[1])], evidence)
+            if secondary[0].citation_id not in {item.citation_id for item in citations}:
+                citations += exact
+            applicability = plan.roles["product_applicability"]
+            if applicability[0].citation_id not in {item.citation_id for item in citations}:
+                citations += self._map_citations([(applicability[0].citation_id, applicability[1])], evidence)
         sections = ChatService._explanation_sections(
             plan, understanding, first, identity_item, compared, secondary, simplify,
         )
@@ -2105,6 +2356,17 @@ class ChatService:
             return self._unknown_standard_response(understanding)
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
+        if plan.category == "explain_secondary_part_list":
+            # This dedicated response may use an identity role during planning
+            # without presenting it. Publish only citations used by finalized,
+            # user-visible cited sections, in their first-seen order.
+            used_ids = list(dict.fromkeys(
+                citation_id for section in sections for citation_id in section.citation_ids
+            ))
+            citation_by_id = {citation.citation_id: citation for citation in citations}
+            if not all(citation_id in citation_by_id for citation_id in used_ids):
+                raise EvidenceCompletenessError("UNKNOWN_FACT_OR_CITATION_ID")
+            citations = [citation_by_id[citation_id] for citation_id in used_ids]
         self._validate_sections(sections, fact_plan, citations)
         return self._guided_response(
             sections=sections,
@@ -2141,9 +2403,41 @@ class ChatService:
         citation_id = identity_item.citation_id
         display = first.display if first else "the requested Indian Standard"
         sections: list[AnswerSection] = []
-        if plan.category == "explain_electric_standard":
+        if plan.category == "explain_secondary_part_list":
+            primary = plan.roles["primary_standard"]
+            applicability = plan.roles["product_applicability"]
+            assert secondary is not None
+            parts = ChatService._standard_parts(secondary[1])
+            rendered = ", ".join(f"Part {part}" for part in parts[:-1]) + f", and Part {parts[-1]}"
+            sections = [
+                AnswerSection(
+                    type="direct_answer", title="Direct answer",
+                    content="IS 15644 is the cited primary standard for electric toys.",
+                    citation_ids=[primary[0].citation_id],
+                ),
+                AnswerSection(
+                    type="explanation", title="Supported IS 9873 parts",
+                    content=f"The cited supported secondary-part list is IS 9873 {rendered}.",
+                    citation_ids=[secondary[0].citation_id],
+                ),
+                AnswerSection(
+                    type="explanation", title="Where applicable",
+                    content=("These listed parts are secondary or additional requirements only where applicable. "
+                             "The evidence does not establish that every listed part applies to every toy."),
+                    citation_ids=[applicability[0].citation_id],
+                ),
+                AnswerSection(
+                    type="explanation", title="Your product context",
+                    content="In your question, the toy is described as battery-operated. This is user-provided context, not BIS evidence.",
+                    citation_ids=[],
+                ),
+            ]
+        elif plan.category == "explain_electric_standard":
+            title = plan.roles.get("standard_title")
+            function_context = plan.roles.get("electric_function_context")
             meaning = (
-                f"The indexed evidence identifies {display} as the primary standard for electric toys."
+                f"{display} is titled ‘Safety of Electric Toys’ and is the cited primary standard for electric toys."
+                if title else f"The indexed evidence identifies {display} as the primary standard for electric toys."
                 if not simplify else
                 f"{display} is the main cited standard for electric toys."
             )
@@ -2155,12 +2449,20 @@ class ChatService:
                 if understanding.power == "mains_electric" else
                 "The indexed evidence identifies this as the primary standard for electric toys. It does not establish applicability for non-electric toys."
             )
+            if function_context:
+                applies = "It is relevant for a toy with an electric function — meaning at least one function depends on electricity. Final applicability can depend on the toy’s actual construction and functions."
             if understanding.power == "non_electric":
                 applies = "The indexed evidence does not establish that IS 15644 applies to non-electric toys."
             sections = [
-                AnswerSection(type="direct_answer", title="What this standard means", content=meaning, citation_ids=[citation_id]),
-                AnswerSection(type="explanation", title="When it applies", content=applies, citation_ids=[citation_id]),
+                AnswerSection(type="direct_answer", title="What this standard means", content=meaning, citation_ids=list(dict.fromkeys([citation_id, title[0].citation_id] if title else [citation_id]))),
+                AnswerSection(type="explanation", title="When it applies", content=applies, citation_ids=list(dict.fromkeys([citation_id, function_context[0].citation_id] if function_context else [citation_id]))),
             ]
+            if understanding.power == "battery_operated":
+                sections.insert(1, AnswerSection(
+                    type="explanation", title="Your product context",
+                    content="In your question, the toy is described as battery-operated. This is user-provided context, not BIS evidence.",
+                    citation_ids=[],
+                ))
             if secondary:
                 sections.append(AnswerSection(
                     type="explanation", title="How it relates to other standards",
@@ -2197,14 +2499,17 @@ class ChatService:
                 items=["Start with the cited primary-standard role, then check which additional listed parts the evidence marks as applicable."],
                 citation_ids=[citation_id],
             ))
-        elif plan.category == "explain_secondary_part":
+        elif plan.category in {"explain_secondary_part", "explain_secondary_part_list"}:
+            title = plan.roles.get("standard_title")
             meaning = (
+                f"{display} is titled ‘Safety of Toys Part 2 Flammability’ and is a secondary or additional requirement where applicable."
+                if title and first and first.number == "9873" and first.part == 2 else
                 f"The indexed evidence lists {display} as a secondary or additional requirement, where applicable."
                 if not simplify else
                 f"{display} is listed as an extra requirement only where it applies."
             )
             sections = [
-                AnswerSection(type="direct_answer", title="What this standard means", content=meaning, citation_ids=[citation_id]),
+                AnswerSection(type="explanation" if understanding.power == "battery_operated" else "direct_answer", title="What this standard means", content=meaning, citation_ids=list(dict.fromkeys([citation_id, title[0].citation_id] if title else [citation_id]))),
                 AnswerSection(
                     type="explanation", title="When it applies",
                     content="The indexed documents do not establish that this part applies to every toy. Applicability is limited to the cited secondary or additional role.",
@@ -2216,6 +2521,35 @@ class ChatService:
                     citation_ids=[citation_id],
                 ),
             ]
+            if understanding.power == "battery_operated":
+                sections.insert(1, AnswerSection(
+                    type="explanation", title="Your product context",
+                    content="In your question, the toy is described as battery-operated. This is user-provided context, not BIS evidence.",
+                    citation_ids=[],
+                ))
+            primary = plan.roles.get("primary_standard")
+            if primary and understanding.power == "battery_operated":
+                sections.insert(0, AnswerSection(
+                    type="direct_answer", title="In simple terms",
+                    content="For the battery-operated electric toy route, IS 15644 is the cited primary standard.",
+                    citation_ids=[primary[0].citation_id],
+                ))
+            if secondary and understanding.power == "battery_operated":
+                parts = ChatService._standard_parts(secondary[1])
+                rendered = ", ".join(f"Part {part}" for part in parts[:-1]) + f", and Part {parts[-1]}"
+                sections.append(AnswerSection(
+                    type="explanation", title="Supported IS 9873 parts",
+                    content=f"The cited supported secondary-part list is IS 9873 {rendered}.",
+                    citation_ids=[secondary[0].citation_id],
+                ))
+                applicability = plan.roles.get("product_applicability")
+                if applicability:
+                    sections.append(AnswerSection(
+                        type="explanation", title="Where applicable",
+                        content=("Those cited parts are secondary or additional requirements, where applicable. "
+                                 "The cited evidence does not establish that every listed part applies to every battery-operated toy."),
+                        citation_ids=[applicability[0].citation_id],
+                    ))
         elif plan.category == "explain_standard_relationship":
             left = understanding.standard_references[0].display if len(understanding.standard_references) > 0 else "the first standard"
             right = understanding.standard_references[1].display if len(understanding.standard_references) > 1 else "the second standard"
@@ -2247,13 +2581,15 @@ class ChatService:
                 content=f"The indexed evidence identifies {display} in a supported standards role.",
                 citation_ids=[citation_id],
             )]
+        limitation = (
+            "The indexed sources establish the standard’s title and product role, but do not contain its complete clause-level requirements."
+            if plan.category in {"explain_electric_standard", "explain_non_electric_primary", "explain_secondary_part", "explain_secondary_part_list"}
+            else
+            "The indexed sources support the standards’ product roles, not a clause-by-clause comparison."
+        )
         sections.append(AnswerSection(
             type="important", title="What the indexed documents do not establish",
-            content=(
-                "The selected evidence does not establish an official full title, complete scope, clause wording, "
-                "laboratory tests, chemical or mechanical limits, sampling rules, marking details, "
-                "fees, form numbers, approval timelines, or a certification outcome."
-            ),
+            content=limitation,
         ))
         return sections
 

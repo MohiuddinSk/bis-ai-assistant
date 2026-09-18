@@ -192,6 +192,75 @@ class StandardExplanationRealIndexTests(unittest.TestCase):
             self.assertNotIn("test method", citation.excerpt.lower())
             self.assertFalse(citation.chunk_id in response.answer)
 
+    def test_is_15644_keeps_selected_title_and_short_limitation(self):
+        response = self.service().chat(ChatRequest(question="Explain IS 15644 in simple words."))
+        self.assertTrue(response.grounded)
+        self.assertIn("Safety of Electric Toys", response.answer)
+        self.assertIn("electric function", response.answer.lower())
+        self.assertNotIn("chemical or mechanical limits", response.answer.lower())
+        self.assertTrue(all(set(section.citation_ids) <= {c.citation_id for c in response.citations}
+                            for section in response.answer_sections))
+
+    def test_is_15644_applicability_question_is_deterministic(self):
+        response = self.service().chat(ChatRequest(question="When does IS 15644 apply?"))
+        self.assertTrue(response.grounded)
+        self.assertEqual(response.generation_mode, "extractive_fallback")
+        self.assertIn("electric", response.answer.lower())
+
+    def test_part_2_title_is_retrieved_conditionally(self):
+        response = self.service().chat(ChatRequest(question="What does IS 9873 Part 2 cover?"))
+        self.assertTrue(response.grounded)
+        self.assertIn("Flammability", response.answer)
+        self.assertIn("where applicable", response.answer.lower())
+        self.assertNotIn("every toy", response.answer.lower().split("do not establish")[0])
+
+    def test_battery_secondary_parts_use_deterministic_plan(self):
+        response = self.service().chat(ChatRequest(question="Which IS 9873 parts may apply to a battery-operated toy?"))
+        self.assertTrue(response.grounded)
+        self.assertEqual(response.generation_mode, "extractive_fallback")
+        self.assertIn("IS 15644", response.answer)
+        self.assertIn("where applicable", response.answer.lower())
+        for part in ("Part 2", "Part 3", "Part 4", "Part 9", "Part 10", "Part 11"):
+            self.assertIn(part, response.answer)
+        part_list = next(
+            section for section in response.answer_sections
+            if "supported secondary-part list" in (section.content or "").lower()
+        )
+        self.assertNotRegex(" ".join(filter(None, [part_list.content, *part_list.items])), r"\bPart\s+1\b")
+        self.assertNotRegex(" ".join(filter(None, [part_list.content, *part_list.items])), r"\bPart\s+7\b")
+        citation_ids = {citation.citation_id for citation in response.citations}
+        self.assertTrue(all(set(section.citation_ids) <= citation_ids for section in response.answer_sections))
+        self.assertTrue(part_list.citation_ids)
+        part_citation = next(citation for citation in response.citations if citation.citation_id == part_list.citation_ids[0])
+        self.assertEqual(ChatService._standard_parts(part_citation.excerpt), ["2", "3", "4", "9", "10", "11"])
+        context = next(section for section in response.answer_sections if section.title == "Your product context")
+        self.assertEqual(context.citation_ids, [])
+
+    def test_battery_context_is_uncited_and_electric_function_is_cited(self):
+        response = self.service().chat(ChatRequest(question="Why does IS 15644 apply to a battery-operated toy?"))
+        contexts = [section for section in response.answer_sections if section.title == "Your product context"]
+        self.assertEqual(len(contexts), 1)
+        context = contexts[0]
+        applicability = next(section for section in response.answer_sections if "electric function" in (section.content or "").lower())
+        self.assertIn("battery-operated", context.content.lower())
+        self.assertIn("user-provided context", context.content.lower())
+        self.assertEqual(context.citation_ids, [])
+        self.assertIn("electric function", applicability.content.lower())
+        self.assertTrue(applicability.citation_ids)
+        self.assertEqual(response.answer.lower().count("user-provided context"), 1)
+
+    def test_battery_context_never_copies_hostile_free_text(self):
+        response = self.service().chat(ChatRequest(
+            question="Why does IS 15644 apply to a battery-operated toy named DROP TABLE?"
+        ))
+        context = next(section for section in response.answer_sections if section.title == "Your product context")
+        self.assertNotIn("drop table", context.content.lower())
+        self.assertEqual(context.citation_ids, [])
+
+    def test_generic_explanation_has_no_battery_context(self):
+        response = self.service().chat(ChatRequest(question="Explain IS 15644."))
+        self.assertFalse(any(section.title == "Your product context" for section in response.answer_sections))
+
     def test_non_electric_explanation_does_not_claim_15644(self):
         response = self.service().chat(ChatRequest(question="Which standard applies to my non-electric toy?"))
         self.assertTrue(response.grounded)

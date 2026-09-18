@@ -168,6 +168,8 @@ def _explanation_intent(query: str, refs: tuple[StandardReference, ...]) -> Inte
         return "standard_comparison"
     if refs and (_EXPLANATION_CUE.search(query) or _SIMPLIFY_CUE.search(query)):
         return "standard_explanation"
+    if refs and re.search(r"\b(?:when|which toys|does|why)\b.*\bapply\b|\bwhich\s+is\s*9873\s+parts?\b", query):
+        return "standard_explanation"
     if _is_standard_follow_up(query):
         return "standard_explanation"
     return None
@@ -193,6 +195,8 @@ def _intent(query: str) -> Intent:
         return "commencement"
     if re.search(r"\b(exempt|exemption|artisan|handmade)\b", query):
         return "exemption"
+    if re.search(r"\bafter identifying (?:the )?applicable (?:toy )?standard\b", query):
+        return "certification"
     if (
         re.search(r"\b(add|addition|include|inclusion|extend|extension|scope)\b", query)
         and re.search(r"\b(series|model|variety|licence)\b", query)
@@ -464,19 +468,25 @@ def understand_question(
         clarification = "Is the toy battery-operated, mains-powered, or non-electric?"
         suggestions = ("Battery-operated", "Mains-powered", "Non-electric")
     elif intent == "certification":
-        if "toy" not in signals and "children_play" not in signals:
-            missing.append("product_type")
-        elif product_description in {None, "toys"} and re.search(r"\b(?:my\s+)?toys?\b", combined) and not re.search(
-            r"\b(car|doll|rattle|puzzle|game|set|vehicle|ball|plush|figure|blocks?)\b",
-            combined,
-        ):
-            missing.append("product_description")
-        if power in {"unknown", "electric_unspecified"}:
-            missing.append("power_type")
-        if role is None:
-            missing.append("role")
-        if stage is None:
-            missing.append("application_stage")
+        # A general process question can safely use the selected partial
+        # procedure facts. Keep structured clarification for personal cases.
+        general_process = bool(re.search(r"\b(?:what are|what should|how do i|how to|steps?)\b", current)) and "my" not in current
+        if general_process:
+            pass
+        else:
+            if "toy" not in signals and "children_play" not in signals:
+                missing.append("product_type")
+            elif product_description in {None, "toys"} and re.search(r"\b(?:my\s+)?toys?\b", combined) and not re.search(
+                r"\b(car|doll|rattle|puzzle|game|set|vehicle|ball|plush|figure|blocks?)\b",
+                combined,
+            ):
+                missing.append("product_description")
+            if power in {"unknown", "electric_unspecified"}:
+                missing.append("power_type")
+            if role is None:
+                missing.append("role")
+            if stage is None:
+                missing.append("application_stage")
         if missing:
             labels = {
                 "product_type": "the product and whether it is a children's toy",
