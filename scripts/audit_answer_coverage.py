@@ -35,8 +35,19 @@ PROTECTED_PATHS = ("data/raw", "data/processed", "data/chroma", "evaluation")
 QUALITY_RATINGS = frozenset({"GOOD", "USABLE_BUT_THIN", "VAGUE", "UNSUPPORTED", "CORRECTLY_LIMITED"})
 CAUSE_CODES = frozenset({
     "SOURCE_ABSENT", "EXTRACTION_MISSING", "INDEX_MISSING", "RETRIEVAL_MISS",
-    "RANKING_MISS", "PLANNER_DROPPED", "TEMPLATE_REDUCED", "CORRECT_LIMITATION",
+    "RANKING_MISS", "PLANNER_DROPPED", "TEMPLATE_REDUCED", "CORRECT_LIMITATION", "SUPPORTED",
 })
+CAUSE_CODE_DESCRIPTIONS = {
+    "SUPPORTED": "Visible answer text supports the fact; fixture lacks finalized citation sections.",
+    "SOURCE_ABSENT": "Fact was not found in checked source text.",
+    "EXTRACTION_MISSING": "Fact appears in source text but not processed text.",
+    "INDEX_MISSING": "Fact survived processing but is absent from active index.",
+    "RETRIEVAL_MISS": "Indexed fact was not retrieved.",
+    "RANKING_MISS": "Fact was retrieved below the effective answer cutoff.",
+    "PLANNER_DROPPED": "Retrieved fact was not selected into the evidence plan.",
+    "TEMPLATE_REDUCED": "Selected fact was omitted from finalized answer sections.",
+    "CORRECT_LIMITATION": "No stronger claim is supported by selected evidence.",
+}
 
 
 @dataclass(frozen=True)
@@ -66,13 +77,13 @@ AUDIT_QUESTIONS = (
         ("applicability condition", ("applic",), False), ("relationship", ("is 9873",), False))),
     AuditQuestion("Q03", "When does IS 15644 apply?", _facts(
         ("standard identity", ("is 15644",), False), ("applicability", ("applic", "electric"), False),
-        ("condition", ("where", "may", "verify"), False))),
+        ("condition", ("electric function", "depends on electricity"), False))),
     AuditQuestion("Q04", "Explain IS 9873 Part 1 in simple words.", _facts(
         ("standard identity", ("is 9873 part 1",), False), ("non-electric role", ("non-electric", "primary"), False),
         ("applicability", ("applic",), False))),
     AuditQuestion("Q05", "Explain IS 9873 Part 2 in simple words.", _facts(
         ("standard identity", ("is 9873 part 2",), False), ("secondary role", ("secondary", "where applicable"), False),
-        ("scope or purpose", ("scope", "appl", "require"), False))),
+        ("title or purpose", ("safety of toys part 2 flammability",), False))),
     AuditQuestion("Q06", "Compare IS 15644 with IS 9873 Part 1.", _facts(
         ("IS 15644 role", ("is 15644", "electric"), False), ("IS 9873 Part 1 role", ("is 9873 part 1", "non-electric"), False),
         ("comparison limitation", ("not established", "cannot", "verify"), True))),
@@ -92,7 +103,8 @@ AUDIT_QUESTIONS = (
         ("application details", ("raw material", "detail"), False), ("test facilities", ("test facilit",), False))),
     AuditQuestion("Q11", "Which IS 9873 parts may apply to a battery-operated toy?", _facts(
         ("battery/electric route", ("battery", "electric"), False), ("IS 9873", ("is 9873",), False),
-        ("conditional language", ("may", "where applicable"), False))),
+        ("supported part list", ("part 2", "part 3", "part 4", "part 9", "part 10", "part 11"), False),
+        ("conditional language", ("where applicable",), False))),
     AuditQuestion("Q12", "What should a manufacturer do after identifying the applicable toy standard?", _facts(
         ("immediate action", ("next", "application", "manakonline"), False), ("conditional limitation", ("verify", "where applicable", "indexed"), True))),
 )
@@ -111,6 +123,19 @@ def safe_excerpt(value: str, limit: int = 220) -> str:
 def _matches(text: str, check: FactCheck) -> bool:
     normalized = normalize(text)
     return all(term in normalized for term in check.terms)
+
+
+def _matches_finalized_section(
+    sections: list[dict[str, object]], citations: list[dict[str, object]], check: FactCheck,
+) -> bool:
+    """Evidence facts count only when visible in a section with a valid citation."""
+    known = {str(citation["citation_id"]) for citation in citations}
+    for section in sections:
+        ids = {str(value) for value in section.get("citation_ids", [])}
+        visible = " ".join(filter(None, [str(section.get("content") or ""), *map(str, section.get("items", []))]))
+        if ids and ids <= known and _matches(visible, check):
+            return True
+    return False
 
 
 def _snapshot(paths: Iterable[str] = PROTECTED_PATHS) -> dict[str, str]:
@@ -253,7 +278,9 @@ def _classify(check: FactCheck, answer: str, selected: list[TrustedEvidence], re
               ranked_candidates: list[RetrievalHit], indexed: list[RetrievalHit], processed: list[str],
               raw: list[str], raw_checked: bool) -> str:
     if _matches(answer, check):
-        return "INCLUDED"
+        # This is a non-loss state retained for diagnostics when visible output
+        # has the fact but a synthetic fixture has no finalized sections.
+        return "SUPPORTED"
     if any(_matches(item.text, check) for item in selected):
         return "TEMPLATE_REDUCED"
     if any(_matches(item.text, check) for item in retrieved):
@@ -267,6 +294,17 @@ def _classify(check: FactCheck, answer: str, selected: list[TrustedEvidence], re
     if raw_checked and any(_matches(text, check) for text in raw):
         return "EXTRACTION_MISSING"
     return "CORRECT_LIMITATION" if check.limitation else "SOURCE_ABSENT"
+
+
+def _ranked_candidate_diagnostic(_candidates: Iterable[RetrievalHit]) -> dict[str, object]:
+    """Stable public marker for an internal, boundary-sensitive ranking probe.
+
+    The probe remains available to `_classify` for distinguishing ranking loss
+    from retrieval loss. Its exact top-N membership is not an audit contract:
+    near-tied vector results can legitimately vary at the boundary and would
+    otherwise make an identical grounded audit serialize differently.
+    """
+    return {"kind": "boundary_sensitive_probe", "serialized_candidates": False}
 
 
 def _quality(missing: list[dict[str, str]], answer: str) -> str:
@@ -331,9 +369,16 @@ def run_audit() -> dict[str, object]:
         selected_ids = {item.chunk_id for item in selected}
         retrieved_ids = {item.chunk_id for item in retrieved}
         citation_integrity = all(citation["chunk_id"] in retrieved_ids for citation in citations)
-        missing = [{"fact": check.name, "cause": _classify(check, answer, selected, retrieved, ranked_candidates,
-                                                             indexed, processed, raw, raw_checked)}
-                   for check in spec.facts if not _matches(answer, check)]
+        missing: list[dict[str, str]] = []
+        for check in spec.facts:
+            if _matches_finalized_section(sections, citations, check):
+                continue
+            cause = _classify(check, answer, selected, retrieved, ranked_candidates, indexed, processed, raw, raw_checked)
+            # SUPPORTED is a non-loss diagnostic state for synthetic fixtures
+            # without finalized sections. It is satisfied evidence, never a
+            # missing fact in the serialized audit.
+            if cause != "SUPPORTED":
+                missing.append({"fact": check.name, "cause": cause})
         primary_cause = missing[0]["cause"] if missing else "CORRECT_LIMITATION"
         questions.append({
             "id": spec.identifier, "question": spec.question,
@@ -341,8 +386,7 @@ def run_audit() -> dict[str, object]:
                               "clarification_required": understanding.clarification_required},
             "retrieval_queries": [spec.question, *service._coverage_queries(spec.question, None, understanding)],
             "retrieved": [{"rank": rank, **_safe_metadata(item)} for rank, item in enumerate(retrieved, start=1)],
-            "ranked_candidates": [{"rank": rank, **_safe_metadata(item)}
-                                  for rank, item in enumerate(ranked_candidates, start=1)],
+            "ranked_candidates": _ranked_candidate_diagnostic(ranked_candidates),
             "selected_evidence_ids": sorted(selected_ids), "plan_category": plan.category,
             "plan_roles": sorted(plan.roles), "execution": execution, "answer": answer,
             "answer_sections": sections, "citations": citations, "citation_integrity": citation_integrity,

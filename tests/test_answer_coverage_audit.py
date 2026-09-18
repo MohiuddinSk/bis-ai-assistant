@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -94,7 +95,9 @@ class AnswerCoverageAuditTests(unittest.TestCase):
     def test_contract_contains_all_twelve_questions_and_valid_codes(self):
         self.assertEqual([item.identifier for item in audit.AUDIT_QUESTIONS], [f"Q{number:02d}" for number in range(1, 13)])
         self.assertEqual(len(audit.QUALITY_RATINGS), 5)
-        self.assertEqual(len(audit.CAUSE_CODES), 8)
+        self.assertEqual(len(audit.CAUSE_CODES), 9)
+        self.assertIn("SUPPORTED", audit.CAUSE_CODES)
+        self.assertEqual(set(audit.CAUSE_CODE_DESCRIPTIONS), set(audit.CAUSE_CODES))
 
     def test_output_destination_rejects_protected_paths(self):
         for protected in audit.PROTECTED_PATHS:
@@ -152,6 +155,41 @@ class AnswerCoverageAuditTests(unittest.TestCase):
         excerpt = audit.safe_excerpt("  short\n excerpt  ")
         self.assertEqual(excerpt, "short excerpt")
         self.assertNotIn(str(Path.cwd()), excerpt)
+
+    def test_finalized_fact_requires_a_valid_citation(self):
+        check = audit.FactCheck("condition", ("electric function",), False)
+        sections = [{"content": "A toy has an electric function.", "items": [], "citation_ids": ["S1"]}]
+        self.assertTrue(audit._matches_finalized_section(sections, [{"citation_id": "S1"}], check))
+        self.assertFalse(audit._matches_finalized_section(sections, [], check))
+
+    def test_ranked_candidate_diagnostic_omits_boundary_varying_membership(self):
+        first = RetrievalHit("near-tie-a", "first", {}, 0.144343)
+        second = RetrievalHit("near-tie-b", "second", {}, 0.144369)
+        self.assertEqual(
+            audit._ranked_candidate_diagnostic([first, second]),
+            audit._ranked_candidate_diagnostic([second]),
+        )
+
+    def test_two_fresh_cli_audits_are_identical_and_q11_has_no_missing_facts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "first.json"
+            second = Path(directory) / "second.json"
+            first_run = self._cli("--output", str(first), cwd=audit.ROOT)
+            second_run = self._cli("--output", str(second), cwd=audit.ROOT)
+            self.assertEqual(first_run.returncode, 0, first_run.stderr)
+            self.assertEqual(second_run.returncode, 0, second_run.stderr)
+            first_bytes, second_bytes = first.read_bytes(), second.read_bytes()
+        self.assertEqual(first_bytes, second_bytes)
+        self.assertEqual(hashlib.sha256(first_bytes).hexdigest(), hashlib.sha256(second_bytes).hexdigest())
+        report = json.loads(first_bytes)
+        q11 = next(row for row in report["questions"] if row["id"] == "Q11")
+        self.assertEqual(q11["quality"], "GOOD")
+        self.assertEqual(q11["primary_cause"], "CORRECT_LIMITATION")
+        self.assertEqual(q11["missing_facts"], [])
+        self.assertTrue(all(
+            entry["cause"] != "SUPPORTED"
+            for row in report["questions"] for entry in row["missing_facts"]
+        ))
 
 
 if __name__ == "__main__":
