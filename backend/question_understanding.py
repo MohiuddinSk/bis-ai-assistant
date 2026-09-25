@@ -18,11 +18,19 @@ PowerClassification = Literal[
     "battery_operated", "mains_electric", "non_electric",
     "electric_unspecified", "unknown",
 ]
+ReviewedQuestionFamily = Literal[
+    "battery_standards", "is15644_simple", "is15644_applies",
+    "is9873_part2_simple", "certification_steps", "battery_q11_parts",
+]
 
 
 @dataclass(frozen=True)
 class QuestionUnderstanding:
     normalized_query: str
+    # Server-owned routing text for a small reviewed multilingual set.  It is
+    # never displayed, embedded as the user's query, or treated as evidence.
+    routing_query: str
+    reviewed_question_family: ReviewedQuestionFamily | None
     intent: Intent
     product_signals: tuple[str, ...]
     power: PowerClassification
@@ -53,7 +61,7 @@ _SUPPORTED_STANDARD_NUMBERS = frozenset({"15644", "9873"})
 _SUPPORTED_9873_PARTS = frozenset({1, 2, 3, 4, 7, 9, 10, 11})
 _MAX_STANDARD_REFERENCES = 4
 _STANDARD_PATTERN = re.compile(
-    r"\bis[\s-]*(\d{3,6})(?:\s*(?:parts?|pt\.?)\s*(\d{1,2}))?\b",
+    r"\bis[\s-]*(\d{3,6})(?:\s*(?:parts?|pt\.?|भाग)\s*(\d{1,2}))?\b",
     re.IGNORECASE,
 )
 _GENERAL_IS_MEANING = re.compile(
@@ -68,6 +76,23 @@ _CONTEXTUAL_STANDARD = re.compile(
     r"\bprimary standard(?: that)? you mentioned\b|\bafter identifying the standard\b",
 )
 _SIMPLIFY_CUE = re.compile(r"\b(?:simple words|simpler language|in simple(?:r)?(?:\s+language)?|more simply)\b")
+# Phase 3A deliberately recognizes only the reviewed Hindi and Marathi question
+# forms supported by deterministic rendering.  These aliases resolve to the same
+# canonical routing values as their English equivalents; they never create facts.
+_HI_MR_STANDARD_CUE = re.compile(
+    r"(?:बैटरी\s+से\s+चलने\s+वाले\s+खिलौने.*मानक\s+लागू|बॅटरीवर\s+चालणाऱ्या\s+खेळण्याला.*मानक\s+लागू)"
+)
+_HI_MR_CERTIFICATION_CUE = re.compile(
+    r"(?:खिलौने\s+के\s+लिए\s+bis\s+प्रमाणन\s+प्राप्त\s+करने\s+के\s+चरण|खेळण्यासाठी\s+bis\s+प्रमाणन\s+मिळवण्याच्या\s+पायऱ्या)"
+)
+_HI_MR_EXPLANATION_CUE = re.compile(
+    r"(?:आसान\s+भाषा\s+में\s+समझाइए|सोप्या\s+भाषेत\s+समजावून\s+सांगा|"
+    r"कब\s+लागू\s+होता|कधी\s+लागू\s+होते|कौन[-\s]*से\s+भाग\s+लागू\s+हो\s+सकते|"
+    r"कोणते\s+भाग\s+लागू\s+होऊ\s+शकतात)"
+)
+_HI_MR_SIMPLE_CUE = re.compile(r"(?:आसान\s+भाषा\s+में\s+समझाइए|सोप्या\s+भाषेत\s+समजावून\s+सांगा)")
+_HI_MR_APPLIES_CUE = re.compile(r"(?:कब\s+लागू\s+होता|कधी\s+लागू\s+होते)")
+_HI_MR_Q11_CUE = re.compile(r"(?:कौन[-\s]*से\s+भाग\s+लागू\s+हो\s+सकते|कोणते\s+भाग\s+लागू\s+होऊ\s+शकतात)")
 _CORPUS_STANDARD_SUGGESTIONS = (
     "IS 15644", "IS 9873 Part 1", "IS 9873 Part 3", "IS 9873 Part 4",
 )
@@ -93,7 +118,18 @@ def normalize_question(value: str) -> tuple[str, tuple[str, ...]]:
     """Normalize layout and only high-confidence, auditable domain typos."""
     normalized = unicodedata.normalize("NFKC", value)
     normalized = normalized.replace("‐", "-").replace("‑", "-").replace("–", "-").replace("—", "-")
-    normalized = re.sub(r"[^\w\s./():+-]", " ", normalized.lower(), flags=re.UNICODE)
+    # ``\w`` drops Indic combining marks (matras), which silently changes a
+    # Hindi/Marathi question before reviewed aliases can inspect it. Retain all
+    # Unicode letters, numbers, and marks while keeping the existing small set
+    # of routing punctuation.
+    normalized = "".join(
+        char if (
+            char.isspace()
+            or char in "./():+-"
+            or unicodedata.category(char)[0] in {"L", "N", "M"}
+        ) else " "
+        for char in normalized.lower()
+    )
     normalized = re.sub(r"\s+", " ", normalized).strip()
     corrections: list[str] = []
     if re.match(r"^ow\s+many\b", normalized):
@@ -161,12 +197,35 @@ def _is_standard_follow_up(query: str) -> bool:
     return bool(_CONTEXTUAL_STANDARD.search(query) or _SIMPLIFY_CUE.search(query))
 
 
+def _reviewed_routing_form(query: str) -> tuple[str, ReviewedQuestionFamily] | None:
+    """Return an audited routing form and family for one supported input.
+
+    The caller retains ``query`` for vector retrieval and display.  This is a
+    semantic routing signal, not a translation service or an evidence source.
+    """
+    if _HI_MR_CERTIFICATION_CUE.search(query):
+        return "What are the steps to obtain BIS certification for a toy?", "certification_steps"
+    if re.search(r"\bis\s*9873\b", query, re.I) and _HI_MR_Q11_CUE.search(query):
+        return "Which IS 9873 parts may apply to a battery-operated toy?", "battery_q11_parts"
+    if re.search(r"\bis\s*15644\b", query, re.I) and _HI_MR_SIMPLE_CUE.search(query):
+        return "Explain IS 15644 in simple words.", "is15644_simple"
+    if re.search(r"\bis\s*15644\b", query, re.I) and _HI_MR_APPLIES_CUE.search(query):
+        return "When does IS 15644 apply?", "is15644_applies"
+    if re.search(r"\bis\s*9873\s*(?:part|भाग)\s*2\b", query, re.I) and _HI_MR_SIMPLE_CUE.search(query):
+        return "Explain IS 9873 Part 2 in simple words.", "is9873_part2_simple"
+    if _HI_MR_STANDARD_CUE.search(query):
+        return "Which standard applies to a battery-operated toy?", "battery_standards"
+    return None
+
+
 def _explanation_intent(query: str, refs: tuple[StandardReference, ...]) -> Intent | None:
     if _GENERAL_IS_MEANING.search(query):
         return "is_general_meaning"
     if len(refs) >= 2 and _COMPARISON_CUE.search(query):
         return "standard_comparison"
     if refs and (_EXPLANATION_CUE.search(query) or _SIMPLIFY_CUE.search(query)):
+        return "standard_explanation"
+    if refs and _HI_MR_EXPLANATION_CUE.search(query):
         return "standard_explanation"
     if refs and re.search(r"\b(?:when|which toys|does|why)\b.*\bapply\b|\bwhich\s+is\s*9873\s+parts?\b", query):
         return "standard_explanation"
@@ -179,6 +238,10 @@ def _intent(query: str) -> Intent:
     # What the user asks takes precedence over product/power mentions.
     if re.search(r"\b(industrial inverter|solar inverter|refrigerator|washing machine|actual household)\b", query):
         return "out_of_domain"
+    if _HI_MR_CERTIFICATION_CUE.search(query):
+        return "certification"
+    if _HI_MR_STANDARD_CUE.search(query):
+        return "standards"
     if re.search(r"\b(complete (?:compliance )?roadmap|complete process)\b", query):
         return "roadmap"
     if re.search(r"\b(how (?:many|long)|processing time|approval time|timeline|take to approve|days? to approve)\b", query):
@@ -312,6 +375,8 @@ def _is_context_continuation(query: str, context: AssistantContext) -> bool:
 
 
 def _power(query: str) -> PowerClassification:
+    if re.search(r"(?:बैटरी\s+से\s+चलने|बॅटरीवर\s+चालण)", query):
+        return "battery_operated"
     if re.search(
         r"\b(non-electric|manual toy|manual(?:ly)?[- ](?:powered|operated)|no batter(?:y|ies)|without (?:an? )?electric(?:al)? power)\b",
         query,
@@ -344,6 +409,9 @@ def understand_question(
 ) -> QuestionUnderstanding:
     """Classify current plus relevant prior context; neither is legal evidence."""
     current, corrections = normalize_question(question)
+    reviewed_routing = _reviewed_routing_form(current)
+    routing_query = reviewed_routing[0] if reviewed_routing else current
+    reviewed_question_family = reviewed_routing[1] if reviewed_routing else None
     retained = bool(assistant_context and _is_context_continuation(current, assistant_context))
     active_context = assistant_context if retained else None
     current_refs = extract_standard_references(current)
@@ -470,7 +538,10 @@ def understand_question(
     elif intent == "certification":
         # A general process question can safely use the selected partial
         # procedure facts. Keep structured clarification for personal cases.
-        general_process = bool(re.search(r"\b(?:what are|what should|how do i|how to|steps?)\b", current)) and "my" not in current
+        general_process = (
+            bool(re.search(r"\b(?:what are|what should|how do i|how to|steps?)\b", current))
+            or bool(_HI_MR_CERTIFICATION_CUE.search(current))
+        ) and "my" not in current
         if general_process:
             pass
         else:
@@ -562,6 +633,8 @@ def understand_question(
 
     return QuestionUnderstanding(
         normalized_query=combined,
+        routing_query=routing_query,
+        reviewed_question_family=reviewed_question_family,
         intent=intent,
         product_signals=signals,
         power=power,

@@ -27,7 +27,7 @@ function isStandardFollowUp(value: string): boolean {
 const builtInSuggestionKeys: TranslationKey[] = ['suggestionBattery', 'suggestionHandmade', 'suggestionDocuments', 'suggestionTransition'];
 
 function AppContent() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -85,7 +85,7 @@ function AppContent() {
     const controller = new AbortController();
     chatController.current = controller;
     try {
-      const response = await askQuestion(question, audience, assistantContext, controller.signal);
+      const response = await askQuestion(question, audience, assistantContext, controller.signal, language);
       setMessages((items) => [...items, { role: 'assistant', text: response.answer, response, suggestedActions: normalizeSuggestedActions(response) }]);
       setSessionContext(response.assistant_context ?? undefined);
       setPendingContext(response.needs_clarification

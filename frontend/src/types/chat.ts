@@ -1,6 +1,7 @@
 export type GenerationMode = 'llm' | 'extractive_fallback' | 'abstention' | 'clarification';
 export interface Citation { citation_id:string; source_filename:string|null; page_start:number|null; page_end:number|null; chunk_id:string; excerpt:string }
 export type Audience = 'general' | 'manufacturer' | 'consumer';
+export type ResponseLanguage = 'en' | 'hi' | 'mr';
 export interface AnswerSection { type:'direct_answer'|'explanation'|'next_steps'|'important'|'clarification'; title:string; content?:string|null; items:string[]; citation_ids:string[] }
 export interface ClarificationContext { original_question:string }
 export type ClarificationSlot='role'|'product_description'|'product_scope'|'power_type'|'age_group'|'application_stage'|'goal'|'standard_reference';

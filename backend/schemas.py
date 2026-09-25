@@ -5,6 +5,9 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
+ResponseLanguage = Literal["en", "hi", "mr"]
+
+
 Question = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=2, max_length=1000),
@@ -26,6 +29,7 @@ class ChatRequest(BaseModel):
     top_k: int = Field(default=8, ge=1, le=8)
     include_guidance: bool = False
     audience: Literal["general", "manufacturer", "consumer"] = "general"
+    response_language: ResponseLanguage = "en"
     clarification_context: "ClarificationContext | None" = None
     assistant_context: "AssistantContext | None" = None
 
@@ -79,6 +83,7 @@ class ComplianceProfile(BaseModel):
     goal: Literal["identify_standards", "new_licence", "add_new_series", "check_exemption", "understand_transition", "complete_roadmap", "not_sure"]
     application_stage: Literal["researching", "preparing_application", "existing_licence", "scope_extension", "not_sure"]
     additional_context: Annotated[str | None, StringConstraints(max_length=500)] = None
+    response_language: ResponseLanguage = Field(default="en", exclude=True)
 
 
 class RetrievalResult(BaseModel):

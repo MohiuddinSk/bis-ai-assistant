@@ -196,6 +196,14 @@ it('renders a successful service response before its deadline', async () => {
   expect(vi.getTimerCount()).toBe(0);
 });
 
+it('includes the selected response language in chat payloads', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(chatPayload)));
+  await askQuestion('question', 'general', undefined, undefined, 'hi');
+  expect(JSON.parse(String((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body))).toMatchObject({
+    question: 'question', response_language: 'hi', audience: 'general',
+  });
+});
+
 it('does not mislabel an HTTP provider error as a frontend timeout', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ detail: 'provider error' }, false, 503)));
   await expect(askQuestion('question')).rejects.toMatchObject({

@@ -487,6 +487,7 @@ def create_app(
         )
         guidance = run_chat(ChatRequest(
             question=compliance_query(profile), top_k=8, include_guidance=False, audience=audience,
+            response_language=profile.response_language,
         ), request, routing_context)
         guidance = enforce_compliance_invariants(profile, guidance)
         return ComplianceGuideResponse(profile=profile, guidance=guidance)

@@ -48,7 +48,7 @@ it('keeps all five localized wizard steps functional and submits untranslated en
     for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: continueLabel }));
     expect(screen.getByRole('heading', { name: finalHeading })).toBeInTheDocument();
     const generate = language === 'hi' ? 'मेरा मार्गदर्शन बनाएँ' : 'माझे मार्गदर्शन तयार करा'; await user.click(screen.getByRole('button', { name: generate })); await screen.findAllByText('IS 15644 applies.');
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).power_type).toBe('battery_operated');
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1].body)); expect(payload.power_type).toBe('battery_operated'); expect(payload.response_language).toBe(language);
   }
 });
 
