@@ -21,6 +21,71 @@ export function ngrokBypassHeadersForBase(value: string): Record<string, string>
   return isFreeNgrokApiBase(value) ? { [NGROK_SKIP_BROWSER_WARNING]: '1' } : {};
 }
 
+export function sourceDocumentUrl(filename: string, apiBase = base): string {
+  return `${apiBase.replace(/\/$/, '')}/api/documents/${encodeURIComponent(filename)}`;
+}
+
+export function sourceDocumentPageFragment(page?: number | null): string {
+  return Number.isSafeInteger(page) && page! > 0 ? `#page=${page}` : '';
+}
+
+type SourcePdfOptions = {
+  apiBase?: string;
+  openTab?: () => Window | null;
+  fetchFn?: typeof fetch;
+  createObjectURL?: typeof URL.createObjectURL;
+  revokeObjectURL?: typeof URL.revokeObjectURL;
+};
+
+const activeSourcePdfUrls = new Set<string>();
+let sourcePdfCleanupRegistered = false;
+
+function retainSourcePdfUrl(url: string, revokeObjectURL: typeof URL.revokeObjectURL) {
+  activeSourcePdfUrls.add(url);
+  if (sourcePdfCleanupRegistered || typeof window === 'undefined') return;
+  sourcePdfCleanupRegistered = true;
+  window.addEventListener('pagehide', () => {
+    activeSourcePdfUrls.forEach(revokeObjectURL);
+    activeSourcePdfUrls.clear();
+    sourcePdfCleanupRegistered = false;
+  }, { once: true });
+}
+
+/** Opens a server-selected PDF without ever navigating a tab directly to a free ngrok origin. */
+export async function openSourcePdf(filename: string, page?: number | null, options: SourcePdfOptions = {}): Promise<void> {
+  const apiBase = options.apiBase ?? base;
+  const openTab = options.openTab ?? (() => window.open('', '_blank'));
+  const fetchFn = options.fetchFn ?? fetch;
+  const createObjectURL = options.createObjectURL ?? URL.createObjectURL;
+  const revokeObjectURL = options.revokeObjectURL ?? URL.revokeObjectURL;
+  const tab = openTab();
+
+  if (!tab) throw new ApiError('Unable to open the source PDF. Please try again.');
+
+  // The tab starts as same-origin about:blank, so remove its opener before any navigation.
+  try { tab.opener = null; } catch { /* Browser may expose opener as read-only. */ }
+
+  let blobUrl: string | undefined;
+  try {
+    const response = await fetchFn(sourceDocumentUrl(filename, apiBase), {
+      headers: ngrokBypassHeadersForBase(apiBase),
+    });
+    if (!response.ok || !/^application\/pdf(?:;|$)/i.test(response.headers.get('content-type') ?? '')) {
+      throw new Error('Source PDF was unavailable.');
+    }
+    const blob = await response.blob();
+    blobUrl = createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    tab.location.replace(`${blobUrl}${sourceDocumentPageFragment(page)}`);
+    // Keep the URL for the current app lifetime; revoking on the destination's load/unload
+    // could race the browser's built-in PDF viewer.
+    retainSourcePdfUrl(blobUrl, revokeObjectURL);
+  } catch {
+    if (blobUrl) revokeObjectURL(blobUrl);
+    tab.close();
+    throw new ApiError('Unable to open the source PDF. Please try again.');
+  }
+}
+
 const ngrokBypassHeaders = ngrokBypassHeadersForBase(base);
 export const HEALTH_TIMEOUT_MS = 8_000;
 export const CHAT_DEFAULT_TIMEOUT_MS = 90_000;

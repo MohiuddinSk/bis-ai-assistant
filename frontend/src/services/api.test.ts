@@ -8,7 +8,9 @@ import {
   HEALTH_TIMEOUT_MS,
   isFreeNgrokApiBase,
   ngrokBypassHeadersForBase,
+  openSourcePdf,
   parseChatTimeoutMs,
+  sourceDocumentPageFragment,
 } from './api';
 
 it('adds the ngrok bypass header only for exact approved free development origins', () => {
@@ -26,6 +28,85 @@ it('adds the ngrok bypass header only for exact approved free development origin
     expect(isFreeNgrokApiBase(base)).toBe(false);
     expect(ngrokBypassHeadersForBase(base)).toEqual({});
   }
+});
+
+function pdfResponse() {
+  return {
+    ok: true,
+    headers: new Headers({ 'content-type': 'application/pdf' }),
+    blob: vi.fn().mockResolvedValue(new Blob(['%PDF-1.7'], { type: 'application/pdf' })),
+  };
+}
+
+function temporaryTab() {
+  return {
+    opener: window,
+    close: vi.fn(),
+    location: { replace: vi.fn() },
+  } as unknown as Window;
+}
+
+it('fetches exact approved ngrok origins with the bypass header before navigating a synchronous blank tab to a Blob URL', async () => {
+  for (const apiBase of ['https://demo-account.ngrok-free.app', 'https://demo-account.ngrok-free.dev']) {
+    const tab = temporaryTab();
+    const openTab = vi.fn(() => tab);
+    const fetchFn = vi.fn().mockResolvedValue(pdfResponse());
+    const createObjectURL = vi.fn(() => 'blob:source-pdf');
+
+    const pending = openSourcePdf('product manual.pdf', 4, { apiBase, openTab, fetchFn, createObjectURL });
+    expect(openTab).toHaveBeenCalledOnce();
+    expect(fetchFn).toHaveBeenCalledWith(`${apiBase}/api/documents/product%20manual.pdf`, {
+      headers: { 'ngrok-skip-browser-warning': '1' },
+    });
+    await pending;
+    expect(tab.opener).toBeNull();
+    expect(tab.location.replace).toHaveBeenCalledWith('blob:source-pdf#page=4');
+    expect(tab.location.replace).not.toHaveBeenCalledWith(expect.stringContaining('ngrok-free'));
+  }
+});
+
+it('does not attach a bypass header for hostile or lookalike document origins', async () => {
+  for (const apiBase of [
+    'https://demo-account.ngrok-free.dev.evil.example', 'https://user:pass@demo-account.ngrok-free.dev',
+    'https://demo-account.ngrok-free.dev/path', 'https://demo-account.ngrok-free.dev:8443',
+  ]) {
+    const fetchFn = vi.fn().mockResolvedValue(pdfResponse());
+    await openSourcePdf('source.pdf', 1, {
+      apiBase, openTab: () => temporaryTab(), fetchFn, createObjectURL: () => 'blob:source-pdf',
+    });
+    expect(fetchFn.mock.calls[0][1]).toEqual({ headers: {} });
+  }
+});
+
+it('omits unsafe document page fragments', () => {
+  expect(sourceDocumentPageFragment(4)).toBe('#page=4');
+  for (const page of [undefined, null, 0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    expect(sourceDocumentPageFragment(page)).toBe('');
+  }
+});
+
+it('closes the temporary tab and exposes only a safe error for HTTP or network failures', async () => {
+  for (const fetchFn of [
+    vi.fn().mockResolvedValue({ ok: false, headers: new Headers({ 'content-type': 'text/html' }), blob: vi.fn() }),
+    vi.fn().mockRejectedValue(new Error('<html>backend failure</html>')),
+  ]) {
+    const tab = temporaryTab();
+    await expect(openSourcePdf('source.pdf', 4, {
+      apiBase: 'https://demo-account.ngrok-free.dev', openTab: () => tab, fetchFn,
+    })).rejects.toMatchObject({ friendly: 'Unable to open the source PDF. Please try again.' });
+    expect(tab.close).toHaveBeenCalledOnce();
+    expect(tab.location.replace).not.toHaveBeenCalled();
+  }
+});
+
+it('rejects non-PDF response types without opening their body in the tab', async () => {
+  const tab = temporaryTab();
+  const response = { ok: true, headers: new Headers({ 'content-type': 'text/html' }), blob: vi.fn() };
+  await expect(openSourcePdf('source.pdf', 4, {
+    openTab: () => tab, fetchFn: vi.fn().mockResolvedValue(response),
+  })).rejects.toMatchObject({ friendly: 'Unable to open the source PDF. Please try again.' });
+  expect(response.blob).not.toHaveBeenCalled();
+  expect(tab.location.replace).not.toHaveBeenCalled();
 });
 
 const chatPayload = {
