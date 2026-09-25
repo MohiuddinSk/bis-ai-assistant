@@ -26,6 +26,11 @@ from backend.schemas import (
 from backend.retrieval_provider import RetrievalHit, RetrieverProtocol
 from backend.service import RetrievalService
 from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
+from backend.response_localization import (
+    localized_disclaimer,
+    localized_english_fallback_notice,
+    localize_reviewed_sections,
+)
 from backend.settings import (
     INSUFFICIENT_EVIDENCE_ANSWER,
     LEGAL_INFORMATION_DISCLAIMER,
@@ -278,12 +283,12 @@ class ChatService:
             if plan.category == "explain_is_general" and not plan.complete:
                 return self._abstention(evidence=[], citations=[])
             if "requested_standard_identity" in plan.roles or plan.complete:
-                return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
+                return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
             return self._abstention(evidence=[], citations=[])
         # Complete trusted evidence plans bypass Groq: this removes avoidable
         # latency and cannot weaken citation or qualification controls.
         if plan.complete:
-            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
+            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
         if self._generator is None:
             raise ProviderUnavailableError("Chat generation is unavailable")
 
@@ -313,7 +318,7 @@ class ChatService:
             except (ValidationError, ValueError) as validation_error:
                 if used_completion_retry:
                     self._log_abstention(validation_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
+                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
                 try:
                     repaired_output = self._generator.generate(
                         effective_question,
@@ -332,7 +337,7 @@ class ChatService:
                 except (ValidationError, ValueError) as repair_error:
                     # Invalid model evidence must never be surfaced as a grounded claim.
                     self._log_abstention(repair_error, evidence, [])
-                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
+                    return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
 
         if generated.insufficient_evidence:
             return self._abstention(evidence=evidence, citations=citations)
@@ -342,7 +347,7 @@ class ChatService:
                 understanding.intent,
                 understanding.power,
             )
-            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding)
+            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
 
         # Certain high-risk, structured facts have an unambiguous evidence-role
         # plan.  Compose those facts from the verified roles instead of allowing
@@ -371,7 +376,8 @@ class ChatService:
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
     ) -> EvidencePlan:
-        question_lower = question.lower()
+        routing_question = understanding.routing_query if understanding is not None else question
+        question_lower = routing_question.lower()
         roles: dict[str, tuple[TrustedEvidence, str]] = {}
         if routing_context is not None:
             category = {
@@ -436,7 +442,7 @@ class ChatService:
         if (
             category == "explain_secondary_part"
             and ChatService._requires_supported_secondary_part_list(
-                question, routing_context, understanding
+                routing_question, routing_context, understanding
             )
         ):
             category = "explain_secondary_part_list"
@@ -653,6 +659,31 @@ class ChatService:
         return normalized
 
     @staticmethod
+    def _localized_or_english_fallback(
+        sections: list[AnswerSection],
+        category: str,
+        response_language: Literal["en", "hi", "mr"],
+        reviewed_question_family: str | None = None,
+    ) -> list[AnswerSection]:
+        """Localize only reviewed plan categories after validation has passed."""
+        if response_language == "en":
+            return sections
+        localized = localize_reviewed_sections(
+            response_language, category, sections, reviewed_question_family,
+        )
+        if localized is not None:
+            return localized
+        return [
+            *ChatService._plain_language_sections(sections),
+            AnswerSection(
+                type="important",
+                title="सत्यापित उत्तर" if response_language == "hi" else "पडताळलेले उत्तर",
+                content=localized_english_fallback_notice(response_language),
+                citation_ids=[],
+            ),
+        ]
+
+    @staticmethod
     def _plain_language_sections(sections: list[AnswerSection]) -> list[AnswerSection]:
         """Apply conservative presentation rules without rewriting evidence claims.
 
@@ -730,6 +761,7 @@ class ChatService:
         needs_clarification: bool = False,
         suggested_replies: list[str] | None = None,
         assistant_context: AssistantContext | None = None,
+        response_language: Literal["en", "hi", "mr"] = "en",
     ) -> ChatResponse:
         """The sole non-abstention response assembly boundary.
 
@@ -738,7 +770,7 @@ class ChatService:
         bypass this final boundary.
         """
         finalized_sections = cls._deduplicate_section_citations(
-            cls._plain_language_sections(sections) if grounded else sections
+            cls._plain_language_sections(sections) if grounded and response_language == "en" else sections
         )
         return ChatResponse(
             answer=cls._join_sections(finalized_sections),
@@ -762,10 +794,16 @@ class ChatService:
         audience: str = "general",
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
+        response_language: Literal["en", "hi", "mr"] = "en",
     ) -> ChatResponse:
         if plan.category.startswith("explain_"):
-            return self._explain_from_plan(evidence, plan, understanding)
+            return self._explain_from_plan(evidence, plan, understanding, response_language)
         if not plan.complete:
+            return self._abstention(evidence=evidence)
+        if routing_context is not None and not self._plan_matches_routing(plan, routing_context):
+            # Validate the canonical plan before any localized presentation is
+            # constructed.  The later response-text guard remains in place as a
+            # defense in depth for existing English routes.
             return self._abstention(evidence=evidence)
         ordered_roles = {
             "standards": ("primary_standard", "secondary_standard"),
@@ -985,12 +1023,44 @@ class ChatService:
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
         self._validate_sections(sections, fact_plan, citations)
+        sections = self._localized_or_english_fallback(
+            sections, plan.category, response_language,
+            understanding.reviewed_question_family if understanding else None,
+        )
         logger.info("Chat generation_mode=extractive_fallback evidence_complete=true roles=%s citation_ids=%s", ordered_roles, [item.citation_id for item, _ in selected])
         return self._guided_response(sections=sections, grounded=True, insufficient_evidence=False,
             evidence_count=len(evidence), citations=citations, model="extractive-evidence-fallback",
-            generation_mode="extractive_fallback", disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            generation_mode="extractive_fallback", disclaimer=localized_disclaimer(response_language),
             suggested_replies=self._continuity_suggestions(plan, understanding),
-            assistant_context=self._continuity_context(plan, understanding, routing_context, joined_answer=self._join_sections(sections)))
+            assistant_context=self._continuity_context(plan, understanding, routing_context, joined_answer=self._join_sections(sections)),
+            response_language=response_language)
+
+    @staticmethod
+    def _plan_matches_routing(plan: EvidencePlan, routing_context: ComplianceRoutingContext) -> bool:
+        """Language-independent route invariant for deterministic wizard plans."""
+        expected = {
+            "check_exemption": "exemption",
+            "add_new_series": "documents",
+            "understand_transition": "transition",
+            "new_licence": "certification",
+        }.get(routing_context.goal)
+        if expected is not None:
+            return plan.category == expected
+        if routing_context.goal == "identify_standards":
+            return plan.category == {
+                "battery_operated": "standards_battery",
+                "mains_electric": "standards_mains",
+                "non_electric": "standards_non_electric",
+            }.get(routing_context.power_type)
+        if routing_context.goal == "complete_roadmap":
+            if routing_context.role == "artisan" and routing_context.power_type == "non_electric":
+                return plan.category == "roadmap_artisan_non_electric"
+            return plan.category == {
+                "battery_operated": "roadmap_battery",
+                "mains_electric": "roadmap_mains",
+                "non_electric": "roadmap_non_electric",
+            }.get(routing_context.power_type)
+        return False
 
     @staticmethod
     def _compose_fragments(*fragments: str) -> str:
@@ -1030,6 +1100,9 @@ class ChatService:
     ) -> list[RetrievalResult]:
         """Merge controlled coverage searches with normal retrieval, deterministically."""
         service = RetrievalService(self._retriever)
+        # The original question is deliberately the vector query.  Only the
+        # reviewed canonical signal may drive deterministic coverage/routing.
+        routing_question = understanding.routing_query if understanding is not None else request.question
         base = service.retrieve(RetrieveRequest(
             question=request.question, top_k=8, include_guidance=request.include_guidance,
         )).results
@@ -1037,14 +1110,14 @@ class ChatService:
             (item, 0, index) for index, item in enumerate(base)
         ]
         for coverage_index, coverage_question in enumerate(
-            self._coverage_queries(request.question, routing_context, understanding), start=1
+            self._coverage_queries(routing_question, routing_context, understanding), start=1
         ):
             coverage = service.retrieve(RetrieveRequest(
                 question=coverage_question, top_k=8, include_guidance=request.include_guidance,
             )).results
             candidates.extend((item, coverage_index, index) for index, item in enumerate(coverage))
         candidates.extend((item, -1, index) for index, item in enumerate(
-            self._controlled_role_candidates(request.question, routing_context, understanding)
+            self._controlled_role_candidates(routing_question, routing_context, understanding)
         ))
 
         unique: dict[str, tuple[RetrievalResult, int, int]] = {}
@@ -1055,7 +1128,7 @@ class ChatService:
 
         merged = list(unique.values())
         merged.sort(key=lambda entry: (
-            -self._coverage_score(request.question, entry[0].text, routing_context, understanding),
+            -self._coverage_score(routing_question, entry[0].text, routing_context, understanding),
             entry[0].distance,
             entry[1], entry[2], entry[0].chunk_id,
         ))
@@ -1064,13 +1137,13 @@ class ChatService:
         ordered = [item for item, _, _ in merged]
         reserved: list[RetrievalResult] = []
         seen_ids: set[str] = set()
-        for role in self._required_retrieval_roles(request.question, routing_context, understanding):
+        for role in self._required_retrieval_roles(routing_question, routing_context, understanding):
             match = next((item for item in ordered if self._role_matches(role, item.text)), None)
             if match is not None and match.chunk_id not in seen_ids:
                 reserved.append(match)
                 seen_ids.add(match.chunk_id)
         reserved.extend(item for item in ordered if item.chunk_id not in seen_ids)
-        expanded = self._include_adjacent_context(reserved, request.question, routing_context, understanding)
+        expanded = self._include_adjacent_context(reserved, routing_question, routing_context, understanding)
         return expanded[:8]
 
     @staticmethod
@@ -1157,7 +1230,7 @@ class ChatService:
         return (
             power == "battery_operated"
             and bool(re.search(r"\bis\s*9873\b", question, re.I))
-            and bool(re.search(r"\bparts?\b", question, re.I))
+            and bool(re.search(r"(?:\bparts?\b|भाग)", question, re.I))
         )
 
     def _controlled_role_candidates(
@@ -2063,7 +2136,7 @@ class ChatService:
                 if (
                     understanding.power == "battery_operated"
                     and ChatService._requires_supported_secondary_part_list(
-                        understanding.normalized_query, understanding=understanding
+                        understanding.routing_query, understanding=understanding
                     )
                 ):
                     roles = ["supported-secondary-part-list", "secondary-applicability", *roles]
@@ -2094,7 +2167,7 @@ class ChatService:
         exact_part_list = (
             category == "explain_secondary_part_list"
             and ChatService._requires_supported_secondary_part_list(
-                understanding.normalized_query, understanding=understanding
+                understanding.routing_query, understanding=understanding
             )
         )
         if exact_part_list:
@@ -2289,6 +2362,7 @@ class ChatService:
         evidence: list[TrustedEvidence],
         plan: EvidencePlan,
         understanding: QuestionUnderstanding | None,
+        response_language: Literal["en", "hi", "mr"] = "en",
     ) -> ChatResponse:
         if understanding is None:
             return self._abstention(evidence=[], citations=[])
@@ -2324,7 +2398,7 @@ class ChatService:
         if (
             plan.category == "explain_secondary_part_list"
             and ChatService._requires_supported_secondary_part_list(
-                understanding.normalized_query, understanding=understanding
+                understanding.routing_query, understanding=understanding
             )
         ):
             supported_parts = plan.roles.get("supported_secondary_part_list")
@@ -2368,6 +2442,10 @@ class ChatService:
                 raise EvidenceCompletenessError("UNKNOWN_FACT_OR_CITATION_ID")
             citations = [citation_by_id[citation_id] for citation_id in used_ids]
         self._validate_sections(sections, fact_plan, citations)
+        sections = self._localized_or_english_fallback(
+            sections, plan.category, response_language,
+            understanding.reviewed_question_family if understanding else None,
+        )
         return self._guided_response(
             sections=sections,
             grounded=True,
@@ -2376,9 +2454,10 @@ class ChatService:
             citations=citations,
             model="extractive-evidence-fallback",
             generation_mode="extractive_fallback",
-            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            disclaimer=localized_disclaimer(response_language),
             suggested_replies=self._explanation_suggestions(understanding, plan),
             assistant_context=self._continuity_context(plan, understanding, None, joined_answer=self._join_sections(sections)),
+            response_language=response_language,
         )
 
     @staticmethod

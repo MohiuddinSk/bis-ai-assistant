@@ -1,4 +1,4 @@
-import type { AssistantContext, Audience, ChatResponse, HealthResponse } from '../types/chat';
+import type { AssistantContext, Audience, ChatResponse, HealthResponse, ResponseLanguage } from '../types/chat';
 import type { ComplianceGuideResponse, ComplianceProfile } from '../types/compliance';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -158,6 +158,7 @@ export const askQuestion = (
   audience: Audience = 'general',
   assistantContext?: AssistantContext,
   signal?: AbortSignal,
+  responseLanguage: ResponseLanguage = 'en',
 ) =>
   request<ChatResponse>('/api/chat', chatTimeoutMs, {
     method: 'POST',
@@ -166,6 +167,7 @@ export const askQuestion = (
       top_k: 8,
       include_guidance: false,
       audience,
+      response_language: responseLanguage,
       ...(assistantContext ? { assistant_context: assistantContext } : {}),
     }),
     signal,

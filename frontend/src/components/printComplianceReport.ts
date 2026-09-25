@@ -8,10 +8,10 @@ table { width: 100%; border-collapse: collapse; font-size: 9pt; } th, td { paddi
 .print-profile-note { margin: 2mm 0 0; color: #486581; font-size: 8.5pt; }.print-next-action { border-left: 2.5pt solid #0b4f8a; padding-left: 3mm; }.print-important { border-left: 2.5pt solid #e78b28; padding-left: 3mm; }.print-important, .print-next-action { break-inside: avoid; page-break-inside: avoid; }.print-report-disclaimer { margin: 4mm 0 2mm; padding: 2.5mm 3mm; border: 1pt solid #e78b28; font-weight: 700; break-inside: avoid; page-break-inside: avoid; }.compliance-print-report footer { margin-top: 3mm; color: #486581; font-size: 8.5pt; }
 `;
 
-export function printComplianceReport(report: HTMLElement, origin: HTMLButtonElement) {
+export function printComplianceReport(report: HTMLElement, origin: HTMLButtonElement, title = 'Compliance Action Report') {
   const frame = document.createElement('iframe');
   frame.className = 'compliance-print-frame';
-  frame.title = 'Compliance Action Report print frame';
+  frame.title = `${title} print frame`;
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = 'position:fixed;width:1px;height:1px;right:0;bottom:0;border:0;opacity:0;pointer-events:none;';
   let cleaned = false;
