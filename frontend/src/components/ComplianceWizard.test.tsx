@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ComplianceWizard } from './ComplianceWizard';
 import { printComplianceReport } from './printComplianceReport';
+import { LanguageProvider } from '../i18n/LanguageContext';
+import { ChatHeader } from './ChatHeader';
 
 const guidance = { answer: 'Grounded answer.', grounded: true, insufficient_evidence: false, evidence_count: 1, citations: [{ citation_id: 'S1', source_filename: 'manual.pdf', page_start: 4, page_end: 4, chunk_id: 'c1', excerpt: 'IS 15644 applies.' }], model: 'fake', generation_mode: 'extractive_fallback' as const, disclaimer: 'Verify.', answer_sections: [
   { type: 'direct_answer' as const, title: 'Standards found', content: 'IS 15644 applies.', items: [], citation_ids: ['S1'] },
@@ -13,7 +15,7 @@ const guidance = { answer: 'Grounded answer.', grounded: true, insufficient_evid
 const profile = { role: 'manufacturer', product_description: 'Toy car', power_type: 'battery_operated', intended_age_group: '3_to_8', goal: 'identify_standards', application_stage: 'researching', additional_context: null };
 const response = { profile, guidance };
 const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
 const journey = () => within(screen.getByRole('region', { name: 'Compliance journey result' }));
 const printReport = () => within(screen.getByRole('article', { name: 'Compliance Action Report' }));
 
@@ -25,6 +27,40 @@ async function reachFinal(user = userEvent.setup(), role: 'Consumer' | 'Manufact
   for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: 'Continue' }));
   return user;
 }
+
+function renderWizardIn(language: 'hi' | 'mr') {
+  localStorage.setItem('bis-assistant-language', language);
+  return render(<LanguageProvider><ComplianceWizard /></LanguageProvider>);
+}
+
+it('translates the wizard entry screen into Hindi and Marathi', () => {
+  renderWizardIn('hi'); expect(screen.getByRole('heading', { name: 'अनुपालन सहायक' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'निर्माता' })).toHaveTextContent('अनुशंसित यात्रा');
+  cleanup(); renderWizardIn('mr'); expect(screen.getByRole('heading', { name: 'अनुपालन सहाय्यक' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'उत्पादक' })).toHaveTextContent('शिफारस केलेला प्रवास');
+});
+
+it('keeps all five localized wizard steps functional and submits untranslated enum values', async () => {
+  for (const [language, manufacturer, productLabel, continueLabel, powerLabel, finalHeading] of [
+    ['hi', 'निर्माता', 'उत्पाद विवरण या प्रकार', 'जारी रखें', 'बैटरी से चलने वाला', 'आपको क्या चाहिए'],
+    ['mr', 'उत्पादक', 'उत्पादनाचे वर्णन किंवा प्रकार', 'पुढे जा', 'बॅटरीवर चालणारे', 'तुम्हाला काय हवे आहे'],
+  ] as const) {
+    cleanup(); localStorage.clear(); const fetchMock = vi.fn().mockResolvedValue(ok(response)); vi.stubGlobal('fetch', fetchMock); renderWizardIn(language);
+    const user = userEvent.setup(); await user.click(screen.getByRole('button', { name: manufacturer })); await user.type(screen.getByLabelText(productLabel), 'Toy car'); await user.click(screen.getByRole('button', { name: continueLabel })); await user.click(screen.getByLabelText(powerLabel));
+    for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: continueLabel }));
+    expect(screen.getByRole('heading', { name: finalHeading })).toBeInTheDocument();
+    const generate = language === 'hi' ? 'मेरा मार्गदर्शन बनाएँ' : 'माझे मार्गदर्शन तयार करा'; await user.click(screen.getByRole('button', { name: generate })); await screen.findAllByText('IS 15644 applies.');
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).power_type).toBe('battery_operated');
+  }
+});
+
+it('uses the selected language in the printable report while preserving citations and standards', async () => {
+  localStorage.setItem('bis-assistant-language', 'hi'); vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(response))); render(<LanguageProvider><ComplianceWizard /></LanguageProvider>);
+  const user = userEvent.setup(); await user.click(screen.getByRole('button', { name: 'निर्माता' })); await user.type(screen.getByLabelText('उत्पाद विवरण या प्रकार'), 'Toy car'); await user.click(screen.getByRole('button', { name: 'जारी रखें' })); for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: 'जारी रखें' })); await user.click(screen.getByRole('button', { name: 'मेरा मार्गदर्शन बनाएँ' }));
+  const report = within(await screen.findByRole('article', { name: 'अनुपालन कार्य रिपोर्ट' })); expect(report.getByRole('heading', { name: 'अनुपालन कार्य रिपोर्ट' })).toBeInTheDocument(); expect(report.getByRole('heading', { name: 'लागू मानक' })).toBeInTheDocument(); expect(report.getByText('IS 15644 applies.')).toBeInTheDocument(); expect(report.getByText('manual.pdf')).toBeInTheDocument(); expect(screen.getAllByText('पृष्ठ 4')).not.toHaveLength(0);
+});
+
+it('preserves entered profile data when language switches during the wizard', async () => {
+  render(<LanguageProvider><ChatHeader status="ready" /><ComplianceWizard /></LanguageProvider>); const user = userEvent.setup(); await user.click(screen.getByRole('button', { name: 'Manufacturer' })); await user.type(screen.getByLabelText('Product description or type'), 'Toy car'); await user.selectOptions(screen.getByLabelText('Language'), 'mr'); expect(screen.getByLabelText('उत्पादनाचे वर्णन किंवा प्रकार')).toHaveValue('Toy car');
+});
 
 it('offers clear consumer and highlighted manufacturer entry choices', async () => {
   const user = userEvent.setup(); render(<ComplianceWizard />);
