@@ -1,4 +1,4 @@
-# Free ngrok demo: Netlify + account-assigned development domain
+# Free ngrok demo: Vercel/Netlify + account-assigned development domain
 
 This is a **demo-only** transport for one laptop. It is not the production scaling design. The existing Cloudflare named-tunnel workflow remains an optional alternative in `docs/SECURE_DEMO_DEPLOYMENT.md`; this guide does not replace or weaken it.
 
@@ -14,9 +14,9 @@ Keep ngrok configuration in its normal user-local location, not this checkout. I
 
 In the ngrok dashboard, find the account-assigned free development domain. Copy only its hostname, for example `your-assigned-domain.ngrok-free.dev` or `your-assigned-domain.ngrok-free.app`; do not use a random or agent-generated URL. The free-plan agent selects its assigned development domain automatically. The script starts `ngrok http http://127.0.0.1:8000`, then queries only the local agent API at `http://127.0.0.1:4040/api/tunnels` and verifies the expected HTTPS URL and loopback upstream without displaying agent data.
 
-## Configure Netlify and this shell
+## Configure Vercel or Netlify and this shell
 
-Set Netlify's public build variable, then rebuild/deploy the frontend:
+Set the public build variable for the deployed frontend, then rebuild/deploy it:
 
 ```text
 VITE_API_BASE_URL=https://your-assigned-domain.ngrok-free.dev
@@ -26,10 +26,10 @@ In the PowerShell process that will start the demo, set the exact values (the fr
 
 ```powershell
 $env:FREE_NGROK_HTTPS_HOSTNAME = "your-assigned-domain.ngrok-free.dev"
-$env:FREE_NGROK_FRONTEND_ORIGIN = "https://bis-saarthi-ai-assistant.netlify.app"
+$env:FREE_NGROK_FRONTEND_ORIGIN = "https://bis-saarthi-phi.vercel.app"
 ```
 
-`FREE_NGROK_FRONTEND_ORIGIN` must be the exact Netlify origin `https://bis-saarthi-ai-assistant.netlify.app`: no wildcard, path, comma list, query, fragment, port, or trailing slash. The start script sets `ALLOWED_ORIGINS` to only that value for the demo container. The assigned ngrok hostname is also exact and must not include a scheme, path, port, query, fragment, or wildcard.
+`FREE_NGROK_FRONTEND_ORIGIN` must be one exact HTTPS origin, for example `https://bis-saarthi-phi.vercel.app` or a Netlify `https://<site>.netlify.app` origin. It cannot contain a wildcard, path, comma list, query, fragment, port, credentials, or trailing slash. The start script sets `ALLOWED_ORIGINS` to only that validated value for the demo container. The assigned ngrok hostname is also exact and must not include a scheme, path, port, query, fragment, or wildcard.
 
 ## Start and validate
 
@@ -40,7 +40,7 @@ From the repository root, start with generation disabled (the default):
 .\deploy\free-ngrok-demo\check.ps1
 ```
 
-The check validates local and public legacy/versioned health routes, the public CORS preflight for the exact Netlify origin, legacy and versioned retrieve/chat routes, echoed request IDs, and empty provider-key environment entries. It emits fixed, non-secret reason codes such as `missing-api-hostname`, `cors-origin-mismatch`, and `provider-secret-present` on failure.
+The check validates local and public legacy/versioned health routes, the public CORS preflight for the exact configured frontend origin, legacy and versioned retrieve/chat routes, echoed request IDs, and empty provider-key environment entries. It emits fixed, non-secret reason codes such as `missing-api-hostname`, `cors-origin-mismatch`, and `provider-secret-present` on failure.
 
 For free-tier browser interstitials, public demo probes and the frontend send `ngrok-skip-browser-warning: 1`. The backend CORS allowlist permits that explicit request header only for the configured frontend origin. Loopback probes never send it. A public non-JSON/interstitial reply reports the fixed `public-health-non-json-response` code without exposing its body; a network timeout reports `public-health-network-timeout`.
 
@@ -52,7 +52,7 @@ Generation remains off unless an operator intentionally supplies the existing pr
 .\deploy\free-ngrok-demo\stop.ps1
 ```
 
-The workflow records only the PID and start time of the ngrok process it started, in ignored local runtime state. Stop verifies both before stopping it, and stops only the `free-ngrok-demo` Compose project. It never kills other ngrok processes, Docker containers, images, or volumes.
+The workflow records only the PID and start time of the ngrok process it started, in ignored local runtime state. On a later start it discards stale PID state after a restart, starts a new tunnel if ngrok is no longer running, and reuses an already-running demo backend without taking it down if startup fails. Stop verifies both before stopping it, and stops only the `free-ngrok-demo` Compose project. It never kills other ngrok processes, Docker containers, images, or volumes.
 
 ## Limits and operating conditions
 
