@@ -205,3 +205,15 @@ it('is keyboard-accessible and aborts an active request on unmount', async () =>
   const user = userEvent.setup(); render(<ComplianceWizard />); await user.keyboard('{Tab}{Enter}'); expect(screen.getByText(/consumer journey/i)).toBeInTheDocument(); cleanup();
   let captured: AbortSignal | undefined; vi.stubGlobal('fetch', vi.fn((_url, init) => { captured = init?.signal; return new Promise(() => undefined); })); const manufacturer = await reachFinal(); await manufacturer.click(screen.getByRole('button', { name: 'Generate my guidance' })); cleanup(); await waitFor(() => expect(captured?.aborted).toBe(true));
 });
+
+it('refreshes a generated result without resetting the typed profile', async () => {
+ const localized = { ...response, guidance: { ...guidance, answer: 'मराठी मार्गदर्शन.', answer_sections: [{ ...guidance.answer_sections[0], content: 'मराठी मार्गदर्शन.' }, ...guidance.answer_sections.slice(1)] } };
+ const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+  const body = JSON.parse(String(init?.body)); return Promise.resolve(ok(body.response_language === 'mr' ? localized : response));
+ });
+ vi.stubGlobal('fetch', fetchMock); render(<LanguageProvider><ChatHeader status="ready" /><ComplianceWizard /></LanguageProvider>);
+ const user = userEvent.setup(); await user.click(screen.getByRole('button', { name: 'Manufacturer' })); await user.type(screen.getByLabelText('Product description or type'), 'Toy car'); await user.click(screen.getByRole('button', { name: 'Continue' }));
+ for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: 'Continue' })); await user.click(screen.getByRole('button', { name: 'Generate my guidance' })); await screen.findAllByText('IS 15644 applies.');
+ await user.selectOptions(screen.getByLabelText('Language'), 'mr'); await screen.findAllByText('मराठी मार्गदर्शन.'); expect(screen.getAllByText('Toy car')).not.toHaveLength(0);
+ const localizationCall = fetchMock.mock.calls[1]; const localizationPayload = JSON.parse(String((localizationCall?.[1] as RequestInit | undefined)?.body)); expect(localizationPayload.response_language).toBe('mr'); expect(localizationPayload.power_type).toBe('not_sure');
+});

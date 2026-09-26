@@ -136,3 +136,45 @@ it('keeps citations, page metadata and hides internal identifiers after a standa
  expect(screen.getByText(/Page 4/)).toBeInTheDocument();
  expect(document.body).not.toHaveTextContent('secret');
 });
+
+it('refreshes assistant answers by selected language, preserves user text, and caches variants', async () => {
+ const answers = {
+  en: { ...a, answer: 'English answer.' }, hi: { ...a, answer: 'हिंदी उत्तर।' }, mr: { ...a, answer: 'मराठी उत्तर.' },
+ };
+ const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+  if (url.includes('health')) return Promise.resolve(rep({ status: 'ready' }));
+  const payload = JSON.parse(String(init?.body)); return Promise.resolve(rep(answers[payload.response_language as keyof typeof answers]));
+ });
+ vi.stubGlobal('fetch', fetchMock); await renderReady(); const user = userEvent.setup();
+ await user.type(screen.getByLabelText(/ask a question/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
+ await user.selectOptions(screen.getByLabelText('Language'), 'hi'); await screen.findByText('हिंदी उत्तर।');
+ await user.selectOptions(screen.getByLabelText('भाषा'), 'mr'); await screen.findByText('मराठी उत्तर.');
+ expect(screen.getByText('Original question?')).toBeInTheDocument(); expect(screen.getByText('manual.pdf')).toBeInTheDocument(); expect(screen.getByText(/S1/)).toBeInTheDocument();
+ const callsBeforeReturn = fetchMock.mock.calls.length;
+ await user.selectOptions(screen.getByLabelText('भाषा'), 'hi'); await screen.findByText('हिंदी उत्तर।');
+ expect(fetchMock).toHaveBeenCalledTimes(callsBeforeReturn);
+});
+
+it('ignores stale localization results and preserves the last response after localization failure', async () => {
+ let resolveHindi!: (value: unknown) => void; let resolveMarathi!: (value: unknown) => void;
+ const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+  if (url.includes('health')) return Promise.resolve(rep({ status: 'ready' }));
+  const language = JSON.parse(String(init?.body)).response_language;
+  if (language === 'en') return Promise.resolve(rep({ ...a, answer: 'English answer.' }));
+  if (language === 'hi') return new Promise(resolve => { resolveHindi = resolve; });
+  return new Promise(resolve => { resolveMarathi = resolve; });
+ });
+ vi.stubGlobal('fetch', fetchMock); await renderReady(); const user = userEvent.setup();
+ await user.type(screen.getByLabelText(/ask a question/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
+ await user.selectOptions(screen.getByLabelText('Language'), 'hi'); expect(screen.getByText('उत्तर अपडेट किए जा रहे हैं…')).toBeInTheDocument();
+ await user.selectOptions(screen.getByLabelText('भाषा'), 'mr'); await act(async () => resolveMarathi(rep({ ...a, answer: 'मराठी उत्तर.' }))); await screen.findByText('मराठी उत्तर.');
+ await act(async () => resolveHindi(rep({ ...a, answer: 'पुराना हिंदी उत्तर।' }))); expect(screen.queryByText('पुराना हिंदी उत्तर।')).toBeNull();
+ cleanup(); localStorage.clear(); document.documentElement.lang = 'en';
+ const failedFetch = vi.fn((url: string, init?: RequestInit) => {
+  if (url.includes('health')) return Promise.resolve(rep({ status: 'ready' }));
+  return JSON.parse(String(init?.body)).response_language === 'hi' ? Promise.reject(new Error('private backend body')) : Promise.resolve(rep({ ...a, answer: 'English answer.' }));
+ });
+ vi.stubGlobal('fetch', failedFetch); await renderReady(); const retryUser = userEvent.setup();
+ await retryUser.type(screen.getByLabelText(/ask a question/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
+ await retryUser.selectOptions(screen.getByLabelText('Language'), 'hi'); await waitFor(() => expect(screen.getByText('English answer.')).toBeInTheDocument()); expect(document.body).not.toHaveTextContent('private backend body');
+});
