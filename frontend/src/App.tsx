@@ -11,9 +11,10 @@ import { ComplianceWizard } from './components/ComplianceWizard';
 import { builtInSuggestedActions, normalizeSuggestedActions, questionForSuggestedAction } from './suggestedActions';
 import type { SuggestedAction } from './suggestedActions';
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
-import type { TranslationKey } from './i18n/translations';
+import type { Language, TranslationKey } from './i18n/translations';
 
-type Message = { role: 'user' | 'assistant'; text: string; response?: ChatResponse; suggestedActions?: SuggestedAction[] };
+type AssistantRequest = { question: string; audience: Audience; assistantContext?: AssistantContext };
+type Message = { id: number; role: 'user' | 'assistant'; text: string; response?: ChatResponse; suggestedActions?: SuggestedAction[]; request?: AssistantRequest };
 
 function isIndependentQuestion(value: string): boolean {
   const text = value.trim();
@@ -38,8 +39,13 @@ function AppContent() {
   const [audience, setAudience] = useState<Audience>('general');
   const [mode, setMode] = useState<'chat' | 'wizard'>('chat');
   const [status, setStatus] = useState<'ready' | 'degraded' | 'unavailable'>('unavailable');
+  const [updatingAnswers, setUpdatingAnswers] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const chatController = useRef<AbortController | null>(null);
+  const localizationController = useRef<AbortController | null>(null);
+  const localizationVersion = useRef(0);
+  const messageId = useRef(0);
+  const responseVariants = useRef(new Map<number, Map<Language, ChatResponse>>());
   const requestPending = useRef(false);
   const wizardEntry = useRef<HTMLDivElement>(null);
 
@@ -61,7 +67,51 @@ function AppContent() {
     end.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy]);
 
-  useEffect(() => () => chatController.current?.abort(), []);
+  useEffect(() => () => {
+    chatController.current?.abort();
+    localizationController.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    const assistantMessages = messages.filter((message): message is Message & { request: AssistantRequest } => message.role === 'assistant' && Boolean(message.request));
+    if (assistantMessages.length === 0) return;
+
+    localizationController.current?.abort();
+    const controller = new AbortController();
+    localizationController.current = controller;
+    const version = ++localizationVersion.current;
+    const missing = assistantMessages.filter((message) => !responseVariants.current.get(message.id)?.has(language));
+
+    setMessages((items) => items.map((message) => {
+      if (message.role !== 'assistant') return message;
+      const cached = responseVariants.current.get(message.id)?.get(language);
+      return cached ? { ...message, text: cached.answer, response: cached } : message;
+    }));
+    if (missing.length === 0) {
+      setUpdatingAnswers(false);
+      return () => controller.abort();
+    }
+
+    setUpdatingAnswers(true);
+    void Promise.all(missing.map(async (message) => {
+      try {
+        const response = await askQuestion(message.request.question, message.request.audience, message.request.assistantContext, controller.signal, language);
+        if (controller.signal.aborted || localizationVersion.current !== version) return;
+        const variants = responseVariants.current.get(message.id) ?? new Map<Language, ChatResponse>();
+        variants.set(language, response);
+        responseVariants.current.set(message.id, variants);
+        setMessages((items) => items.map((item) => item.id === message.id && item.role === 'assistant'
+          ? { ...item, text: response.answer, response }
+          : item));
+      } catch {
+        // Retain the last verified response. Backend error bodies are never surfaced here.
+      }
+    })).finally(() => {
+      if (!controller.signal.aborted && localizationVersion.current === version) setUpdatingAnswers(false);
+    });
+
+    return () => controller.abort();
+  }, [language]);
 
   useEffect(() => {
     if (mode === 'wizard') {
@@ -81,12 +131,14 @@ function AppContent() {
     setError('');
     setLast(question);
     setLastContext(assistantContext);
-    setMessages((items) => [...items, { role: 'user', text: question }]);
+    setMessages((items) => [...items, { id: ++messageId.current, role: 'user', text: question }]);
     const controller = new AbortController();
     chatController.current = controller;
     try {
       const response = await askQuestion(question, audience, assistantContext, controller.signal, language);
-      setMessages((items) => [...items, { role: 'assistant', text: response.answer, response, suggestedActions: normalizeSuggestedActions(response) }]);
+      const id = ++messageId.current;
+      responseVariants.current.set(id, new Map([[language, response]]));
+      setMessages((items) => [...items, { id, role: 'assistant', text: response.answer, response, suggestedActions: normalizeSuggestedActions(response), request: { question, audience, assistantContext } }]);
       setSessionContext(response.assistant_context ?? undefined);
       setPendingContext(response.needs_clarification
         ? (response.assistant_context ?? { original_question: assistantContext?.original_question ?? question, expected_slots: [] })
@@ -104,8 +156,11 @@ function AppContent() {
 
   const resetConversation = () => {
     chatController.current?.abort();
+    localizationController.current?.abort();
+    localizationVersion.current += 1;
+    responseVariants.current.clear();
     requestPending.current = false;
-    setMessages([]); setPendingContext(null); setSessionContext(undefined); setLastContext(undefined); setLast(''); setError(''); setBusy(false);
+    setMessages([]); setPendingContext(null); setSessionContext(undefined); setLastContext(undefined); setLast(''); setError(''); setBusy(false); setUpdatingAnswers(false);
   };
 
   const switchMode = (next: 'chat' | 'wizard') => {
@@ -138,8 +193,9 @@ function AppContent() {
       </section>
       {messages.length === 0 && <SuggestedQuestions actions={translatedBuiltInActions} busy={busy} onSelect={action => dispatchSuggestedAction(action)} />}
       <section className="chat" aria-live="polite">
-        {messages.map((message, index) => <ChatMessage key={index} {...message} busy={busy} onSuggestedAction={message.role === 'assistant' && (message.suggestedActions?.length ?? 0) > 0 ? action => dispatchSuggestedAction(action, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
+        {messages.map((message) => <ChatMessage key={message.id} {...message} busy={busy} onSuggestedAction={message.role === 'assistant' && (message.suggestedActions?.length ?? 0) > 0 ? action => dispatchSuggestedAction(action, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
         {busy && <LoadingMessage />}
+        {updatingAnswers && <p className="answer-update" aria-live="polite">{t('updatingAnswers')}</p>}
         {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext)} />}
         <div ref={end} />
       </section>
