@@ -20,7 +20,7 @@ function Get-RequiredFrontendOrigin {
     $Value = [Environment]::GetEnvironmentVariable("FREE_NGROK_FRONTEND_ORIGIN", "Process")
     if ([string]::IsNullOrWhiteSpace($Value)) { Stop-WithReason "missing-frontend-origin" }
     $Origin = $Value.Trim()
-    if ($Origin -notmatch '^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$' -or $Origin -notmatch '^https://[^/]+\.netlify\.app$') { Stop-WithReason "invalid-frontend-origin" }
+    if ($Origin -notmatch '^https://(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$') { Stop-WithReason "invalid-frontend-origin" }
     return $Origin.ToLowerInvariant()
 }
 function Get-TrackedNgrokProcess {
@@ -59,10 +59,10 @@ function Wait-ForPublicHealth { param([string]$Uri, [int]$Timeout)
     if ($LastState -eq "network") { Stop-WithReason "public-health-network-timeout" }
     Stop-WithReason "public-health-not-ready"
 }
-function Stop-OwnedResources { param([System.Diagnostics.Process]$Process)
+function Stop-OwnedResources { param([System.Diagnostics.Process]$Process, [bool]$StopBackend)
     if ($null -ne $Process -and -not $Process.HasExited -and $Process.ProcessName -match '^ngrok(?:\.exe)?$') { Stop-Process -Id $Process.Id -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $StatePath -PathType Leaf) { Remove-Item -LiteralPath $StatePath -Force }
-    docker compose -f (Join-Path $Root "compose.yaml") -p $ProjectName down 2>$null | Out-Null
+    if ($StopBackend) { docker compose -f (Join-Path $Root "compose.yaml") -p $ProjectName down 2>$null | Out-Null }
 }
 
 $ApiHostname = Get-RequiredNgrokHostname
@@ -72,6 +72,8 @@ Assert-Condition ($TimeoutSeconds -gt 0 -and $TimeoutSeconds -le 300) "invalid-t
 Get-Command docker -ErrorAction Stop | Out-Null
 $NgrokCommand = Get-Command ngrok -ErrorAction Stop
 if ($null -ne (Get-TrackedNgrokProcess)) { Stop-WithReason "demo-ngrok-already-running" }
+$ExistingBackendContainer = docker compose -f (Join-Path $Root "compose.yaml") -p $ProjectName ps -q backend 2>$null
+$BackendStartedByScript = [string]::IsNullOrWhiteSpace([string]$ExistingBackendContainer)
 $OriginalEnvironment = @{}
 foreach ($Name in @("ALLOWED_ORIGINS", "BACKEND_HOST_PORT", "LLM_PROVIDER", "GROQ_API_KEY", "LLM_API_KEY")) { $OriginalEnvironment[$Name] = [Environment]::GetEnvironmentVariable($Name, "Process") }
 $TunnelProcess = $null; $Succeeded = $false
@@ -98,8 +100,8 @@ try {
     if ($TunnelProcess.HasExited) { Stop-WithReason "ngrok-exited-early" }
     Wait-ForPublicHealth "$ExpectedPublicUrl/health" $TimeoutSeconds
     $Succeeded = $true
-    Write-Output "Free ngrok demo started. Configure Netlify VITE_API_BASE_URL as $ExpectedPublicUrl."
+    Write-Output "Free ngrok demo started. Configure the frontend VITE_API_BASE_URL as $ExpectedPublicUrl."
 } finally {
-    if (-not $Succeeded) { Stop-OwnedResources $TunnelProcess }
+    if (-not $Succeeded) { Stop-OwnedResources $TunnelProcess $BackendStartedByScript }
     foreach ($Name in $OriginalEnvironment.Keys) { [Environment]::SetEnvironmentVariable($Name, $OriginalEnvironment[$Name], "Process") }
 }

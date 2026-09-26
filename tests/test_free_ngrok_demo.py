@@ -31,6 +31,7 @@ class FreeNgrokDemoTests(unittest.TestCase):
         self.assertNotIn('ArgumentList.Add($ApiHostname)', self.start)
         self.assertIn('SetEnvironmentVariable("ALLOWED_ORIGINS", $FrontendOrigin, "Process")', self.start)
         self.assertIn("'\\.ngrok-free\\.(?:app|dev)$'", self.start)
+        self.assertNotIn(".netlify\\.app$", self.start + self.check)
         self.assertNotIn('"ALLOWED_ORIGINS", "*"', self.start)
         self.assertNotRegex(self.start + self.docs, r"(?i)trycloudflare")
 
@@ -95,18 +96,38 @@ class FreeNgrokDemoTests(unittest.TestCase):
             with self.subTest(rejected=value):
                 self.assertIsNone(hostname.fullmatch(value))
 
-    def test_frontend_origin_contract_is_exact_and_origin_only(self):
-        origin = re.compile(r"^https://[^/]+\.netlify\.app$")
-        self.assertIsNotNone(origin.fullmatch("https://bis-saarthi-ai-assistant.netlify.app"))
+    def test_frontend_origin_contract_accepts_exact_https_vercel_and_netlify_origins_only(self):
+        origin = re.compile(
+            r"^https://(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+            r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+        )
         for value in (
+            "https://bis-saarthi-phi.vercel.app",
+            "https://bis-saarthi-ai-assistant.netlify.app",
+        ):
+            with self.subTest(accepted=value):
+                self.assertIsNotNone(origin.fullmatch(value))
+        for value in (
+            "http://bis-saarthi-phi.vercel.app",
+            "https://*.vercel.app",
             "https://bis-saarthi-ai-assistant.netlify.app/",
             "https://bis-saarthi-ai-assistant.netlify.app/path",
             "https://bis-saarthi-ai-assistant.netlify.app?x=1",
             "https://bis-saarthi-ai-assistant.netlify.app#fragment",
             "https://bis-saarthi-ai-assistant.netlify.app:443",
+            "https://user:password@bis-saarthi-phi.vercel.app",
+            "https://bis-saarthi-phi.vercel.app,https://other.vercel.app",
+            "https://bad_host.vercel.app",
+            "https://localhost",
         ):
             with self.subTest(rejected=value):
                 self.assertIsNone(origin.fullmatch(value))
+
+    def test_start_reuses_existing_backend_but_cleans_only_its_own_stale_runtime_state(self):
+        self.assertIn('$ExistingBackendContainer = docker compose', self.start)
+        self.assertIn('$BackendStartedByScript = [string]::IsNullOrWhiteSpace', self.start)
+        self.assertIn('Stop-OwnedResources $TunnelProcess $BackendStartedByScript', self.start)
+        self.assertIn('Remove-Item -LiteralPath $StatePath -Force; return $null', self.start)
 
     def test_no_ngrok_credentials_are_handled_or_persisted(self):
         combined = self.start + self.check + self.stop
