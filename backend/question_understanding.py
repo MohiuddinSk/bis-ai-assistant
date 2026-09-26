@@ -21,6 +21,7 @@ PowerClassification = Literal[
 ReviewedQuestionFamily = Literal[
     "battery_standards", "is15644_simple", "is15644_applies",
     "is9873_part2_simple", "certification_steps", "battery_q11_parts",
+    "transition_order",
 ]
 
 
@@ -93,6 +94,19 @@ _HI_MR_EXPLANATION_CUE = re.compile(
 _HI_MR_SIMPLE_CUE = re.compile(r"(?:आसान\s+भाषा\s+में\s+समझाइए|सोप्या\s+भाषेत\s+समजावून\s+सांगा)")
 _HI_MR_APPLIES_CUE = re.compile(r"(?:कब\s+लागू\s+होता|कधी\s+लागू\s+होते)")
 _HI_MR_Q11_CUE = re.compile(r"(?:कौन[-\s]*से\s+भाग\s+लागू\s+हो\s+सकते|कोणते\s+भाग\s+लागू\s+होऊ\s+शकतात)")
+_REVIEWED_EXACT_ROUTING: dict[str, tuple[str, ReviewedQuestionFamily]] = {
+    # These server-owned, audited forms support deterministic planning only.
+    # The original question remains the retrieval and display query.
+    "which standard applies to a battery-operated toy": ("Which standard applies to a battery-operated toy?", "battery_standards"),
+    "explain is 15644 in simple words": ("Explain IS 15644 in simple words.", "is15644_simple"),
+    "when does is 15644 apply": ("When does IS 15644 apply?", "is15644_applies"),
+    "explain is 9873 part 2 in simple words": ("Explain IS 9873 Part 2 in simple words.", "is9873_part2_simple"),
+    "what are the steps to obtain bis certification for a toy": ("What are the steps to obtain BIS certification for a toy?", "certification_steps"),
+    "which is 9873 parts may apply to a battery-operated toy": ("Which IS 9873 parts may apply to a battery-operated toy?", "battery_q11_parts"),
+    "what does the 2026 transition order do": ("What does the 2026 transition order do?", "transition_order"),
+    "2026 का संक्रमण आदेश क्या करता है": ("What does the 2026 transition order do?", "transition_order"),
+    "2026 चा संक्रमण आदेश काय करतो": ("What does the 2026 transition order do?", "transition_order"),
+}
 _CORPUS_STANDARD_SUGGESTIONS = (
     "IS 15644", "IS 9873 Part 1", "IS 9873 Part 3", "IS 9873 Part 4",
 )
@@ -203,6 +217,8 @@ def _reviewed_routing_form(query: str) -> tuple[str, ReviewedQuestionFamily] | N
     The caller retains ``query`` for vector retrieval and display.  This is a
     semantic routing signal, not a translation service or an evidence source.
     """
+    if exact := _REVIEWED_EXACT_ROUTING.get(query):
+        return exact
     if _HI_MR_CERTIFICATION_CUE.search(query):
         return "What are the steps to obtain BIS certification for a toy?", "certification_steps"
     if re.search(r"\bis\s*9873\b", query, re.I) and _HI_MR_Q11_CUE.search(query):

@@ -57,7 +57,8 @@ def localize_reviewed_sections(
         "is15644_simple": "explain_electric_standard",
         "is15644_applies": "explain_electric_standard",
         "is9873_part2_simple": "explain_secondary_part",
-        "battery_q11_parts": "explain_secondary_part_list",
+    "battery_q11_parts": "explain_secondary_part_list",
+    "transition_order": "transition",
     }.get(reviewed_question_family)
     if expected_category != category:
         return None
@@ -79,6 +80,23 @@ def localize_reviewed_sections(
         if not all(section.title in replacements for section in sections):
             return None
         return [_replace(section, title=replacements[section.title][0], content=replacements[section.title][1], items=replacements[section.title][2]) for section in sections]
+    if reviewed_question_family == "transition_order":
+        required_titles = ["Direct answer", "What this means", "Important condition"]
+        source_text = " ".join(section.content or "" for section in sections).lower()
+        required_terms = (
+            "2026 transition facilitation order", "dpiit", "companies act, 2013",
+            "risk assessment", "not automatic", "only under",
+        )
+        # Do not provide reviewed copy unless the validated deterministic plan
+        # contains every evidence-bound role needed by this template.
+        if [section.title for section in sections] != required_titles or not all(term in source_text for term in required_terms):
+            return None
+        replacement = [
+            (text["direct"], "2026 Transition Facilitation Order के तहत covered goods या articles के लिए अनुमति दी जा सकती है, लेकिन अनुमति स्वचालित नहीं है।" if hi else "2026 Transition Facilitation Order अंतर्गत covered goods किंवा articles साठी परवानगी दिली जाऊ शकते, परंतु परवानगी स्वयंचलित नाही.", None),
+            (text["meaning"], "DPIIT Companies Act, 2013 के तहत निगमित कंपनी को Implementation Committee के risk assessment के आधार पर अनुमति दे सकता है।" if hi else "DPIIT Companies Act, 2013 अंतर्गत निगमित कंपनीला Implementation Committee च्या risk assessment च्या आधारावर परवानगी देऊ शकते.", None),
+            (text["important"], "अनुमति केवल आदेश में दी गई शर्तों के अधीन दी जा सकती है; यह सशर्त है और स्वचालित नहीं है।" if hi else "परवानगी केवळ आदेशातील नमूद अटींनुसार दिली जाऊ शकते; ती सशर्त आहे आणि स्वयंचलित नाही.", None),
+        ]
+        return [_replace(section, title=title, content=content, items=items) for section, (title, content, items) in zip(sections, replacement)]
     if reviewed_question_family == "certification_steps":
         replacement = [
             (text["direct"], "नए खिलौना-लाइसेंस आवेदन के लिए उद्धृत प्रारंभिक चरणों से शुरू करें।" if hi else "नवीन खेळणी-परवाना अर्जासाठी उद्धृत प्रारंभिक पायऱ्यांपासून सुरुवात करा.", None),

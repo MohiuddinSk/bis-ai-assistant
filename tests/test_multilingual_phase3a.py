@@ -114,6 +114,47 @@ class MultilingualPhase3ATests(unittest.TestCase):
         self.assertIsNone(localize_reviewed_sections("hi", "exemption", [section], None))
         self.assertIsNone(localize_reviewed_sections("mr", "transition", [section], None))
 
+    def test_canonical_english_and_localized_transition_forms_share_the_reviewed_family(self):
+        english = "What does the 2026 transition order do?"
+        forms = (english, "2026 का संक्रमण आदेश क्या करता है?", "2026 चा संक्रमण आदेश काय करतो?")
+        understandings = [understand_question(question) for question in forms]
+        self.assertEqual({item.reviewed_question_family for item in understandings}, {"transition_order"})
+        self.assertEqual({item.routing_query for item in understandings}, {english})
+
+    def test_transition_order_reviewed_templates_preserve_legal_identifiers_and_evidence_metadata(self):
+        sections = [
+            AnswerSection(type="direct_answer", title="Direct answer", content="The 2026 Transition Facilitation Order may allow permission for covered goods or articles, but approval is not automatic.", citation_ids=["S1", "S2"]),
+            AnswerSection(type="explanation", title="What this means", content="DPIIT may grant permission to a company incorporated under the Companies Act, 2013, based on the Implementation Committee's risk assessment.", citation_ids=["S2"]),
+            AnswerSection(type="important", title="Important condition", content="Permission may be granted only under the order's stated conditions.", citation_ids=["S2"]),
+        ]
+        for language in ("hi", "mr"):
+            with self.subTest(language=language):
+                localized = localize_reviewed_sections(language, "transition", sections, "transition_order")
+                self.assertIsNotNone(localized)
+                assert localized is not None
+                visible = " ".join(section.content or "" for section in localized)
+                for identifier in ("2026 Transition Facilitation Order", "DPIIT", "Companies Act, 2013", "risk assessment"):
+                    self.assertIn(identifier, visible)
+                self.assertIn("स्वचालित नहीं" if language == "hi" else "स्वयंचलित नाही", visible)
+                self.assertEqual([section.citation_ids for section in localized], [section.citation_ids for section in sections])
+        incomplete = sections[:-1]
+        self.assertIsNone(localize_reviewed_sections("hi", "transition", incomplete, "transition_order"))
+
+    def test_transition_order_response_localizes_for_canonical_english_request(self):
+        english = self.service.chat(ChatRequest(question="What does the 2026 transition order do?"))
+        for language in ("hi", "mr"):
+            with self.subTest(language=language):
+                localized = self.service.chat(ChatRequest(
+                    question="What does the 2026 transition order do?", response_language=language,
+                ))
+                self.assertNotIn(localized_english_fallback_notice(language), localized.answer)
+                for identifier in ("2026 Transition Facilitation Order", "DPIIT", "Companies Act, 2013", "risk assessment"):
+                    self.assertIn(identifier, localized.answer)
+                self.assertEqual(
+                    [citation.model_dump() for citation in localized.citations],
+                    [citation.model_dump() for citation in english.citations],
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

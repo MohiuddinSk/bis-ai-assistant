@@ -33,6 +33,7 @@ function AppContent() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [last, setLast] = useState('');
+  const [lastDisplay, setLastDisplay] = useState('');
   const [lastContext, setLastContext] = useState<AssistantContext | undefined>();
   const [pendingContext, setPendingContext] = useState<AssistantContext | null>(null);
   const [sessionContext, setSessionContext] = useState<AssistantContext | undefined>();
@@ -120,7 +121,7 @@ function AppContent() {
     }
   }, [mode]);
 
-  const send = async (question: string, suppliedContext?: AssistantContext) => {
+  const send = async (question: string, suppliedContext?: AssistantContext, displayText = question) => {
     if (busy || requestPending.current) return;
     requestPending.current = true;
     const continuing = Boolean(pendingContext && !isIndependentQuestion(question));
@@ -130,8 +131,9 @@ function AppContent() {
     setBusy(true);
     setError('');
     setLast(question);
+    setLastDisplay(displayText);
     setLastContext(assistantContext);
-    setMessages((items) => [...items, { id: ++messageId.current, role: 'user', text: question }]);
+    setMessages((items) => [...items, { id: ++messageId.current, role: 'user', text: displayText }]);
     const controller = new AbortController();
     chatController.current = controller;
     try {
@@ -160,7 +162,7 @@ function AppContent() {
     localizationVersion.current += 1;
     responseVariants.current.clear();
     requestPending.current = false;
-    setMessages([]); setPendingContext(null); setSessionContext(undefined); setLastContext(undefined); setLast(''); setError(''); setBusy(false); setUpdatingAnswers(false);
+    setMessages([]); setPendingContext(null); setSessionContext(undefined); setLastContext(undefined); setLast(''); setLastDisplay(''); setError(''); setBusy(false); setUpdatingAnswers(false);
   };
 
   const switchMode = (next: 'chat' | 'wizard') => {
@@ -175,7 +177,7 @@ function AppContent() {
       return;
     }
     const question = questionForSuggestedAction(action);
-    if (question) void send(question, context);
+    if (question) void send(question, context, action.label);
   };
 
   const translatedBuiltInActions = builtInSuggestedActions.map((action, index) => ({ ...action, label: t(builtInSuggestionKeys[index]) }));
@@ -196,7 +198,7 @@ function AppContent() {
         {messages.map((message) => <ChatMessage key={message.id} {...message} busy={busy} onSuggestedAction={message.role === 'assistant' && (message.suggestedActions?.length ?? 0) > 0 ? action => dispatchSuggestedAction(action, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
         {busy && <LoadingMessage />}
         {updatingAnswers && <p className="answer-update" aria-live="polite">{t('updatingAnswers')}</p>}
-        {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext)} />}
+        {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext, lastDisplay)} />}
         <div ref={end} />
       </section>
       <ChatInput onSend={send} busy={busy} audience={audience} onAudienceChange={setAudience} />
