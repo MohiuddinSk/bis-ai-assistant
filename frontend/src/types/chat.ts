@@ -1,6 +1,6 @@
 export type GenerationMode = 'llm' | 'extractive_fallback' | 'abstention' | 'clarification' | 'conversation';
 export type ResponseKind = 'conversation' | 'grounded_guidance' | 'clarification' | 'limitation';
-export interface Citation { citation_id:string; source_filename:string|null; page_start:number|null; page_end:number|null; chunk_id:string; excerpt:string }
+export interface Citation { citation_id:string; source_filename:string|null; page_start:number|null; page_end:number|null; chunk_id:string; excerpt:string; supporting_quote?:string }
 export type Audience = 'general' | 'manufacturer' | 'consumer';
 export type ResponseLanguage = 'en' | 'hi' | 'mr' | 'ta' | 'bn';
 export interface AnswerSection { type:'direct_answer'|'explanation'|'next_steps'|'important'|'clarification'; title:string; content?:string|null; items:string[]; citation_ids:string[] }

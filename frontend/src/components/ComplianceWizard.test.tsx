@@ -178,7 +178,7 @@ it('prints only the dedicated report in an isolated iframe without altering the 
   const reportView = printReport();
   for (const text of ['Compliance Passport', 'Toy car', 'IS 15644 applies.', 'The evidence covers this product.', 'Review the cited source.', 'Open the cited primary standard.', 'Verify before relying on guidance.', 'Informational guidance — not a BIS certificate.']) expect(reportView.getAllByText(text).length).toBeGreaterThan(0);
   expect(reportView.getByText(/BIS-CP-/)).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Product profile' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Applicable standards' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Evidence-backed completed findings' })).toBeInTheDocument(); expect(reportView.getByRole('heading', { name: 'Cited evidence' })).toBeInTheDocument();
-  expect(reportView.getAllByText(/manual\.pdf/).length).toBeGreaterThan(0); expect(reportView.queryByText(/certification\.pdf/)).not.toBeInTheDocument(); expect(reportView.getAllByText('Raw evidence excerpt S1').length).toBeGreaterThan(0);
+  expect(reportView.getAllByText(/manual\.pdf/).length).toBeGreaterThan(0); expect(reportView.queryByText(/certification\.pdf/)).not.toBeInTheDocument(); expect(reportView.queryByText('Raw evidence excerpt S1')).not.toBeInTheDocument();
   const root = document.getElementById('root') ?? document.body.firstElementChild as HTMLElement; const rootClass = root.className; const bodyClass = document.body.className; const htmlClass = document.documentElement.className; const rootStyle = root.getAttribute('style'); const bodyStyle = document.body.getAttribute('style'); const htmlStyle = document.documentElement.getAttribute('style');
   const button = screen.getByRole('button', { name: 'Save compliance passport as PDF or print' });
   const unrelatedContent = document.createTextNode('Powered by Netlify unrelated body content'); document.body.append(unrelatedContent);
@@ -193,6 +193,10 @@ it('prints only the dedicated report in an isolated iframe without altering the 
   expect(iframePrint.mock.contexts[0]).toBe(frame.contentWindow);
   const printed = frame.contentDocument!;
   expect(printed.querySelector('.compliance-print-report')).not.toBeNull(); expect(printed.querySelector('.journey-result')).toBeNull(); expect(printed.querySelector('nav')).toBeNull(); expect(printed.body).not.toHaveTextContent('Powered by Netlify'); expect(printed.body).not.toHaveTextContent('unrelated body content');
+  const printCss = printed.head.querySelector('style')?.textContent ?? '';
+  expect(printCss).toContain('@page { size: A4 portrait; margin: 13mm 15mm; }');
+  expect(printCss).toContain('.compliance-print-report .passport-source { display: block; padding: .75mm 0; border-bottom: .4pt solid #cbd9e8; break-inside: avoid; page-break-inside: avoid; }');
+  expect(printCss).toContain('.compliance-print-report { color: #102a43; font-size: 10pt; line-height: 1.4; background: #fff; }');
   expect(root.className).toBe(rootClass); expect(document.body.className).toBe(bodyClass); expect(document.documentElement.className).toBe(htmlClass); expect(root.getAttribute('style')).toBe(rootStyle); expect(document.body.getAttribute('style')).toBe(bodyStyle); expect(document.documentElement.getAttribute('style')).toBe(htmlStyle); expect((await journey().findAllByRole('heading', { name: 'Applicable standards' })).length).toBeGreaterThan(0);
   act(() => frame.contentWindow!.dispatchEvent(new Event('afterprint')));
   await waitFor(() => expect(document.querySelector('iframe.compliance-print-frame')).toBeNull()); expect(document.activeElement).toBe(button);

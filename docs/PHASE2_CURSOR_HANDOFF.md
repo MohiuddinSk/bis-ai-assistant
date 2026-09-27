@@ -512,3 +512,62 @@ PDF / Print** and confirm the isolated print view contains only the Passport.
   Its operative legal roles, conditions, and dates remain deterministic and the
   existing zero-provider-call behavior is preserved.
 - Focused real-index and synthesis suites: **27 passed in 9.067s**.
+
+### 32. Passport and print polish (27 September 2026)
+
+- Passport-owned outer explanation/important labels were removed where the
+  structural subsection heading already supplies the same localized label. This
+  changes presentation only; section content, facts, and evidence remain intact.
+- Printable cited-evidence blocks now prefer a supplied validated
+  `supporting_quote`; without one, they retain citation metadata only rather
+  than printing noisy OCR excerpts. Each block keeps its citation ID, filename,
+  and page metadata together with
+  A4 `break-inside/page-break-inside: avoid` styling and a non-orphaned sources
+  heading.
+- Frontend validation: lint passed; **98 tests** passed; production build
+  passed. `git diff --check` passed; protected paths remained clean.
+
+### 33. Passport print-polish regression coverage (27 September 2026)
+
+- Passport tests now assert exactly one structural explanation and important
+  label in each of English, Hindi, Marathi, Tamil, and Bengali, on both screen
+  and printable report paths.
+- Print tests cover quote-first evidence, metadata-only handling when a quote
+  is absent, source identity/order, and dedicated citation blocks. Metadata
+  (ID, filename, page) remains unchanged.
+- Frontend lint passed; full Vitest suite: **7 files, 100 tests** passed;
+  production build passed. `git diff --check` and protected-path checks passed.
+
+### 34. Final printable citation correction (27 September 2026)
+
+- Printable Passport citations now keep the ID, filename, page metadata, and
+  an optional validated `supporting_quote` inside one `.passport-source` block.
+  The wrapper is a normal print block and has both `break-inside: avoid` and
+  `page-break-inside: avoid`; the cited-evidence heading is also kept with its
+  following source content.
+- A printable source shows `supporting_quote` verbatim when supplied. When it
+  is absent, it shows metadata only: the full `excerpt` is intentionally not
+  printed, so noisy OCR is not duplicated in the PDF. API citations and screen
+  evidence controls retain their unchanged excerpts.
+- Regression coverage verifies label deduplication for all five locales,
+  quote-first and metadata-only source rendering, source identity/order,
+  same-wrapper markup, and pagination CSS.
+- Final frontend validation: lint passed; Vitest ran **7 files, 101 tests**,
+  all passing; production build passed. `git diff --check` and protected-path
+  status checks passed. Nothing was staged, committed, pushed, merged, or
+  deployed.
+
+### 35. Compact A4 Passport print layout (27 September 2026)
+
+- The isolated print stylesheet now uses tighter section, heading, profile-grid,
+  and citation-row spacing plus `13mm` top/bottom A4 margins. It retains the
+  10pt report body, full-width single-column sources, readable content, and
+  normal pagination for longer reports.
+- Each printable `.passport-source` remains a block with `break-inside: avoid`
+  and `page-break-inside: avoid`; no transforms, zoom, clipping, overflow
+  hiding, or content removal were introduced.
+- The isolated-print regression checks the compact page margins, source block
+  protection, and 10pt body style. Frontend lint passed; Vitest ran **7 files,
+  101 tests**, all passing; production build passed. `git diff --check` and
+  protected-path status checks passed. Nothing was staged, committed, pushed,
+  merged, or deployed.
