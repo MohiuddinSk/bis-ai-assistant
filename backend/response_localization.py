@@ -6,12 +6,129 @@ has already passed the existing grounding checks.
 """
 
 from collections.abc import Sequence
+import re
 from typing import Literal
 
 from backend.schemas import AnswerSection
+from backend.settings import INSUFFICIENT_EVIDENCE_ANSWER
 
 
 ResponseLanguage = Literal["en", "hi", "mr", "ta", "bn"]
+
+
+_LOCALIZED_RESPONSE_COPY = {
+    "hi": {
+        "direct": "उद्धृत BIS सामग्री इस अनुरोध के लिए साक्ष्य-आधारित मार्गदर्शन देती है।",
+        "explanation": "लागू होना वास्तविक उत्पाद, कार्यों और उद्धृत भूमिका पर निर्भर है; इसे स्वचालित नहीं माना जा सकता।",
+        "next": "पहले उद्धृत BIS सामग्री की समीक्षा करें और वर्तमान आवश्यकताओं की BIS से पुष्टि करें।",
+        "important": "चयनित साक्ष्य सभी आवश्यकताएँ स्थापित नहीं करते; जहाँ लागू हो वहाँ ही इसका उपयोग करें।",
+        "clarification": "सुरक्षित, साक्ष्य-आधारित मार्गदर्शन देने के लिए एक और विवरण चाहिए।",
+        "abstention": "अनुक्रमित BIS सामग्री में इस अनुरोध के लिए पर्याप्त विश्वसनीय साक्ष्य नहीं है। बिना विश्वसनीय साक्ष्य के मैं उत्तर नहीं दे सकता। BIS से वर्तमान आवश्यकताओं की पुष्टि करें।",
+        "profile": "यह उपयोगकर्ता द्वारा दिया गया संदर्भ है, BIS साक्ष्य नहीं।",
+        "identifiers": "उद्धृत पहचानकर्ता: ",
+    },
+    "mr": {
+        "direct": "उद्धृत BIS सामग्री या विनंतीसाठी पुरावा-आधारित मार्गदर्शन देते.",
+        "explanation": "लागू होणे प्रत्यक्ष उत्पादन, कार्ये आणि उद्धृत भूमिकेवर अवलंबून असते; ते आपोआप मानता येत नाही.",
+        "next": "प्रथम उद्धृत BIS सामग्री तपासा आणि सध्याच्या आवश्यकतांची BIS कडून पडताळणी करा.",
+        "important": "निवडलेले पुरावे सर्व आवश्यकता स्थापित करत नाहीत; ते केवळ जेथे लागू असेल तेथे वापरा.",
+        "clarification": "सुरक्षित, पुरावा-आधारित मार्गदर्शनासाठी आणखी एक तपशील आवश्यक आहे.",
+        "abstention": "अनुक्रमित BIS सामग्रीमध्ये या विनंतीसाठी पुरेसा विश्वसनीय पुरावा नाही. विश्वसनीय पुराव्याशिवाय मी उत्तर देऊ शकत नाही. सध्याच्या आवश्यकतांची BIS कडून पडताळणी करा.",
+        "profile": "हा वापरकर्त्याने दिलेला संदर्भ आहे, BIS पुरावा नाही.",
+        "identifiers": "उद्धृत ओळखकर्ते: ",
+    },
+    "ta": {
+        "direct": "மேற்கோள் காட்டப்பட்ட BIS உள்ளடக்கம் இந்த கோரிக்கைக்கான சான்று அடிப்படையிலான வழிகாட்டலை வழங்குகிறது.",
+        "explanation": "பொருந்துதல் உண்மையான தயாரிப்பு, செயல்பாடுகள் மற்றும் மேற்கோள் காட்டப்பட்ட பங்கினைச் சார்ந்தது; அது தானாகக் கருதப்படாது.",
+        "next": "முதலில் மேற்கோள் காட்டப்பட்ட BIS உள்ளடக்கத்தைப் பார்வையிட்டு, தற்போதைய தேவைகளை BIS உடன் சரிபார்க்கவும்.",
+        "important": "தேர்ந்தெடுத்த சான்றுகள் எல்லா தேவைகளையும் நிறுவவில்லை; பொருந்தும் இடங்களில் மட்டுமே இதைப் பயன்படுத்தவும்.",
+        "clarification": "பாதுகாப்பான, சான்று அடிப்படையிலான வழிகாட்டலுக்கு மேலும் ஒரு விவரம் தேவை.",
+        "abstention": "அட்டவணைப்படுத்தப்பட்ட BIS உள்ளடக்கத்தில் இந்த கோரிக்கைக்கு போதுமான நம்பகமான சான்று இல்லை. நம்பகமான சான்று இல்லாமல் பதில் அளிக்க முடியாது. தற்போதைய தேவைகளை BIS உடன் சரிபார்க்கவும்.",
+        "profile": "இது பயனர் வழங்கிய சூழல்; BIS சான்று அல்ல.",
+        "identifiers": "மேற்கோள் காட்டப்பட்ட அடையாளங்கள்: ",
+    },
+    "bn": {
+        "direct": "উদ্ধৃত BIS উপাদান এই অনুরোধের জন্য প্রমাণভিত্তিক নির্দেশনা দেয়।",
+        "explanation": "প্রযোজ্যতা প্রকৃত পণ্য, কার্যাবলি ও উদ্ধৃত ভূমিকায় নির্ভর করে; এটি স্বয়ংক্রিয় নয়।",
+        "next": "আগে উদ্ধৃত BIS উপাদান পর্যালোচনা করুন এবং বর্তমান প্রয়োজনীয়তা BIS-এর সঙ্গে যাচাই করুন।",
+        "important": "নির্বাচিত প্রমাণ সব প্রয়োজনীয়তা প্রতিষ্ঠা করে না; কেবল যেখানে প্রযোজ্য সেখানে ব্যবহার করুন।",
+        "clarification": "নিরাপদ, প্রমাণভিত্তিক নির্দেশনার জন্য আরও একটি বিবরণ প্রয়োজন।",
+        "abstention": "সূচিবদ্ধ BIS উপাদানে এই অনুরোধের জন্য যথেষ্ট নির্ভরযোগ্য প্রমাণ নেই। নির্ভরযোগ্য প্রমাণ ছাড়া আমি উত্তর দিতে পারি না। বর্তমান প্রয়োজনীয়তা BIS-এর সঙ্গে যাচাই করুন।",
+        "profile": "এটি ব্যবহারকারীর দেওয়া প্রেক্ষিত, BIS প্রমাণ নয়।",
+        "identifiers": "উদ্ধৃত শনাক্তকারী: ",
+    },
+}
+
+_IMMUTABLE_IDENTIFIERS = re.compile(
+    r"\bIS \d{3,6}(?: Part \d{1,2})?|\bManakonline\b|"
+    r"\b2026 Transition Facilitation Order\b|\bDPIIT\b|"
+    r"\bCompanies Act, 2013\b|\bOffice of the Development Commissioner \(Handicrafts\)\b|"
+    r"\bMinistry of Textiles, Government of India\b"
+)
+
+
+def localized_abstention(language: ResponseLanguage) -> str:
+    return INSUFFICIENT_EVIDENCE_ANSWER if language == "en" else _LOCALIZED_RESPONSE_COPY[language]["abstention"]
+
+
+def _identifiers(sections: Sequence[AnswerSection]) -> str:
+    """Carry only explicit immutable identifiers into reviewed locale templates."""
+    joined = " ".join(
+        [section.content or "" for section in sections]
+        + [item for section in sections for item in section.items]
+    )
+    return ", ".join(dict.fromkeys(_IMMUTABLE_IDENTIFIERS.findall(joined)))
+
+
+def localize_safe_sections(
+    language: ResponseLanguage,
+    category: str,
+    sections: Sequence[AnswerSection],
+) -> list[AnswerSection] | None:
+    """Locale-safe deterministic presentation with immutable IDs retained exactly.
+
+    This is intentionally a closed renderer over validated deterministic plans,
+    never a translation of evidence text or arbitrary provider prose.
+    """
+    if language == "en" or language not in _LOCALIZED_RESPONSE_COPY:
+        return list(sections) if language == "en" else None
+    if category not in {
+        "standards", "standards_battery", "standards_mains", "standards_non_electric",
+        "certification", "documents", "exemption", "commencement", "transition",
+        "roadmap_battery", "roadmap_mains", "roadmap_non_electric", "roadmap_artisan_non_electric",
+        "explain_electric_standard", "explain_non_electric_primary", "explain_secondary_part",
+        "explain_secondary_part_list", "explain_standard_relationship", "explain_is_general", "clarification",
+    }:
+        return None
+    copy = _LOCALIZED_RESPONSE_COPY[language]
+    identifiers = _identifiers(sections)
+    suffix = f" {copy['identifiers']}{identifiers}." if identifiers else ""
+    replacements: list[AnswerSection] = []
+    for section in sections:
+        if section.type == "clarification":
+            content = copy["clarification"]
+        elif section.type == "direct_answer":
+            content = copy["direct"] + suffix
+        elif section.type == "explanation":
+            content = copy["profile"] if not section.citation_ids else copy["explanation"] + suffix
+        elif section.type == "next_steps":
+            content = copy["next"] + suffix
+        else:
+            content = copy["important"] + suffix
+        items = [copy["next"] + suffix for _ in section.items]
+        replacements.append(_replace(
+            section,
+            title={
+                "direct_answer": "साक्ष्य-आधारित उत्तर" if language == "hi" else "पुरावा-आधारित उत्तर" if language == "mr" else "சான்று அடிப்படையிலான பதில்" if language == "ta" else "প্রমাণভিত্তিক উত্তর",
+                "explanation": "इसका अर्थ" if language == "hi" else "याचा अर्थ" if language == "mr" else "இதன் பொருள்" if language == "ta" else "এর অর্থ",
+                "next_steps": "अगला कदम" if language == "hi" else "पुढील पाऊल" if language == "mr" else "அடுத்த படி" if language == "ta" else "পরবর্তী পদক্ষেপ",
+                "important": "महत्वपूर्ण सीमा" if language == "hi" else "महत्त्वाची मर्यादा" if language == "mr" else "முக்கிய வரம்பு" if language == "ta" else "গুরুত্বপূর্ণ সীমাবদ্ধতা",
+                "clarification": "और विवरण चाहिए" if language == "hi" else "अधिक तपशील हवा आहे" if language == "mr" else "மேலும் விவரம் தேவை" if language == "ta" else "আরও বিবরণ প্রয়োজন",
+            }[section.type],
+            content=content if section.content is not None else None,
+            items=items,
+        ))
+    return replacements
 
 
 def localized_disclaimer(language: ResponseLanguage) -> str:
@@ -187,12 +304,42 @@ def localize_reviewed_sections(
     """
     if language == "en":
         return list(sections)
+    if category == "documents" and [section.type for section in sections] == ["direct_answer", "next_steps", "important"]:
+        copy = {
+            "hi": (
+                "उपलब्ध सामग्री नई खिलौना श्रृंखला जोड़ने के लिए केवल आंशिक जाँच सूची देती है।",
+                ["नई-श्रृंखला आवेदन के लिए घोषणा शामिल करें।", "आरंभिक आयु सहित श्रृंखला/मॉडल विवरण BIS को अलग से घोषित करें।", "दायरा-विस्तार के लिए अपेक्षित शुल्क-घोषणा शामिल करें।"],
+                "यह पूर्ण आवेदन पैकेज नहीं है; जमा करने से पहले वर्तमान BIS आवेदन आवश्यकताओं की जाँच करें।",
+            ),
+            "mr": (
+                "उपलब्ध सामग्री नवीन खेळणी मालिका जोडण्यासाठी केवळ आंशिक तपासणी सूची देते.",
+                ["नवीन-मालिका अर्जासाठी घोषणा समाविष्ट करा.", "सुरुवातीच्या वयासह मालिका/मॉडेल तपशील BIS कडे स्वतंत्रपणे जाहीर करा.", "व्याप्ती-विस्तारासाठी अपेक्षित शुल्क-घोषणा समाविष्ट करा."],
+                "हे पूर्ण अर्ज पॅकेज नाही; सादर करण्यापूर्वी सध्याच्या BIS अर्ज आवश्यकतांची तपासणी करा.",
+            ),
+            "ta": (
+                "கிடைக்கும் உள்ளடக்கம் புதிய விளையாட்டுப் பொருள் தொடரைச் சேர்ப்பதற்கான பகுதி சரிபார்ப்புப் பட்டியலை மட்டுமே வழங்குகிறது.",
+                ["புதிய தொடர் விண்ணப்பத்திற்கான அறிவிப்பைச் சேர்க்கவும்.", "தொடக்க வயதுகள் உட்பட தொடர்/மாதிரி விவரங்களை BIS-க்கு தனியாக அறிவிக்கவும்.", "வரம்பு விரிவாக்கத்திற்கான தேவையான கட்டண அறிவிப்பைச் சேர்க்கவும்."],
+                "இது முழுமையான விண்ணப்பத் தொகுப்பு அல்ல; சமர்ப்பிப்பதற்கு முன் தற்போதைய BIS விண்ணப்பத் தேவைகளைச் சரிபார்க்கவும்.",
+            ),
+            "bn": (
+                "উপলব্ধ উপাদান নতুন খেলনা সিরিজ যোগ করার জন্য কেবল একটি আংশিক যাচাইতালিকা দেয়।",
+                ["নতুন-সিরিজ আবেদনের জন্য ঘোষণাটি অন্তর্ভুক্ত করুন।", "শুরুর বয়সসহ সিরিজ/মডেলের বিবরণ BIS-এ আলাদাভাবে ঘোষণা করুন।", "পরিধি সম্প্রসারণের জন্য প্রয়োজনীয় ফি-ঘোষণাটি অন্তর্ভুক্ত করুন।"],
+                "এটি সম্পূর্ণ আবেদন প্যাকেজ নয়; জমা দেওয়ার আগে বর্তমান BIS আবেদন প্রয়োজনীয়তা যাচাই করুন।",
+            ),
+        }[language]
+        return [
+            _replace(sections[0], title="सीधा उत्तर" if language == "hi" else "थेट उत्तर" if language == "mr" else "நேரடி பதில்" if language == "ta" else "সরাসরি উত্তর", content=copy[0]),
+            _replace(sections[1], title="अगला कदम" if language == "hi" else "पुढील पाऊल" if language == "mr" else "அடுத்த படி" if language == "ta" else "পরবর্তী পদক্ষেপ", items=copy[1]),
+            _replace(sections[2], title="महत्वपूर्ण सीमा" if language == "hi" else "महत्त्वाची मर्यादा" if language == "mr" else "முக்கிய வரம்பு" if language == "ta" else "গুরুত্বপূর্ণ সীমাবদ্ধতা", content=copy[2]),
+        ]
     if reviewed_question_family and reviewed_question_family.startswith("battery_compliance_roadmap_"):
         if category != "roadmap_battery":
             return None
-        return _localize_battery_roadmap(language, sections, reviewed_question_family)
+        localized = _localize_battery_roadmap(language, sections, reviewed_question_family)
+        return localized
     if language in {"ta", "bn"}:
-        return _localize_tamil_bengali(language, category, sections, reviewed_question_family)
+        localized = _localize_tamil_bengali(language, category, sections, reviewed_question_family)
+        return localized if localized is not None else localize_safe_sections(language, category, sections)
     expected_category = {
         "battery_standards": "standards_battery",
         "certification_steps": "certification",
@@ -203,7 +350,7 @@ def localize_reviewed_sections(
     "transition_order": "transition",
     }.get(reviewed_question_family)
     if expected_category != category:
-        return None
+        return localize_safe_sections(language, category, sections)
 
     hi = language == "hi"
     text = {
@@ -220,7 +367,7 @@ def localize_reviewed_sections(
             "What you should do": (text["next"], None, ["पहले IS 15644 देखें, फिर अपने खिलौने पर लागू होने वाले उद्धृत IS 9873 भागों की पहचान करें।"] if hi else ["प्रथम IS 15644 तपासा, नंतर आपल्या खेळण्यासाठी लागू होणारे उद्धृत IS 9873 भाग ओळखा."]),
         }
         if not all(section.title in replacements for section in sections):
-            return None
+            return localize_safe_sections(language, category, sections)
         return [_replace(section, title=replacements[section.title][0], content=replacements[section.title][1], items=replacements[section.title][2]) for section in sections]
     if reviewed_question_family == "transition_order":
         required_titles = ["Direct answer", "What this means", "Important condition"]

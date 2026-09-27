@@ -99,6 +99,21 @@ it('uses structural labels and localized source controls for every journey local
   }
 });
 
+it('localizes citation controls and the suggested-replies label in every locale without changing evidence', () => {
+  for (const language of ['en', 'hi', 'mr', 'ta', 'bn'] as const) {
+    localStorage.setItem('bis-assistant-language', language);
+    const labels = translations[language];
+    render(<LanguageProvider><ChatMessage role="assistant" text={response.answer} response={response} suggestedActions={[{ kind: 'chat_question', label: labels.suggestedRoadmap, question: 'Show my complete compliance roadmap' }]} onSuggestedAction={() => undefined} /></LanguageProvider>);
+    expect(screen.getByRole('group', { name: labels.suggestedReplies })).toBeInTheDocument();
+    expect(screen.getByText(`${labels.source} S1`)).toBeInTheDocument();
+    expect(screen.getByText(`${labels.page} 4`)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: new RegExp(labels.viewEvidence) })).not.toHaveLength(0);
+    expect(screen.getAllByRole('link').some((link) => link.textContent?.includes(labels.openSourcePdf))).toBe(true);
+    expect(screen.getByText('a very long trusted source filename.pdf')).toBeInTheDocument();
+    cleanup();
+  }
+});
+
 it('renders typed accessible suggested actions and submits one once', async () => {
   const action = vi.fn();
   render(<ChatMessage role="assistant" text="Choose" response={{

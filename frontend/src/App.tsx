@@ -27,6 +27,20 @@ function isStandardFollowUp(value: string): boolean {
 
 const builtInSuggestionKeys: TranslationKey[] = ['suggestionBattery', 'suggestionHandmade', 'suggestionDocuments', 'suggestionTransition'];
 
+const suggestedActionKeys: Record<string, TranslationKey> = {
+  'Explain when this standard applies': 'suggestedExplainApplies',
+  'Explain this in simpler language': 'suggestedSimpler',
+  'Explain that standard': 'suggestedExplainStandard',
+  'Show my complete compliance roadmap': 'suggestedRoadmap',
+};
+
+function localizedSuggestedActions(actions: SuggestedAction[] | undefined, t: (key: TranslationKey) => string): SuggestedAction[] | undefined {
+  return actions?.map((action) => {
+    const key = suggestedActionKeys[action.label];
+    return key ? { ...action, label: t(key) } : action;
+  });
+}
+
 function AppContent() {
   const { t, language } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -195,7 +209,7 @@ function AppContent() {
       </section>
       {messages.length === 0 && <SuggestedQuestions actions={translatedBuiltInActions} busy={busy} onSelect={action => dispatchSuggestedAction(action)} />}
       <section className="chat" aria-live="polite">
-        {messages.map((message) => <ChatMessage key={message.id} {...message} busy={busy} onSuggestedAction={message.role === 'assistant' && (message.suggestedActions?.length ?? 0) > 0 ? action => dispatchSuggestedAction(action, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
+        {messages.map((message) => <ChatMessage key={message.id} {...message} suggestedActions={localizedSuggestedActions(message.suggestedActions, t)} busy={busy} onSuggestedAction={message.role === 'assistant' && (message.suggestedActions?.length ?? 0) > 0 ? action => dispatchSuggestedAction(action, pendingContext ?? sessionContext ?? message.response?.assistant_context ?? undefined) : undefined} />)}
         {busy && <LoadingMessage />}
         {updatingAnswers && <p className="answer-update" aria-live="polite">{t('updatingAnswers')}</p>}
         {error && <ErrorMessage message={error} onRetry={() => send(last, lastContext, lastDisplay)} />}
