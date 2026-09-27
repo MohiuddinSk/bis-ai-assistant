@@ -126,10 +126,31 @@ class MultilingualPhase3ATests(unittest.TestCase):
             self.assertNotIn("Part 7", visible)
             self.assertIn("स्थापित नहीं" if language == "hi" else "स्थापित करत नाहीत", visible)
 
-    def test_unreviewed_deterministic_category_has_no_translation_template(self):
+    def test_non_family_deterministic_category_uses_closed_localized_renderer(self):
         section = AnswerSection(type="important", title="Important condition", content="English evidence-bound answer")
-        self.assertIsNone(localize_reviewed_sections("hi", "exemption", [section], None))
-        self.assertIsNone(localize_reviewed_sections("mr", "transition", [section], None))
+        for language in ("hi", "mr", "ta", "bn"):
+            localized = localize_reviewed_sections(language, "exemption", [section], None)
+            self.assertIsNotNone(localized)
+            assert localized is not None
+            self.assertEqual(localized[0].citation_ids, section.citation_ids)
+            self.assertNotEqual(localized[0].content, section.content)
+
+    def test_new_series_documents_keep_each_supported_fact_once_in_every_locale(self):
+        english = [
+            AnswerSection(type="direct_answer", title="Direct answer", content="The available manual material provides only a partial checklist for adding a new toy series.", citation_ids=["S1", "S2", "S3"]),
+            AnswerSection(type="next_steps", title="What you should do", items=["Include a declaration for the new-series application.", "Include series/model details, including starting ages, to be declared separately to BIS.", "Include the requisite fee declaration for extension of scope."], citation_ids=["S1", "S2", "S3"]),
+            AnswerSection(type="important", title="Important condition", content="This is not presented as the complete application package; check the current BIS application requirements before submitting.", citation_ids=["S1", "S2", "S3"]),
+        ]
+        for language in ("hi", "mr", "ta", "bn"):
+            localized = localize_reviewed_sections(language, "documents", english)
+            self.assertIsNotNone(localized)
+            assert localized is not None
+            self.assertEqual([section.citation_ids for section in localized], [section.citation_ids for section in english])
+            self.assertEqual(len(localized[1].items), 3)
+            self.assertEqual(len({item.casefold() for item in localized[1].items}), 3)
+            visible = " ".join([section.content or "" for section in localized] + localized[1].items)
+            self.assertIn("BIS", visible)
+            self.assertNotIn("partial checklist", visible.lower())
 
     def test_reviewed_battery_wizard_roadmap_localizes_copy_without_changing_evidence_metadata(self):
         english = [

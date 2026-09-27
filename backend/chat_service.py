@@ -27,6 +27,7 @@ from backend.retrieval_provider import RetrievalHit, RetrieverProtocol
 from backend.service import RetrievalService
 from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
 from backend.response_localization import (
+    localized_abstention,
     localized_disclaimer,
     localized_english_fallback_notice,
     localize_reviewed_sections,
@@ -223,32 +224,34 @@ class ChatService:
                         application_stage=routing_context.application_stage,
                         current_goal=routing_context.goal,
                     ),
+                    response_language=request.response_language,
                 )
         if routing_context is None and understanding and understanding.profile_statement:
-            return self._profile_clarification(understanding)
+            return self._profile_clarification(understanding, request.response_language)
         if routing_context is None and understanding and understanding.clarification_required:
             return self._clarification(
                 understanding.clarification_question or "What additional detail can you provide?",
                 suggested_replies=list(understanding.suggested_replies),
                 assistant_context=understanding.assistant_context,
+                response_language=request.response_language,
             )
         if routing_context is None and understanding and understanding.intent == "out_of_domain":
-            return self._abstention(evidence=[])
+            return self._abstention(evidence=[], response_language=request.response_language)
         if routing_context is None and understanding and understanding.intent in {
             "timeline", "fee", "laboratory", "form",
         }:
-            return self._specific_limitation(understanding.intent)
+            return self._specific_limitation(understanding.intent, request.response_language)
         if routing_context is None and understanding and understanding.intent in {
             "standard_explanation", "standard_comparison",
         } and understanding.standard_references and not understanding.clarification_required:
             if understanding.intent == "standard_explanation" and not any(
                 item.supported for item in understanding.standard_references
             ):
-                return self._unknown_standard_response(understanding)
+                return self._unknown_standard_response(understanding, response_language=request.response_language)
             if understanding.intent == "standard_comparison" and not any(
                 item.supported for item in understanding.standard_references
             ):
-                return self._unknown_standard_response(understanding)
+                return self._unknown_standard_response(understanding, response_language=request.response_language)
         effective_question = understanding.normalized_query if understanding else request.question
         try:
             with self._retrieval_lock:
@@ -269,22 +272,22 @@ class ChatService:
         ]
 
         if not evidence:
-            return self._abstention(evidence=[])
+            return self._abstention(evidence=[], response_language=request.response_language)
         plan = self._build_evidence_plan(request.question, evidence, routing_context, understanding)
         if plan.category == "clarification":
-            return self._abstention(evidence=evidence)
+            return self._abstention(evidence=evidence, response_language=request.response_language)
         if understanding is not None and understanding.intent in {
             "standard_explanation", "standard_comparison", "is_general_meaning",
         }:
             if plan.category.startswith("explain_") and "requested_standard_identity" not in plan.roles and plan.category != "explain_is_general":
                 if understanding.standard_references and not any(item.supported for item in understanding.standard_references):
-                    return self._unknown_standard_response(understanding)
-                return self._unknown_standard_response(understanding, evidence_count=0)
+                    return self._unknown_standard_response(understanding, response_language=request.response_language)
+                return self._unknown_standard_response(understanding, evidence_count=0, response_language=request.response_language)
             if plan.category == "explain_is_general" and not plan.complete:
-                return self._abstention(evidence=[], citations=[])
+                return self._abstention(evidence=[], citations=[], response_language=request.response_language)
             if "requested_standard_identity" in plan.roles or plan.complete:
                 return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
-            return self._abstention(evidence=[], citations=[])
+            return self._abstention(evidence=[], citations=[], response_language=request.response_language)
         # Complete trusted evidence plans bypass Groq: this removes avoidable
         # latency and cannot weaken citation or qualification controls.
         if plan.complete:
@@ -293,6 +296,7 @@ class ChatService:
             raise ProviderUnavailableError("Chat generation is unavailable")
 
         prompt_evidence = [item.prompt_mapping() for item in evidence]
+        generation_question = self._generation_question(effective_question, request.response_language)
         with self._generation_lock:
             # At most two provider calls per chat request: either an initial call
             # plus one token-exhaustion concise retry, or an initial call plus one
@@ -300,47 +304,56 @@ class ChatService:
             used_completion_retry = False
             try:
                 first_output = self._generator.generate(
-                    effective_question,
+                    generation_question,
                     prompt_evidence,
                 )
             except ProviderCompletionExhaustedError:
                 used_completion_retry = True
                 try:
                     first_output = self._generator.generate(
-                        effective_question,
+                        generation_question,
                         prompt_evidence,
                         concise=True,
                     )
                 except ProviderCompletionExhaustedError:
-                    return self._abstention(evidence=evidence)
+                    return self._abstention(evidence=evidence, response_language=request.response_language)
             try:
                 generated, citations = self._validate_output(first_output, evidence, effective_question)
+                if not self._matches_response_language(generated.answer, request.response_language):
+                    raise ValueError("OUTPUT_LANGUAGE_MISMATCH")
             except (ValidationError, ValueError) as validation_error:
                 if used_completion_retry:
                     self._log_abstention(validation_error, evidence, [])
                     return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
                 try:
                     repaired_output = self._generator.generate(
-                        effective_question,
+                        generation_question,
                         prompt_evidence,
                         repair=True,
-                        repair_feedback=self._repair_feedback(validation_error, evidence),
+                        repair_feedback=(
+                            f"{self._repair_feedback(validation_error, evidence)} "
+                            f"Return the answer entirely in {self._language_name(request.response_language)}."
+                        ),
                     )
                 except ProviderCompletionExhaustedError:
-                    return self._abstention(evidence=evidence)
+                    return self._abstention(evidence=evidence, response_language=request.response_language)
                 try:
                     generated, citations = self._validate_output(
                         repaired_output,
                         evidence,
                         effective_question,
                     )
+                    if not self._matches_response_language(generated.answer, request.response_language):
+                        raise ValueError("OUTPUT_LANGUAGE_MISMATCH")
                 except (ValidationError, ValueError) as repair_error:
                     # Invalid model evidence must never be surfaced as a grounded claim.
                     self._log_abstention(repair_error, evidence, [])
+                    if str(repair_error) == "OUTPUT_LANGUAGE_MISMATCH":
+                        return self._abstention(evidence=evidence, response_language=request.response_language)
                     return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
 
         if generated.insufficient_evidence:
-            return self._abstention(evidence=evidence, citations=citations)
+            return self._abstention(evidence=evidence, citations=citations, response_language=request.response_language)
         if understanding is not None and not self._answer_matches_understanding(generated.answer, understanding):
             logger.warning(
                 "Model candidate rejected; validation_code=QUESTION_INTENT_MISMATCH intent=%s power=%s",
@@ -365,8 +378,9 @@ class ChatService:
             citations=citations,
             model=self._generator.model,
             generation_mode="llm",
-            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            disclaimer=localized_disclaimer(request.response_language),
             assistant_context=self._continuity_context(plan, understanding, routing_context, joined_answer=generated.answer),
+            response_language=request.response_language,
         )
 
     @staticmethod
@@ -655,7 +669,14 @@ class ChatService:
         normalized: list[AnswerSection] = []
         for section in sections:
             citation_ids = list(dict.fromkeys(section.citation_ids))
-            normalized.append(section.model_copy(update={"citation_ids": citation_ids}))
+            seen_items: set[str] = set()
+            items = []
+            for item in section.items:
+                key = re.sub(r"\s+", " ", item).strip().casefold()
+                if key and key not in seen_items:
+                    seen_items.add(key)
+                    items.append(item)
+            normalized.append(section.model_copy(update={"citation_ids": citation_ids, "items": items}))
         return normalized
 
     @staticmethod
@@ -804,12 +825,12 @@ class ChatService:
         if plan.category.startswith("explain_"):
             return self._explain_from_plan(evidence, plan, understanding, response_language)
         if not plan.complete:
-            return self._abstention(evidence=evidence)
+            return self._abstention(evidence=evidence, response_language=response_language)
         if routing_context is not None and not self._plan_matches_routing(plan, routing_context):
             # Validate the canonical plan before any localized presentation is
             # constructed.  The later response-text guard remains in place as a
             # defense in depth for existing English routes.
-            return self._abstention(evidence=evidence)
+            return self._abstention(evidence=evidence, response_language=response_language)
         ordered_roles = {
             "standards": ("primary_standard", "secondary_standard"),
             "standards_battery": ("primary_standard", "secondary_standard"),
@@ -1096,6 +1117,28 @@ class ChatService:
     def _compose_fragments(*fragments: str) -> str:
         """Join deterministic prose fragments without leaking PDF/layout boundaries."""
         return " ".join(" ".join(fragment.split()) for fragment in fragments if fragment and fragment.strip())
+
+    @staticmethod
+    def _language_name(language: Literal["en", "hi", "mr", "ta", "bn"]) -> str:
+        return {"en": "English", "hi": "Hindi", "mr": "Marathi", "ta": "Tamil", "bn": "Bengali"}[language]
+
+    @classmethod
+    def _generation_question(cls, question: str, language: Literal["en", "hi", "mr", "ta", "bn"]) -> str:
+        """Add a fixed provider instruction without treating it as user content."""
+        if language == "en":
+            return question
+        return (
+            f"{question}\n\n[System output requirement: Write all answer prose in "
+            f"{cls._language_name(language)}. Preserve citation IDs and supporting quotes exactly.]"
+        )
+
+    @staticmethod
+    def _matches_response_language(answer: str, language: Literal["en", "hi", "mr", "ta", "bn"]) -> bool:
+        """A conservative script check; immutable identifiers alone cannot pass it."""
+        if language == "en":
+            return True
+        ranges = {"hi": r"[\u0900-\u097F]", "mr": r"[\u0900-\u097F]", "ta": r"[\u0B80-\u0BFF]", "bn": r"[\u0980-\u09FF]"}
+        return len(re.findall(ranges[language], answer)) >= 3
 
     @staticmethod
     def _repair_feedback(error: Exception, evidence: list[TrustedEvidence]) -> str:
@@ -2016,16 +2059,17 @@ class ChatService:
         *,
         evidence: list[TrustedEvidence],
         citations: list[ChatCitation] | None = None,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         return ChatResponse(
-            answer=INSUFFICIENT_EVIDENCE_ANSWER,
+            answer=localized_abstention(response_language),
             grounded=False,
             insufficient_evidence=True,
             evidence_count=len(evidence),
             citations=citations or [],
             model=self._generator.model if self._generator else self._model_name,
             generation_mode="abstention",
-            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            disclaimer=localized_disclaimer(response_language),
         )
 
     def _clarification(
@@ -2034,6 +2078,7 @@ class ChatService:
         *,
         suggested_replies: list[str] | None = None,
         assistant_context: AssistantContext | None = None,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         sections = [AnswerSection(
             type="clarification",
@@ -2041,6 +2086,7 @@ class ChatService:
             content=question,
             citation_ids=[],
         )]
+        sections = self._localized_or_english_fallback(sections, "clarification", response_language)
         return self._guided_response(
             sections=sections,
             grounded=False,
@@ -2049,16 +2095,17 @@ class ChatService:
             citations=[],
             model=self._generator.model if self._generator else self._model_name,
             generation_mode="clarification",
-            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            disclaimer=localized_disclaimer(response_language),
             needs_clarification=True,
             suggested_replies=suggested_replies,
             assistant_context=assistant_context,
+            response_language=response_language,
         )
 
-    def _profile_clarification(self, understanding: QuestionUnderstanding) -> ChatResponse:
+    def _profile_clarification(self, understanding: QuestionUnderstanding, response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en") -> ChatResponse:
         context = understanding.assistant_context
         if context is None:
-            return self._clarification(understanding.clarification_question or "What would you like help with?")
+            return self._clarification(understanding.clarification_question or "What would you like help with?", response_language=response_language)
         role = context.role or "toy business"
         role_article = "an" if role in {"artisan", "importer"} else "a"
         power = {
@@ -2087,16 +2134,17 @@ class ChatService:
                 content="I can identify supported standards, explain cited application steps, or build a grounded compliance roadmap once the essential profile details are clear.",
             ),
         ]
+        sections = self._localized_or_english_fallback(sections, "clarification", response_language)
         return self._guided_response(
             sections=sections, grounded=False, insufficient_evidence=False,
             evidence_count=0, citations=[], model=self._model_name,
-            generation_mode="clarification", disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            generation_mode="clarification", disclaimer=localized_disclaimer(response_language),
             needs_clarification=True,
             suggested_replies=list(understanding.suggested_replies),
             assistant_context=context,
         )
 
-    def _specific_limitation(self, intent: str) -> ChatResponse:
+    def _specific_limitation(self, intent: str, response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en") -> ChatResponse:
         messages = {
             "timeline": (
                 "Licence approval timeline",
@@ -2116,11 +2164,13 @@ class ChatService:
             ),
         }
         title, content = messages[intent]
+        sections = [AnswerSection(type="important", title=title, content=content)]
+        sections = self._localized_or_english_fallback(sections, "clarification", response_language)
         return self._guided_response(
-            sections=[AnswerSection(type="important", title=title, content=content)],
+            sections=sections,
             grounded=False, insufficient_evidence=True, evidence_count=0, citations=[],
             model=self._model_name, generation_mode="abstention",
-            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            disclaimer=localized_disclaimer(response_language),
         )
 
     @staticmethod
@@ -2365,25 +2415,28 @@ class ChatService:
         self,
         understanding: QuestionUnderstanding,
         evidence_count: int = 0,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         requested = ", ".join(item.display for item in understanding.standard_references) or "that Indian Standard"
         content = (
             f"The indexed documents do not contain sufficient evidence to explain {requested} reliably. "
             "I cannot substitute another Indian Standard. Check the official BIS portal or provide a relevant BIS document."
         )
-        return self._guided_response(
-            sections=[AnswerSection(
+        sections = [AnswerSection(
                 type="important",
                 title="What the indexed documents do not establish",
                 content=content,
-            )],
+            )]
+        sections = self._localized_or_english_fallback(sections, "clarification", response_language)
+        return self._guided_response(
+            sections=sections,
             grounded=False,
             insufficient_evidence=True,
             evidence_count=evidence_count,
             citations=[],
             model=self._model_name,
             generation_mode="abstention",
-            disclaimer=LEGAL_INFORMATION_DISCLAIMER,
+            disclaimer=localized_disclaimer(response_language),
             assistant_context=understanding.assistant_context,
         )
 
@@ -2395,12 +2448,12 @@ class ChatService:
         response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         if understanding is None:
-            return self._abstention(evidence=[], citations=[])
+            return self._abstention(evidence=[], citations=[], response_language=response_language)
         identity = plan.roles.get("requested_standard_identity")
         if plan.category == "explain_is_general":
-            return self._abstention(evidence=[], citations=[])
+            return self._abstention(evidence=[], citations=[], response_language=response_language)
         if identity is None:
-            return self._unknown_standard_response(understanding)
+            return self._unknown_standard_response(understanding, response_language=response_language)
         refs = understanding.standard_references
         first = refs[0] if refs else None
         simplify = bool(understanding.simplify)
@@ -2433,11 +2486,11 @@ class ChatService:
         ):
             supported_parts = plan.roles.get("supported_secondary_part_list")
             if not supported_parts or "product_applicability" not in plan.roles or "primary_standard" not in plan.roles:
-                return self._abstention(evidence=[], citations=[])
+                return self._abstention(evidence=[], citations=[], response_language=response_language)
             secondary = supported_parts
             parts = self._standard_parts(secondary[1])
             if set(parts) != {"2", "3", "4", "9", "10", "11"}:
-                return self._abstention(evidence=[], citations=[])
+                return self._abstention(evidence=[], citations=[], response_language=response_language)
             exact = self._map_citations([(secondary[0].citation_id, secondary[1])], evidence)
             if secondary[0].citation_id not in {item.citation_id for item in citations}:
                 citations += exact
@@ -2457,7 +2510,7 @@ class ChatService:
             for item in section.items
         ]))
         if ChatService._explanation_contains_unsupported_detail(factual):
-            return self._unknown_standard_response(understanding)
+            return self._unknown_standard_response(understanding, response_language=response_language)
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
         if plan.category == "explain_secondary_part_list":
