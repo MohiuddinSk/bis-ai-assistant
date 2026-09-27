@@ -106,6 +106,20 @@ _REVIEWED_EXACT_ROUTING: dict[str, tuple[str, ReviewedQuestionFamily]] = {
     "what does the 2026 transition order do": ("What does the 2026 transition order do?", "transition_order"),
     "2026 का संक्रमण आदेश क्या करता है": ("What does the 2026 transition order do?", "transition_order"),
     "2026 चा संक्रमण आदेश काय करतो": ("What does the 2026 transition order do?", "transition_order"),
+    "மின்கலத்தில் இயங்கும் பொம்மைக்கு எந்த தரநிலை பொருந்தும்": ("Which standard applies to a battery-operated toy?", "battery_standards"),
+    "is 15644 ஐ எளிய வார்த்தைகளில் விளக்கவும்": ("Explain IS 15644 in simple words.", "is15644_simple"),
+    "is 15644 எப்போது பொருந்தும்": ("When does IS 15644 apply?", "is15644_applies"),
+    "is 9873 பகுதி 2 ஐ எளிய வார்த்தைகளில் விளக்கவும்": ("Explain IS 9873 Part 2 in simple words.", "is9873_part2_simple"),
+    "ஒரு பொம்மைக்கான bis சான்றிதழைப் பெறுவதற்கான படிகள் என்ன": ("What are the steps to obtain BIS certification for a toy?", "certification_steps"),
+    "மின்கலத்தில் இயங்கும் பொம்மைக்கு is 9873 இன் எந்த பகுதிகள் பொருந்தலாம்": ("Which IS 9873 parts may apply to a battery-operated toy?", "battery_q11_parts"),
+    "2026 மாற்ற ஆணை என்ன செய்கிறது": ("What does the 2026 transition order do?", "transition_order"),
+    "ব্যাটারিচালিত খেলনার জন্য কোন মান প্রযোজ্য": ("Which standard applies to a battery-operated toy?", "battery_standards"),
+    "is 15644 সহজ ভাষায় ব্যাখ্যা করুন": ("Explain IS 15644 in simple words.", "is15644_simple"),
+    "is 15644 কখন প্রযোজ্য": ("When does IS 15644 apply?", "is15644_applies"),
+    "is 9873 পার্ট 2 সহজ ভাষায় ব্যাখ্যা করুন": ("Explain IS 9873 Part 2 in simple words.", "is9873_part2_simple"),
+    "একটি খেলনার জন্য bis সার্টিফিকেশন পাওয়ার ধাপগুলি কী": ("What are the steps to obtain BIS certification for a toy?", "certification_steps"),
+    "ব্যাটারিচালিত খেলনার জন্য is 9873 এর কোন অংশগুলি প্রযোজ্য হতে পারে": ("Which IS 9873 parts may apply to a battery-operated toy?", "battery_q11_parts"),
+    "2026 পরিবর্তন আদেশ কী করে": ("What does the 2026 transition order do?", "transition_order"),
 }
 _CORPUS_STANDARD_SUGGESTIONS = (
     "IS 15644", "IS 9873 Part 1", "IS 9873 Part 3", "IS 9873 Part 4",
@@ -144,7 +158,7 @@ def normalize_question(value: str) -> tuple[str, tuple[str, ...]]:
         ) else " "
         for char in normalized.lower()
     )
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = re.sub(r"\s+", " ", normalized).strip().rstrip(".")
     corrections: list[str] = []
     if re.match(r"^ow\s+many\b", normalized):
         normalized = "h" + normalized
@@ -428,9 +442,14 @@ def understand_question(
     reviewed_routing = _reviewed_routing_form(current)
     routing_query = reviewed_routing[0] if reviewed_routing else current
     reviewed_question_family = reviewed_routing[1] if reviewed_routing else None
+    # Reviewed aliases may supply a canonical English semantic form for
+    # deterministic intent/plan selection only. The original question remains
+    # the retrieval/display/audit text.
+    use_canonical_semantics = bool(reviewed_routing and re.search(r"[\u0b80-\u0bff\u0980-\u09ff]", current))
+    semantic_current = routing_query if use_canonical_semantics else current
     retained = bool(assistant_context and _is_context_continuation(current, assistant_context))
     active_context = assistant_context if retained else None
-    current_refs = extract_standard_references(current)
+    current_refs = extract_standard_references(semantic_current)
     if active_context and active_context.original_question:
         original, original_corrections = normalize_question(active_context.original_question)
         combined = f"{original} follow-up {current}"
@@ -449,8 +468,10 @@ def understand_question(
     profile_statement = profile_origin and (
         not retained or _goal_for_intent(_intent(current)) is None
     )
-    explanation = None if profile_statement else _explanation_intent(current, current_refs)
-    intent = "profile" if profile_statement else (explanation or _intent(combined))
+    explanation = None if profile_statement else _explanation_intent(semantic_current, current_refs)
+    intent = "profile" if profile_statement else (explanation or _intent(routing_query if use_canonical_semantics else combined))
+    if reviewed_question_family == "battery_q11_parts":
+        intent = "standard_explanation"
     if retained and intent == "general" and active_context and active_context.current_goal:
         intent = {
             "identify_standards": "standards", "new_licence": "certification",
@@ -470,11 +491,11 @@ def understand_question(
         and intent in {"general", "standards"}
     ):
         intent = "standard_explanation"
-    current_power = _power(current)
+    current_power = _power(semantic_current)
     power = current_power if current_power != "unknown" else _power(combined)
     if power == "unknown" and active_context and active_context.power_type:
         power = active_context.power_type if active_context.power_type != "not_sure" else "unknown"
-    signals = _product_signals(combined)
+    signals = _product_signals(routing_query if use_canonical_semantics else combined)
     role = _role(current) or _role(combined) or (active_context.role if active_context else None)
     current_age, current_age_ambiguous = _age_group(current)
     combined_age, combined_age_ambiguous = _age_group(combined)
@@ -500,7 +521,7 @@ def understand_question(
         refs = context_refs
     else:
         refs = ()
-    simplify = bool(_SIMPLIFY_CUE.search(current))
+    simplify = bool(_SIMPLIFY_CUE.search(semantic_current))
     missing: list[str] = []
     asked_slots: list[str] = []
     ambiguity: list[str] = []

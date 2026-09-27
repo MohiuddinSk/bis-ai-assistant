@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { CompliancePassport, compliancePassportId, passportCitations, passportStatus } from './CompliancePassport';
+import { CompliancePrintReport } from './CompliancePrintReport';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import type { ChatResponse } from '../types/chat';
 import type { ComplianceProfile } from '../types/compliance';
@@ -17,9 +18,14 @@ const generatedAt = new Date('2026-01-02T03:04:05.000Z');
 
 afterEach(() => { cleanup(); localStorage.clear(); });
 
-function renderPassport(language: 'en' | 'hi' | 'mr' = 'en') {
+function renderPassport(language: 'en' | 'hi' | 'mr' | 'ta' | 'bn' = 'en', response = guidance) {
   localStorage.setItem('bis-assistant-language', language);
-  return render(<LanguageProvider><CompliancePassport profile={profile} guidance={guidance} generatedAt={generatedAt} /></LanguageProvider>);
+  return render(<LanguageProvider><CompliancePassport profile={profile} guidance={response} generatedAt={generatedAt} /></LanguageProvider>);
+}
+
+function renderPrintReport(language: 'en' | 'hi' | 'mr' | 'ta' | 'bn' = 'en', response = guidance) {
+  localStorage.setItem('bis-assistant-language', language);
+  return render(<LanguageProvider><CompliancePrintReport profile={profile} guidance={response} generatedAt={generatedAt} /></LanguageProvider>);
 }
 
 it('renders cited findings, verification limits, and at most three actions without promoting user context', () => {
@@ -74,4 +80,85 @@ it('localizes passport UI labels without changing sources or standard identifier
   expect(screen.getByText('उद्धृत पुरावा')).toBeInTheDocument();
   expect(screen.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
   expect(screen.getByText('manual.pdf')).toBeInTheDocument();
+});
+
+it('uses Tamil and Bengali profile labels in the passport and printable report content', () => {
+  for (const [language, labels] of [['ta', ['தயாரிப்பு', 'மின்சார வகை', 'நோக்கமுள்ள வயது குழு', 'தற்போதைய நிலை', 'வழிகாட்டல் இலக்கு']], ['bn', ['পণ্য', 'বিদ্যুতের ধরন', 'নির্ধারিত বয়সের দল', 'বর্তমান ধাপ', 'নির্দেশনার লক্ষ্য']]] as const) {
+    cleanup(); renderPassport(language);
+    for (const label of labels) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    expect(screen.getByText('Battery toy')).toBeInTheDocument(); expect(screen.getByText('manual.pdf')).toBeInTheDocument();
+    cleanup(); renderPrintReport(language);
+    const reportElement = document.querySelector<HTMLElement>('article.compliance-print-report');
+    expect(reportElement).not.toBeNull();
+    const report = within(reportElement!);
+    for (const label of labels) expect(report.getAllByText(label).length).toBeGreaterThan(0);
+    expect(report.getByText('Battery toy')).toBeInTheDocument(); expect(report.getByText('manual.pdf')).toBeInTheDocument();
+  }
+});
+
+it('renders reviewed localized Wizard content unchanged in the Passport and print report', () => {
+  for (const [language, standard, action] of [
+    ['hi', 'IS 15644 प्राथमिक मानक है। उद्धृत IS 9873 भाग, जहाँ लागू हों, द्वितीयक आवश्यकताएँ हैं।', 'उद्धृत प्राथमिक मानक और जहाँ लागू हों, द्वितीयक भागों को पहले देखें।'],
+    ['mr', 'IS 15644 हे प्राथमिक मानक आहे. उद्धृत IS 9873 भाग, जेथे लागू असतील तेथे, दुय्यम आवश्यकता आहेत.', 'उद्धृत प्राथमिक मानक आणि जेथे लागू असतील ते दुय्यम भाग प्रथम तपासा.'],
+    ['ta', 'IS 15644 முதன்மை தரநிலையாகும். மேற்கோள் காட்டப்பட்ட IS 9873 பகுதிகள், பொருந்தும் இடங்களில், இரண்டாம் நிலை தேவைகள்.', 'மேற்கோள் காட்டப்பட்ட முதன்மை தரநிலையையும், பொருந்தும் இடங்களில் இரண்டாம் நிலை பகுதிகளையும் முதலில் பாருங்கள்.'],
+    ['bn', 'IS 15644 প্রাথমিক মান। উদ্ধৃত IS 9873 অংশগুলি, যেখানে প্রযোজ্য, গৌণ প্রয়োজনীয়তা।', 'উদ্ধৃত প্রাথমিক মান এবং যেখানে প্রযোজ্য গৌণ অংশগুলি আগে দেখুন।'],
+  ] as const) {
+    const localized = {
+      ...guidance,
+      answer: `${standard}\n\n${action}`,
+      answer_sections: guidance.answer_sections!.map((section, index) => index === 0
+        ? { ...section, content: standard }
+        : index === 3 ? { ...section, items: [action] } : section),
+    };
+    cleanup(); renderPassport(language, localized);
+    expect(screen.getByText(standard)).toBeInTheDocument();
+    expect(screen.getByText(action)).toBeInTheDocument();
+    expect(screen.getByText('manual.pdf')).toBeInTheDocument();
+    cleanup(); renderPrintReport(language, localized);
+    const report = document.querySelector<HTMLElement>('article.compliance-print-report');
+    expect(report).not.toBeNull();
+    expect(within(report!).getByText(standard)).toBeInTheDocument();
+    expect(within(report!).getByText(action)).toBeInTheDocument();
+    expect(within(report!).getByText('manual.pdf')).toBeInTheDocument();
+  }
+});
+
+it('keeps the responsive header, metadata, profile rows, and localized section cues aligned in every language', () => {
+  for (const [language, simpleTerms, important] of [
+    ['en', 'In simple terms', 'Important to know'],
+    ['hi', 'सरल शब्दों में', 'जानने योग्य महत्वपूर्ण बातें'],
+    ['mr', 'सोप्या शब्दांत', 'जाणून घेण्यासारखे महत्त्वाचे मुद्दे'],
+    ['ta', 'எளிய சொற்களில்', 'தெரிந்துகொள்ள முக்கியம்'],
+    ['bn', 'সহজ ভাষায়', 'জানা গুরুত্বপূর্ণ'],
+  ] as const) {
+    cleanup();
+    renderPassport(language);
+    const passport = document.querySelector<HTMLElement>('.compliance-passport');
+    expect(passport).not.toBeNull();
+    const header = passport!.querySelector<HTMLElement>('.passport-heading');
+    expect(header).not.toBeNull();
+    expect(header!.querySelector('.passport-identity')).not.toBeNull();
+    expect(header!.querySelector('.passport-status')).not.toBeNull();
+    expect(header!.querySelector('.passport-metadata')).not.toBeNull();
+    expect(header!.querySelector('.passport-notice')).not.toBeNull();
+    expect(header!.querySelector('.passport-report-id')).toHaveTextContent(compliancePassportId(profile, guidance));
+    expect(passport!.querySelectorAll('.passport-profile dl > dt')).toHaveLength(5);
+    expect(screen.getAllByText(simpleTerms).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(important).length).toBeGreaterThan(0);
+    if (language !== 'en') {
+      expect(within(passport!).queryByText('In simple terms', { exact: true })).toBeNull();
+      expect(within(passport!).queryByText('Important to know', { exact: true })).toBeNull();
+      expect(within(passport!).queryByText('What this means for you', { exact: true })).toBeNull();
+    }
+
+    cleanup();
+    renderPrintReport(language);
+    const report = document.querySelector<HTMLElement>('article.compliance-print-report');
+    expect(report).not.toBeNull();
+    expect(report!.querySelector('.passport-heading .passport-metadata')).not.toBeNull();
+    expect(report!.querySelectorAll('.passport-profile dl > dt')).toHaveLength(5);
+    expect(within(report!).getAllByText(simpleTerms).length).toBeGreaterThan(0);
+    expect(within(report!).getAllByText(important).length).toBeGreaterThan(0);
+    if (language !== 'en') expect(within(report!).queryByText('In simple terms', { exact: true })).toBeNull();
+  }
 });

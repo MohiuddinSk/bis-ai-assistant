@@ -96,6 +96,40 @@ footer { font-size: .85rem; padding: 22px 0; color: var(--muted-text); }
 
 .compliance-passport { margin-top: 1rem; border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; background: var(--card-background); }.passport-heading { border-bottom: 2px solid var(--primary-blue); margin-bottom: 1rem; padding-bottom: .75rem; }.passport-heading h2 { margin: .15rem 0; }.passport-status { display: inline-block; margin: .35rem 0; padding: .2rem .55rem; border-radius: 999px; font-weight: 700; }.passport-status.available { background: #d7f3e3; color: #14532d; }.passport-status.needs_information { background: #fff1c2; color: #7c4a03; }.passport-status.needs_verification { background: #fde2e2; color: #8b1e1e; }.passport-metadata { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .6rem; font-size: .9rem; }.passport-metadata dt { font-weight: 700; }.passport-metadata dd { margin: 0; }.passport-notice, .passport-user-provided { color: var(--muted-text); font-size: .9rem; }.passport-section { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #d9e2ec; }.passport-section h2 { margin-top: 0; }.passport-subsection { margin: .65rem 0; }.passport-subsection h3 { margin-bottom: .25rem; }.passport-source { padding: .5rem 0; border-bottom: 1px solid #e5edf5; }.passport-source p { margin: .2rem 0; }
 
+.compliance-passport .passport-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(13rem, .8fr);
+  grid-template-areas:
+    "identity status"
+    "metadata notice";
+  align-items: start;
+  gap: .75rem 1rem;
+}
+.passport-identity { grid-area: identity; min-width: 0; }
+.passport-heading .passport-status { grid-area: status; justify-self: start; margin: 0; max-width: 100%; line-height: 1.35; }
+.passport-heading .passport-metadata {
+  grid-area: metadata;
+  grid-template-columns: minmax(8rem, 42%) minmax(0, 1fr);
+  align-items: baseline;
+  margin: 0;
+  min-width: 0;
+}
+.passport-heading .passport-metadata dt,
+.passport-heading .passport-metadata dd { min-width: 0; overflow-wrap: anywhere; }
+.passport-report-id { white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.passport-heading .passport-notice { grid-area: notice; margin: 0; min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.passport-profile dl {
+  display: grid;
+  grid-template-columns: minmax(9rem, 36%) minmax(0, 1fr);
+  gap: .45rem 1rem;
+  align-items: baseline;
+  margin: 0;
+}
+.passport-profile dt { font-weight: 700; }
+.passport-profile dt,
+.passport-profile dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.passport-section-label { margin: -.25rem 0 .65rem; color: var(--muted-text); font-size: .9rem; font-weight: 700; }
+
 @media (max-width: 600px) {
   main { padding: 14px; }
   header { align-items: flex-start; flex-direction: column; }
@@ -106,6 +140,10 @@ footer { font-size: .85rem; padding: 22px 0; color: var(--muted-text); }
   .wizard-actions button { width: 100%; }
   .wizard-review dl { grid-template-columns: 1fr; }
   .journey-cards { grid-template-columns: 1fr; }.journey-form-heading, .result-heading { flex-direction: column; }.wizard-review dl > div { grid-template-columns: 1fr; gap: 3px; }.journey-form-heading > button, .result-heading > button { width: 100%; }.journey-profile-summary dl { grid-template-columns: 1fr; gap: 2px; }.journey-profile-summary dd { margin-bottom: 7px; }
+  .compliance-passport .passport-heading { grid-template-columns: 1fr; grid-template-areas: "identity" "status" "metadata" "notice"; }
+  .passport-heading .passport-metadata { grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr); }
+  .passport-profile dl { grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr); }
+  .passport-report-id { white-space: normal; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -662,7 +662,7 @@ class ChatService:
     def _localized_or_english_fallback(
         sections: list[AnswerSection],
         category: str,
-        response_language: Literal["en", "hi", "mr"],
+        response_language: Literal["en", "hi", "mr", "ta", "bn"],
         reviewed_question_family: str | None = None,
     ) -> list[AnswerSection]:
         """Localize only reviewed plan categories after validation has passed."""
@@ -677,7 +677,12 @@ class ChatService:
             *ChatService._plain_language_sections(sections),
             AnswerSection(
                 type="important",
-                title="सत्यापित उत्तर" if response_language == "hi" else "पडताळलेले उत्तर",
+                title={
+                    "hi": "सत्यापित उत्तर",
+                    "mr": "पडताळलेले उत्तर",
+                    "ta": "சரிபார்க்கப்பட்ட பதில்",
+                    "bn": "যাচাইকৃত উত্তর",
+                }[response_language],
                 content=localized_english_fallback_notice(response_language),
                 citation_ids=[],
             ),
@@ -761,7 +766,7 @@ class ChatService:
         needs_clarification: bool = False,
         suggested_replies: list[str] | None = None,
         assistant_context: AssistantContext | None = None,
-        response_language: Literal["en", "hi", "mr"] = "en",
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         """The sole non-abstention response assembly boundary.
 
@@ -794,7 +799,7 @@ class ChatService:
         audience: str = "general",
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
-        response_language: Literal["en", "hi", "mr"] = "en",
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         if plan.category.startswith("explain_"):
             return self._explain_from_plan(evidence, plan, understanding, response_language)
@@ -1023,9 +1028,12 @@ class ChatService:
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
         self._validate_sections(sections, fact_plan, citations)
+        reviewed_family = understanding.reviewed_question_family if understanding else None
+        reviewed_family = self._reviewed_localization_family(
+            plan, routing_context, reviewed_family,
+        )
         sections = self._localized_or_english_fallback(
-            sections, plan.category, response_language,
-            understanding.reviewed_question_family if understanding else None,
+            sections, plan.category, response_language, reviewed_family,
         )
         logger.info("Chat generation_mode=extractive_fallback evidence_complete=true roles=%s citation_ids=%s", ordered_roles, [item.citation_id for item, _ in selected])
         return self._guided_response(sections=sections, grounded=True, insufficient_evidence=False,
@@ -1061,6 +1069,28 @@ class ChatService:
                 "non_electric": "roadmap_non_electric",
             }.get(routing_context.power_type)
         return False
+
+    @staticmethod
+    def _reviewed_localization_family(
+        plan: EvidencePlan,
+        routing_context: ComplianceRoutingContext | None,
+        question_family: str | None,
+    ) -> str | None:
+        """Select a narrow server-owned presentation family after validation."""
+        if question_family is not None:
+            return question_family
+        if (
+            routing_context is not None
+            and plan.category == "roadmap_battery"
+            and routing_context.goal == "complete_roadmap"
+            and routing_context.power_type == "battery_operated"
+            and routing_context.role == "manufacturer"
+            and routing_context.application_stage in {
+                "researching", "preparing_application", "existing_licence", "scope_extension",
+            }
+        ):
+            return f"battery_compliance_roadmap_{routing_context.application_stage}"
+        return None
 
     @staticmethod
     def _compose_fragments(*fragments: str) -> str:
@@ -2362,7 +2392,7 @@ class ChatService:
         evidence: list[TrustedEvidence],
         plan: EvidencePlan,
         understanding: QuestionUnderstanding | None,
-        response_language: Literal["en", "hi", "mr"] = "en",
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
     ) -> ChatResponse:
         if understanding is None:
             return self._abstention(evidence=[], citations=[])

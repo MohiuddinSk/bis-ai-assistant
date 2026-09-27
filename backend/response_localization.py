@@ -11,7 +11,7 @@ from typing import Literal
 from backend.schemas import AnswerSection
 
 
-ResponseLanguage = Literal["en", "hi", "mr"]
+ResponseLanguage = Literal["en", "hi", "mr", "ta", "bn"]
 
 
 def localized_disclaimer(language: ResponseLanguage) -> str:
@@ -19,6 +19,8 @@ def localized_disclaimer(language: ResponseLanguage) -> str:
         "en": "Informational guidance based on the indexed BIS documents. Verify requirements with BIS or a qualified professional.",
         "hi": "अनुक्रमित BIS दस्तावेज़ों पर आधारित जानकारीात्मक मार्गदर्शन। आवश्यकताओं की पुष्टि BIS या योग्य विशेषज्ञ से करें।",
         "mr": "अनुक्रमित BIS दस्तऐवजांवर आधारित माहितीपर मार्गदर्शन. आवश्यकतांची पडताळणी BIS किंवा पात्र तज्ज्ञाकडून करा.",
+        "ta": "அட்டவணைப்படுத்தப்பட்ட BIS ஆவணங்களை அடிப்படையாகக் கொண்ட தகவல் வழிகாட்டல். தேவைகளை BIS அல்லது தகுதியான நிபுணரிடம் சரிபார்க்கவும்.",
+        "bn": "সূচিবদ্ধ BIS নথির ভিত্তিতে তথ্যভিত্তিক নির্দেশনা। প্রয়োজনীয়তা BIS বা যোগ্য বিশেষজ্ঞের সঙ্গে যাচাই করুন।",
     }[language]
 
 
@@ -26,6 +28,8 @@ def localized_english_fallback_notice(language: ResponseLanguage) -> str:
     return {
         "hi": "इस सत्यापित उत्तर का समीक्षित अनुवाद उपलब्ध नहीं है, इसलिए इसे अंग्रेज़ी में दिखाया गया है।",
         "mr": "या पडताळलेल्या उत्तराचे पुनरावलोकित भाषांतर उपलब्ध नसल्यामुळे ते इंग्रजीमध्ये दाखवले आहे.",
+        "ta": "இந்த சரிபார்க்கப்பட்ட பதிலுக்கான மதிப்பாய்வு செய்யப்பட்ட தமிழ் மொழிபெயர்ப்பு இல்லை; எனவே அது ஆங்கிலத்தில் காட்டப்படுகிறது.",
+        "bn": "এই যাচাইকৃত উত্তরের পর্যালোচিত বাংলা অনুবাদ উপলব্ধ নয়; তাই এটি ইংরেজিতে দেখানো হয়েছে।",
     }[language]
 
 
@@ -36,6 +40,138 @@ def _replace(section: AnswerSection, *, title: str, content: str | None = None, 
         "content": section.content if content is None else content,
         "items": section.items if items is None else items,
     })
+
+
+def _localize_battery_roadmap(
+    language: ResponseLanguage,
+    sections: Sequence[AnswerSection],
+    family: str | None,
+) -> list[AnswerSection] | None:
+    """Reviewed Wizard copy for the validated battery-roadmap shape only.
+
+    The caller reaches this function only after evidence-plan and route checks.
+    This guard still verifies the deterministic section shape and the English
+    qualification-bearing source copy before replacing presentation text.
+    """
+    prefix = "battery_compliance_roadmap_"
+    if not family or not family.startswith(prefix):
+        return None
+    stage = family.removeprefix(prefix)
+    if stage not in {"researching", "preparing_application", "existing_licence", "scope_extension"}:
+        return None
+    expected_types = ["direct_answer", "explanation", "next_steps", "next_steps", "next_steps", "important"]
+    if [section.type for section in sections] != expected_types:
+        return None
+    source_copy = " ".join(
+        [section.content or "" for section in sections]
+        + [item for section in sections for item in section.items]
+    ).lower()
+    required_terms = ("is 15644", "is 9873", "where applicable", "user-provided context, not bis evidence", "partial checklist", "does not establish")
+    if not all(term in source_copy for term in required_terms):
+        return None
+
+    copy = {
+        "hi": {
+            "standard": "IS 15644 प्राथमिक मानक है। उद्धृत IS 9873 भाग, जहाँ लागू हों, द्वितीयक आवश्यकताएँ हैं।",
+            "context": "आपने खिलौने को बैटरी से चलने वाला बताया है। यह उपयोगकर्ता द्वारा दिया गया संदर्भ है, BIS साक्ष्य नहीं।",
+            "next": {
+                "researching": "उद्धृत प्राथमिक मानक और जहाँ लागू हों, द्वितीयक भागों को पहले देखें।",
+                "preparing_application": "उद्धृत Manakonline और आवेदन-विवरण चरणों का उपयोग करें तथा वर्तमान पूर्ण आवेदन आवश्यकताओं की BIS से जाँच करें।",
+                "existing_licence": "उद्धृत आंशिक जाँच सूची से दायरा-विस्तार तैयार करें और वर्तमान पूर्ण जमा आवश्यकताओं की BIS से पुष्टि करें।",
+                "scope_extension": "उद्धृत आंशिक जाँच सूची से दायरा-विस्तार तैयार करें और वर्तमान पूर्ण जमा आवश्यकताओं की BIS से पुष्टि करें।",
+            },
+            "application": ["Manakonline पर खाता बनाकर उसी से आवेदन करें।", "खिलौने के प्रकार से मेल खाता भारतीय मानक चुनें।", "कच्चे माल, विनिर्माण प्रक्रिया, मशीनरी, लेआउट और परीक्षण कर्मियों सहित उद्धृत उत्पाद व कारखाना विवरण दें।"],
+            "documents": "सूचीबद्ध सामग्री केवल आंशिक जाँच सूची देती है, पूरा आधिकारिक आवेदन पैकेज नहीं।",
+            "document_items": ["नई श्रृंखला के आवेदन में उद्धृत घोषणा शामिल करें।", "आरंभिक आयु सहित मॉडल और श्रृंखला विवरण दें।", "दायरा-विस्तार के लिए उद्धृत अपेक्षित-शुल्क घोषणा शामिल करें; साक्ष्य सटीक राशि स्थापित नहीं करते।"],
+            "limits": "चयनित साक्ष्य सटीक वर्तमान शुल्क, गारंटीकृत समयसीमा, अनुशंसित प्रयोगशाला, प्रत्येक वर्तमान फॉर्म या हर शेष प्रमाणन चरण स्थापित नहीं करते।",
+        },
+        "mr": {
+            "standard": "IS 15644 हे प्राथमिक मानक आहे. उद्धृत IS 9873 भाग, जेथे लागू असतील तेथे, दुय्यम आवश्यकता आहेत.",
+            "context": "तुम्ही खेळणे बॅटरीवर चालणारे असल्याचे सांगितले आहे. हा वापरकर्त्याने दिलेला संदर्भ आहे, BIS पुरावा नाही.",
+            "next": {
+                "researching": "उद्धृत प्राथमिक मानक आणि जेथे लागू असतील ते दुय्यम भाग प्रथम तपासा.",
+                "preparing_application": "उद्धृत Manakonline आणि अर्ज-विवरण पायऱ्या वापरा आणि सध्याच्या पूर्ण अर्ज आवश्यकतांची BIS कडून पडताळणी करा.",
+                "existing_licence": "उद्धृत आंशिक तपासणी सूची वापरून व्याप्ती-विस्तार तयार करा आणि सध्याच्या पूर्ण सादरीकरण आवश्यकतांची BIS कडून पडताळणी करा.",
+                "scope_extension": "उद्धृत आंशिक तपासणी सूची वापरून व्याप्ती-विस्तार तयार करा आणि सध्याच्या पूर्ण सादरीकरण आवश्यकतांची BIS कडून पडताळणी करा.",
+            },
+            "application": ["Manakonline वर खाते तयार करून त्यातून अर्ज करा.", "खेळण्याच्या प्रकाराला अनुरूप भारतीय मानक निवडा.", "कच्चा माल, उत्पादन प्रक्रिया, यंत्रसामग्री, लेआउट आणि चाचणी कर्मचारी यांसह उद्धृत उत्पादन व कारखाना तपशील द्या."],
+            "documents": "सूचीबद्ध सामग्री केवळ आंशिक तपासणी सूची देते; संपूर्ण अधिकृत अर्ज पॅकेज नाही.",
+            "document_items": ["नवीन मालिकेच्या अर्जात उद्धृत घोषणा समाविष्ट करा.", "सुरुवातीच्या वयासह मॉडेल आणि मालिका तपशील द्या.", "व्याप्ती-विस्तारासाठी उद्धृत आवश्यक-शुल्क घोषणा समाविष्ट करा; पुरावे अचूक रक्कम स्थापित करत नाहीत."],
+            "limits": "निवडलेले पुरावे अचूक सध्याचे शुल्क, हमी दिलेली वेळमर्यादा, शिफारस केलेली प्रयोगशाळा, प्रत्येक सध्याचा फॉर्म किंवा प्रत्येक उरलेली प्रमाणन पायरी स्थापित करत नाहीत.",
+        },
+        "ta": {
+            "standard": "IS 15644 முதன்மை தரநிலையாகும். மேற்கோள் காட்டப்பட்ட IS 9873 பகுதிகள், பொருந்தும் இடங்களில், இரண்டாம் நிலை தேவைகள்.",
+            "context": "நீங்கள் விளையாட்டுப் பொருள் பேட்டரியில் இயங்குகிறது என்று கூறியுள்ளீர்கள். இது பயனர் வழங்கிய சூழல்; BIS சான்று அல்ல.",
+            "next": {
+                "researching": "மேற்கோள் காட்டப்பட்ட முதன்மை தரநிலையையும், பொருந்தும் இடங்களில் இரண்டாம் நிலை பகுதிகளையும் முதலில் பாருங்கள்.",
+                "preparing_application": "மேற்கோள் காட்டப்பட்ட Manakonline மற்றும் விண்ணப்ப விவரப் படிகளைப் பயன்படுத்தி, தற்போதைய முழு விண்ணப்பத் தேவைகளை BIS உடன் சரிபார்க்கவும்.",
+                "existing_licence": "மேற்கோள் காட்டப்பட்ட பகுதி சரிபார்ப்புப் பட்டியலைப் பயன்படுத்தி வரம்பு விரிவாக்கத்தைத் தயாரித்து, தற்போதைய முழு சமர்ப்பிப்பு தேவைகளை BIS உடன் சரிபார்க்கவும்.",
+                "scope_extension": "மேற்கோள் காட்டப்பட்ட பகுதி சரிபார்ப்புப் பட்டியலைப் பயன்படுத்தி வரம்பு விரிவாக்கத்தைத் தயாரித்து, தற்போதைய முழு சமர்ப்பிப்பு தேவைகளை BIS உடன் சரிபார்க்கவும்.",
+            },
+            "application": ["Manakonline இல் கணக்கை உருவாக்கி அதன்மூலம் விண்ணப்பிக்கவும்.", "விளையாட்டுப் பொருள் வகைக்கு பொருந்தும் இந்தியத் தரநிலையைத் தேர்ந்தெடுக்கவும்.", "மூலப்பொருட்கள், உற்பத்தி செயல்முறை, இயந்திரங்கள், அமைப்பு மற்றும் சோதனைப் பணியாளர்கள் உள்ளிட்ட மேற்கோள் காட்டப்பட்ட தயாரிப்பு மற்றும் தொழிற்சாலை விவரங்களை வழங்கவும்."],
+            "documents": "பட்டியலிடப்பட்ட பொருள் பகுதி சரிபார்ப்புப் பட்டியலை மட்டுமே வழங்குகிறது; முழுமையான அதிகாரப்பூர்வ விண்ணப்பத் தொகுப்பு அல்ல.",
+            "document_items": ["புதிய தொடர் விண்ணப்பத்தில் மேற்கோள் காட்டப்பட்ட அறிவிப்பை சேர்க்கவும்.", "தொடக்க வயதுகள் உட்பட மாதிரி மற்றும் தொடர் விவரங்களை வழங்கவும்.", "வரம்பு விரிவாக்கத்திற்கான மேற்கோள் காட்டப்பட்ட தேவையான கட்டண அறிவிப்பை சேர்க்கவும்; சான்று துல்லியமான தொகையை நிறுவவில்லை."],
+            "limits": "தேர்ந்தெடுத்த சான்றுகள் துல்லியமான தற்போதைய கட்டணங்கள், உத்தரவாத காலவரிசை, பரிந்துரைக்கப்பட்ட ஆய்வகம், ஒவ்வொரு தற்போதைய படிவம் அல்லது மீதமுள்ள ஒவ்வொரு சான்றிதழ் படியையும் நிறுவவில்லை.",
+        },
+        "bn": {
+            "standard": "IS 15644 প্রাথমিক মান। উদ্ধৃত IS 9873 অংশগুলি, যেখানে প্রযোজ্য, গৌণ প্রয়োজনীয়তা।",
+            "context": "আপনি খেলনাটিকে ব্যাটারিচালিত বলেছেন। এটি ব্যবহারকারীর দেওয়া প্রেক্ষিত, BIS প্রমাণ নয়।",
+            "next": {
+                "researching": "উদ্ধৃত প্রাথমিক মান এবং যেখানে প্রযোজ্য গৌণ অংশগুলি আগে দেখুন।",
+                "preparing_application": "উদ্ধৃত Manakonline ও আবেদন-বিবরণ ধাপ ব্যবহার করুন এবং বর্তমান পূর্ণ আবেদন প্রয়োজনীয়তা BIS-এর সঙ্গে যাচাই করুন।",
+                "existing_licence": "উদ্ধৃত আংশিক যাচাইতালিকা ব্যবহার করে পরিধি সম্প্রসারণ প্রস্তুত করুন এবং বর্তমান পূর্ণ জমা দেওয়ার প্রয়োজনীয়তা BIS-এর সঙ্গে যাচাই করুন।",
+                "scope_extension": "উদ্ধৃত আংশিক যাচাইতালিকা ব্যবহার করে পরিধি সম্প্রসারণ প্রস্তুত করুন এবং বর্তমান পূর্ণ জমা দেওয়ার প্রয়োজনীয়তা BIS-এর সঙ্গে যাচাই করুন।",
+            },
+            "application": ["Manakonline-এ অ্যাকাউন্ট তৈরি করে তার মাধ্যমে আবেদন করুন।", "খেলনার ধরনের সঙ্গে মেলে এমন ভারতীয় মান বেছে নিন।", "কাঁচামাল, উৎপাদন প্রক্রিয়া, যন্ত্রপাতি, বিন্যাস ও পরীক্ষাকর্মীসহ উদ্ধৃত পণ্য এবং কারখানার বিবরণ দিন।"],
+            "documents": "সূচিবদ্ধ উপাদান কেবল আংশিক যাচাইতালিকা দেয়, সম্পূর্ণ সরকারি আবেদন প্যাকেজ নয়।",
+            "document_items": ["নতুন সিরিজের আবেদনে উদ্ধৃত ঘোষণাটি অন্তর্ভুক্ত করুন।", "শুরুর বয়সসহ মডেল ও সিরিজের বিবরণ দিন।", "পরিধি সম্প্রসারণের জন্য উদ্ধৃত প্রয়োজনীয়-ফি ঘোষণা অন্তর্ভুক্ত করুন; প্রমাণ সঠিক অঙ্ক প্রতিষ্ঠা করে না।"],
+            "limits": "নির্বাচিত প্রমাণ সঠিক বর্তমান ফি, নিশ্চিত সময়সীমা, প্রস্তাবিত পরীক্ষাগার, প্রতিটি বর্তমান ফর্ম বা প্রতিটি অবশিষ্ট সার্টিফিকেশন ধাপ প্রতিষ্ঠা করে না।",
+        },
+    }.get(language)
+    if copy is None:
+        return None
+    titles = {
+        "hi": ("लागू मानक", "आपका उत्पाद संदर्भ", "अगला कदम", "समर्थित आवेदन चरण", "दस्तावेज़ या घोषणाएँ", "दस्तावेज़ क्या स्थापित नहीं करते"),
+        "mr": ("लागू मानक", "तुमच्या उत्पादनाचा संदर्भ", "पुढील पाऊल", "समर्थित अर्ज पायऱ्या", "दस्तऐवज किंवा घोषणा", "दस्तऐवज काय स्थापित करत नाहीत"),
+        "ta": ("பொருந்தும் தரநிலை", "உங்கள் தயாரிப்பு சூழல்", "அடுத்த படி", "ஆதரிக்கப்படும் விண்ணப்ப படிகள்", "ஆவணங்கள் அல்லது அறிவிப்புகள்", "ஆவணங்கள் நிறுவாதவை"),
+        "bn": ("প্রযোজ্য মান", "আপনার পণ্যের প্রেক্ষিত", "পরবর্তী পদক্ষেপ", "সমর্থিত আবেদন ধাপ", "নথি বা ঘোষণা", "নথি যা প্রতিষ্ঠা করে না"),
+    }[language]
+    replacements = [
+        (titles[0], copy["standard"], None),
+        (titles[1], copy["context"], None),
+        (titles[2], None, [copy["next"][stage]]),
+        (titles[3], None, copy["application"]),
+        (titles[4], copy["documents"], copy["document_items"]),
+        (titles[5], copy["limits"], None),
+    ]
+    return [_replace(section, title=title, content=content, items=items) for section, (title, content, items) in zip(sections, replacements)]
+
+
+def _localize_tamil_bengali(language: Literal["ta", "bn"], category: str, sections: Sequence[AnswerSection], family: str | None) -> list[AnswerSection] | None:
+    """Reviewed fixed Tamil/Bengali copy; evidence text and IDs are never translated."""
+    expected = {"battery_standards": "standards_battery", "certification_steps": "certification", "is15644_simple": "explain_electric_standard", "is15644_applies": "explain_electric_standard", "is9873_part2_simple": "explain_secondary_part", "battery_q11_parts": "explain_secondary_part_list", "transition_order": "transition"}.get(family)
+    if expected != category:
+        return None
+    ta = language == "ta"
+    labels = ("நேரடி பதில்", "இதன் பொருள்", "அடுத்த படி", "முக்கிய வரம்பு") if ta else ("সরাসরি উত্তর", "এর অর্থ", "পরবর্তী পদক্ষেপ", "গুরুত্বপূর্ণ সীমাবদ্ধতা")
+    copy = {
+        "battery_standards": [
+            (labels[0], "மின்சார பொம்மைகளுக்கு IS 15644 முதன்மை தரநிலையாகும்." if ta else "বৈদ্যুতিক খেলনার জন্য IS 15644 প্রাথমিক মান।", None),
+            (labels[1], "பொருந்தும் இடங்களில் மேற்கோள் காட்டப்பட்ட IS 9873 பகுதிகள் இரண்டாம் நிலை அல்லது கூடுதல் தேவைகள்." if ta else "যেখানে প্রযোজ্য, উদ্ধৃত IS 9873 অংশগুলি গৌণ বা অতিরিক্ত প্রয়োজনীয়তা।", None),
+            (labels[2], None, ["முதலில் IS 15644 ஐப் பார்க்கவும்; பின்னர் பொருந்தும் மேற்கோள் காட்டப்பட்ட IS 9873 பகுதிகளை அடையாளம் காணவும்."] if ta else ["আগে IS 15644 দেখুন; তারপর প্রযোজ্য উদ্ধৃত IS 9873 অংশগুলি শনাক্ত করুন."]),
+        ],
+        "certification_steps": [
+            (labels[0], "புதிய பொம்மை உரிம விண்ணப்பத்திற்கான மேற்கோள் காட்டப்பட்ட தொடக்கப் படிகளிலிருந்து தொடங்கவும்." if ta else "নতুন খেলনা লাইসেন্স আবেদনের জন্য উদ্ধৃত প্রাথমিক ধাপগুলি দিয়ে শুরু করুন।", None),
+            (labels[2], None, ["Manakonline இல் கணக்கை உருவாக்கி உரிமத்திற்காக விண்ணப்பிக்கவும்.", "பொருந்தும் இந்திய தரநிலையைத் தேர்ந்தெடுக்கவும்.", "தயாரிப்பு மற்றும் தொழிற்சாலை விவரங்களை வழங்கவும்.", "கிடைக்கும் சோதனை வசதிகளின் விவரங்களை வழங்கவும்."] if ta else ["Manakonline-এ অ্যাকাউন্ট তৈরি করে লাইসেন্সের জন্য আবেদন করুন।", "প্রযোজ্য ভারতীয় মান নির্বাচন করুন।", "পণ্য ও কারখানার বিবরণ দিন।", "উপলব্ধ পরীক্ষার সুবিধার বিবরণ দিন।"]),
+            (labels[3], "இவை மேற்கோள் காட்டப்பட்ட தொடக்கப் படிகள் மட்டுமே; முழு சான்றிதழ் செயல்முறை அல்ல." if ta else "এগুলি কেবল উদ্ধৃত প্রাথমিক ধাপ; সম্পূর্ণ সার্টিফিকেশন প্রক্রিয়া নয়।", None),
+        ],
+        "is15644_simple": [(labels[1], "IS 15644 மேற்கோள் காட்டப்பட்ட சான்றில் மின்சார பொம்மைகளுக்கான முதன்மை தரநிலையாக அடையாளம் காணப்பட்டுள்ளது." if ta else "IS 15644 উদ্ধৃত প্রমাণে বৈদ্যুতিক খেলনার প্রাথমিক মান হিসেবে চিহ্নিত।", None)],
+        "is15644_applies": [(labels[1], "பொம்மையின் குறைந்தது ஒரு செயல்பாடு மின்சாரத்தை சார்ந்திருக்கும்போது IS 15644 பொருந்தும்; இறுதி பொருத்தம் உண்மையான கட்டமைப்பு மற்றும் செயல்பாடுகளை சார்ந்தது." if ta else "খেলনার অন্তত একটি কার্য বিদ্যুতের উপর নির্ভর করলে IS 15644 প্রাসঙ্গিক; চূড়ান্ত প্রযোজ্যতা প্রকৃত গঠন ও কার্যকারিতার উপর নির্ভর করে।", None)],
+        "is9873_part2_simple": [(labels[1], "IS 9873 Part 2, பொருந்தும் இடங்களில், மேற்கோள் காட்டப்பட்ட இரண்டாம் நிலை அல்லது கூடுதல் தேவையாகும்." if ta else "IS 9873 Part 2, যেখানে প্রযোজ্য, উদ্ধৃত গৌণ বা অতিরিক্ত প্রয়োজনীয়তা।", None)],
+        "battery_q11_parts": [(labels[0], "IS 15644 மின்சார பொம்மைகளுக்கான மேற்கோள் காட்டப்பட்ட முதன்மை தரநிலை." if ta else "IS 15644 বৈদ্যুতিক খেলনার জন্য উদ্ধৃত প্রাথমিক মান।", None), (labels[1], "மேற்கோள் காட்டப்பட்ட பட்டியல் IS 9873 Part 2, Part 3, Part 4, Part 9, Part 10 மற்றும் Part 11 ஆகும்." if ta else "উদ্ধৃত তালিকাটি IS 9873 Part 2, Part 3, Part 4, Part 9, Part 10 এবং Part 11।", None)],
+        "transition_order": [(labels[0], "2026 Transition Facilitation Order கீழ் அனுமதி வழங்கப்படலாம்; ஆனால் அது தானாக வழங்கப்படாது." if ta else "2026 Transition Facilitation Order-এর অধীনে অনুমতি দেওয়া হতে পারে; তবে তা স্বয়ংক্রিয় নয়।", None)],
+    }[family]
+    return [_replace(section, title=copy[index][0], content=copy[index][1], items=copy[index][2]) if index < len(copy) else section for index, section in enumerate(sections)]
 
 
 def localize_reviewed_sections(
@@ -51,6 +187,12 @@ def localize_reviewed_sections(
     """
     if language == "en":
         return list(sections)
+    if reviewed_question_family and reviewed_question_family.startswith("battery_compliance_roadmap_"):
+        if category != "roadmap_battery":
+            return None
+        return _localize_battery_roadmap(language, sections, reviewed_question_family)
+    if language in {"ta", "bn"}:
+        return _localize_tamil_bengali(language, category, sections, reviewed_question_family)
     expected_category = {
         "battery_standards": "standards_battery",
         "certification_steps": "certification",
