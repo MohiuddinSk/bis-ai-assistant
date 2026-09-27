@@ -14,6 +14,32 @@ const response = {
   ], model: 'test', generation_mode: 'llm' as const, disclaimer: 'Verify.',
 };
 
+it('renders a greeting as guidance without a grounded or insufficient badge', () => {
+  render(<ChatMessage role="assistant" text="Hello, I am BIS Saarthi." response={{
+    answer: 'Hello, I am BIS Saarthi.', grounded: false, insufficient_evidence: false, evidence_count: 0,
+    citations: [], model: 'local', generation_mode: 'conversation', disclaimer: 'Verify.',
+    answer_sections: [{ type: 'direct_answer', title: 'BIS Saarthi', content: 'Hello, I am BIS Saarthi. This prototype covers toy-related BIS material.', items: [], citation_ids: [] }],
+  }} />);
+  expect(screen.getAllByText('BIS Saarthi').length).toBeGreaterThan(0);
+  expect(screen.queryByText('Grounded answer')).toBeNull();
+  expect(screen.queryByText('Evidence insufficient')).toBeNull();
+  expect(document.querySelector('.sources')).toBeNull();
+});
+
+it('uses the backend response kind for conversation, clarification, limitation, and grounded guidance', () => {
+  const cases = [
+    ['conversation', 'BIS Saarthi'],
+    ['clarification', 'Need more details'],
+    ['limitation', 'Evidence insufficient'],
+    ['grounded_guidance', 'Grounded answer'],
+  ] as const;
+  for (const [response_kind, label] of cases) {
+    render(<ChatMessage role="assistant" text="Safe response" response={{ ...response, response_kind, grounded: response_kind === 'grounded_guidance', insufficient_evidence: response_kind === 'limitation', needs_clarification: response_kind === 'clarification', generation_mode: response_kind === 'conversation' ? 'conversation' : response_kind === 'clarification' ? 'clarification' : response_kind === 'limitation' ? 'abstention' : 'extractive_fallback' }} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    cleanup();
+  }
+});
+
 it('renders a source heading, count, distinct citation cards, and page range', () => {
   render(<ChatMessage role="assistant" text={response.answer} response={response} />);
   expect(screen.getByRole('heading', { name: /sources 2/i })).toBeInTheDocument();

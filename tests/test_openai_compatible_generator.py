@@ -224,15 +224,16 @@ class OpenAICompatibleRedirectTests(OpenAICompatibleGeneratorTestSupport, unitte
             self.assertEqual(str(hit.exception), "Generation provider rejected the request")
             self.assertNotIn(location, "\n".join(captured.output))
 
-    def test_redirect_maps_to_existing_public_sanitized_502(self):
+    def test_redirect_on_a_generic_route_uses_a_safe_limitation(self):
         from fastapi.testclient import TestClient
         from backend.main import create_app
         from tests.test_chat_api import FakeRetriever
         generator = self.generator(lambda _: httpx.Response(302, headers={"Location": "https://redirect-target.test"}))
         with TestClient(create_app(retriever_factory=FakeRetriever, generator_factory=lambda: generator)) as client:
             response = client.post("/api/chat", json={"question": "Tell me about BIS toy regulation"})
-        self.assertEqual(response.status_code, 502)
-        self.assertEqual(response.json(), {"detail": "Chat generation failed."})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["response_kind"], "limitation")
+        self.assertTrue(response.json()["insufficient_evidence"])
 
 
 class OpenAICompatiblePrivacyTests(OpenAICompatibleGeneratorTestSupport, unittest.TestCase):
@@ -256,7 +257,7 @@ class OpenAICompatiblePrivacyTests(OpenAICompatibleGeneratorTestSupport, unittes
             self.assertNotIn(sentinel, surface)
         self.assertIn("request_id=None", "\n".join(captured.output))
 
-    def test_provider_id_is_absent_from_public_json_headers_and_application_id_is_preserved(self):
+    def test_generic_safe_limitation_preserves_application_id_without_provider_leakage(self):
         from fastapi.testclient import TestClient
         from backend.main import create_app
         from tests.test_chat_api import FakeRetriever
@@ -272,9 +273,9 @@ class OpenAICompatiblePrivacyTests(OpenAICompatibleGeneratorTestSupport, unittes
             with self.assertLogs("backend", level="WARNING") as captured, TestClient(app) as client:
                 response = client.post(path, headers={"X-Request-ID": "application-request-001"}, json={"question": "Tell me about BIS toy regulation"})
             surface = "\n".join(captured.output) + response.text + "\n" + str(response.headers)
-            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["response_kind"], "limitation")
             self.assertEqual(response.headers["x-request-id"], "application-request-001")
-            self.assertIn("provider-request-001", "\n".join(captured.output))
             self.assertNotIn("provider-request-001", response.text)
             self.assertNotIn("provider-request-001", str(response.headers))
             self.assertNotIn("api-key-sentinel", surface)

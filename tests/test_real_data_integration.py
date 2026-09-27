@@ -2,6 +2,9 @@
 
 import threading
 import unittest
+import json
+import re
+from unittest.mock import patch
 
 from backend.chat_service import ChatService
 from backend.schemas import ChatRequest
@@ -19,15 +22,37 @@ class InvalidTwiceGenerator:
         return "not valid structured output"
 
 
+class PlainLanguageExplanationGenerator:
+    """Provides only the optional contribution accepted by the hybrid boundary."""
+
+    model = "fake-plain-language-provider"
+
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, question, evidence, **kwargs):
+        self.calls += 1
+        first = kwargs["synthesis_packet"]["facts"][0]
+        return json.dumps({"sections": [
+            {
+                "type": "explanation",
+                "content": "Review the cited material against the product’s actual features before relying on this guidance.",
+                "items": [],
+                "citation_ids": list(first["citation_ids"]),
+                "source_fact_ids": [first["fact_id"]],
+            },
+        ]})
+
+
 class RealDataGroundingIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.retriever = LocalChromaRetriever()
 
-    def service(self):
+    def service(self, generator=None):
         return ChatService(
             retriever=self.retriever,
-            generator=InvalidTwiceGenerator(),
+            generator=generator or InvalidTwiceGenerator(),
             retrieval_lock=threading.Lock(),
             generation_lock=threading.Lock(),
             model_name="fake-integration-provider",
@@ -58,6 +83,11 @@ class RealDataGroundingIntegrationTests(unittest.TestCase):
         )
         for part in ("Part 2", "Part 3", "Part 4", "Part 9", "Part 10", "Part 11"):
             self.assertIn(part.lower(), response.answer.lower())
+            self.assertEqual(len(re.findall(rf"\b{re.escape(part)}\b", response.answer, re.I)), 1)
+        self.assertEqual(len(re.findall(r"\bprimary standard is IS 15644\b", response.answer, re.I)), 1)
+        self.assertIn("battery-operated", response.answer.lower())
+        self.assertNotIn("batteryoperated", response.answer.lower())
+        self.assertNotIn("no other standards apply", response.answer.lower())
         excerpts = [citation.excerpt.lower() for citation in response.citations]
         self.assertTrue(any("is 15644" in excerpt and "electric toys" in excerpt for excerpt in excerpts))
         self.assertTrue(any("is 9873" in excerpt and "secondary" in excerpt for excerpt in excerpts))
@@ -92,9 +122,15 @@ class RealDataGroundingIntegrationTests(unittest.TestCase):
             self.assertFalse(citation.excerpt.lower().startswith("passage:"))
             self.assertNotIn(":.", citation.excerpt)
 
-    def test_new_series_documents_use_complete_evidence_and_bypass_provider(self):
-        service = self.service()
-        response = service.chat(ChatRequest(question="What documents are required for a new toy series?"))
+    def test_new_series_documents_invalid_provider_keeps_exact_locked_fallback(self):
+        question = "What documents are required for a new toy series?"
+        with patch.dict("os.environ", {"LLM_SYNTHESIS_ENABLED": "false"}):
+            baseline = self.service().chat(ChatRequest(question=question))
+        generator = InvalidTwiceGenerator()
+        with patch.dict("os.environ", {"LLM_SYNTHESIS_ENABLED": "true"}):
+            response = self.service(generator).chat(ChatRequest(question=question))
+        self.assertEqual(response, baseline)
+        self.assertEqual(generator.calls, 2)
         self.assertTrue(response.grounded)
         self.assertEqual(response.generation_mode, "extractive_fallback")
         self.assertIn("a declaration", response.answer.lower())
@@ -108,7 +144,30 @@ class RealDataGroundingIntegrationTests(unittest.TestCase):
         for artifact in ("passage:", "table ", "column ", "|"):
             self.assertNotIn(artifact, response.answer.lower())
         self.assertGreaterEqual(len(response.citations), 3)
-        self.assertEqual(service._generator.calls, 0)
+
+    def test_provider_explanation_cannot_change_locked_documents_or_certification_sections(self):
+        questions = (
+            "What documents are required for a new toy series?",
+            "I am a manufacturer applying for a new licence for a battery-operated toy car. How do I get certified?",
+        )
+        for question in questions:
+            with self.subTest(question=question):
+                baseline = self.service().chat(ChatRequest(question=question))
+                generator = PlainLanguageExplanationGenerator()
+                with patch.dict("os.environ", {"LLM_SYNTHESIS_ENABLED": "true"}):
+                    enhanced = self.service(generator).chat(ChatRequest(question=question))
+                self.assertEqual(enhanced.generation_mode, "llm")
+                self.assertEqual(generator.calls, 1)
+                baseline_locked = [
+                    (section.type, section.content, section.items, section.citation_ids)
+                    for section in baseline.answer_sections if section.type != "explanation"
+                ]
+                enhanced_locked = [
+                    (section.type, section.content, section.items, section.citation_ids)
+                    for section in enhanced.answer_sections if section.type != "explanation"
+                ]
+                self.assertEqual(enhanced_locked, baseline_locked)
+                self.assertEqual(enhanced.citations, baseline.citations)
 
     def test_qco_commencement_uses_legal_clause_and_bypasses_provider(self):
         service = self.service()

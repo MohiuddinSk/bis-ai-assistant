@@ -16,6 +16,8 @@ BACKEND_TESTS = [
     "tests.test_personalized_assistant", "tests.test_provider_disabled_api",
     "tests.test_question_understanding", "tests.test_retrieval_disabled_api",
     "tests.test_retrieval_factory", "tests.test_retrieval_provider_contract",
+    "tests.test_synthesis",
+    "tests.test_hybrid_intelligence",
     "tests.test_standard_explanation.StandardExplanationApiTests",
     "tests.test_standard_explanation.StandardExplanationUnderstandingGuardTests",
     "tests.test_ci_artifacts", "tests.test_ci_configuration",

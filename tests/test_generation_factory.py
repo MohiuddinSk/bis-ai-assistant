@@ -2,10 +2,25 @@ import unittest
 from unittest.mock import patch
 
 from backend.generation_factory import create_generation_provider
-from backend.settings import DEFAULT_GROQ_MAX_COMPLETION_TOKENS, DEFAULT_GROQ_MODEL, GenerationSettings, get_generation_settings
+from backend.settings import (
+    DEFAULT_GROQ_MAX_COMPLETION_TOKENS,
+    DEFAULT_GROQ_MODEL,
+    GenerationSettings,
+    get_generation_settings,
+    synthesis_enabled,
+)
 
 
 class GenerationFactoryTests(unittest.TestCase):
+    def test_synthesis_stays_off_unless_explicitly_enabled(self):
+        with patch.dict("os.environ", {"GROQ_API_KEY": "present"}, clear=True):
+            self.assertFalse(synthesis_enabled())
+        for value in ("false", "yes", "1", ""):
+            with self.subTest(value=value), patch.dict("os.environ", {"LLM_SYNTHESIS_ENABLED": value}, clear=True):
+                self.assertFalse(synthesis_enabled())
+        with patch.dict("os.environ", {"LLM_SYNTHESIS_ENABLED": "true"}, clear=True):
+            self.assertTrue(synthesis_enabled())
+
     def test_missing_provider_defaults_to_groq(self):
         with patch.dict("os.environ", {}, clear=True):
             settings = get_generation_settings()

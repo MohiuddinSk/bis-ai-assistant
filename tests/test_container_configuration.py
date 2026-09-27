@@ -47,6 +47,7 @@ class ContainerConfigurationTests(unittest.TestCase):
             self.assertIn(entry, self.ignore)
         self.assertIn("RETRIEVAL_PROVIDER: ${RETRIEVAL_PROVIDER:-chroma_local}", self.compose)
         self.assertIn("GROQ_API_KEY: ${GROQ_API_KEY:-}", self.compose)
+        self.assertIn("LLM_SYNTHESIS_ENABLED: ${LLM_SYNTHESIS_ENABLED:-false}", self.compose)
         self.assertIn("ALLOWED_ORIGINS:", self.compose)
         self.assertIn("cap_drop:", self.compose)
         self.assertIn("no-new-privileges:true", self.compose)
