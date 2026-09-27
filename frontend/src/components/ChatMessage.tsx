@@ -2,9 +2,9 @@ import type { AnswerSection, ChatResponse, Citation } from '../types/chat';
 import { CitationCard } from './CitationCard';
 import type { SuggestedAction } from '../suggestedActions';
 import { useLanguage } from '../i18n/LanguageContext';
+import { journeyCategoryFor, journeyCategoryHeadingKey, sectionHeadingKey, type JourneyCategory } from '../i18n/answerSectionLabels';
 
 type Presentation = 'chat' | 'compliance-journey';
-type JourneyCategory = 'standards' | 'why' | 'checklist' | 'important' | 'next-action';
 
 const profileTitles = new Set(['your profile', 'certification position', 'where this fits in your journey']);
 
@@ -18,17 +18,10 @@ function distinctSections(sections: AnswerSection[]) {
   });
 }
 
-function categoryFor(section: AnswerSection): JourneyCategory {
-  if (section.type === 'direct_answer') return 'standards';
-  if (section.type === 'important') return 'important';
-  if (section.type === 'next_steps' && section.title.trim().toLowerCase() === 'your next action') return 'next-action';
-  if (section.type === 'next_steps') return 'checklist';
-  return 'why';
-}
-
 function BackendSection({ section }: { section: AnswerSection }) {
+  const { t } = useLanguage();
   return <section className={`journey-backend-section ${section.type}`}>
-    <h3>{section.title}</h3>
+    <h3>{t(sectionHeadingKey(section))}</h3>
     {section.content && <p>{section.content}</p>}
     {section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}
   </section>;
@@ -36,21 +29,20 @@ function BackendSection({ section }: { section: AnswerSection }) {
 
 function JourneyGuidance({ sections }: { sections: AnswerSection[] }) {
   const { t } = useLanguage();
-  const categoryHeadings: Record<JourneyCategory, string> = { standards: t('journeyApplicable'), why: t('journeyWhy'), checklist: t('journeyChecklist'), important: t('journeyImportant'), 'next-action': t('journeyNextAction') };
   const grouped = new Map<JourneyCategory, AnswerSection[]>();
   const profile = [] as AnswerSection[];
   for (const section of distinctSections(sections)) {
     if (section.type === 'explanation' && profileTitles.has(section.title.trim().toLowerCase())) profile.push(section);
     else {
-      const category = categoryFor(section);
+      const category = journeyCategoryFor(section);
       grouped.set(category, [...(grouped.get(category) ?? []), section]);
     }
   }
   return <div className="journey-guidance">
     {profile.length > 0 && <section className="journey-category journey-profile-details" aria-label="Profile details from guidance">{profile.map((section, index) => <BackendSection key={`${section.type}-${section.title}-${index}`} section={section} />)}</section>}
-    {(['standards', 'why', 'checklist', 'important', 'next-action'] as JourneyCategory[]).map((category) => {
+    {(['standards', 'summary', 'checklist', 'important'] as JourneyCategory[]).map((category) => {
       const categorySections = grouped.get(category) ?? [];
-      return categorySections.length > 0 && <section key={category} className={`journey-category journey-${category}`} aria-labelledby={`journey-${category}`}><h2 id={`journey-${category}`}>{categoryHeadings[category]}</h2>{categorySections.map((section, index) => <BackendSection key={`${section.type}-${section.title}-${index}`} section={section} />)}</section>;
+      return categorySections.length > 0 && <section key={category} className={`journey-category journey-${category}`} aria-labelledby={`journey-${category}`}><h2 id={`journey-${category}`}>{t(journeyCategoryHeadingKey(category))}</h2>{categorySections.map((section, index) => <BackendSection key={`${section.type}-${section.title}-${index}`} section={section} />)}</section>;
     })}
   </div>;
 }
@@ -73,7 +65,7 @@ export function ChatMessage({ role, text, response, suggestedActions, onSuggeste
   const displayedSourceHeading = sourceHeading ?? t('sourcesHeading');
   return <article className={`message ${role}`}>
     {role === 'assistant' && response && <span className={`answer-status ${response.needs_clarification ? 'clarification-needed' : response.insufficient_evidence ? 'insufficient' : 'grounded'}`}>{response.needs_clarification ? t('evidenceNeedDetails') : response.insufficient_evidence ? t('evidenceInsufficient') : t('evidenceGrounded')}</span>}
-    {sections.length > 0 ? journey ? <JourneyGuidance sections={sections} /> : <div className="guided-answer">{sections.map((section, index) => <section key={`${section.type}-${index}`} className={`guided-section ${section.type}`}><h3>{section.title}</h3>{section.content && <p>{section.content}</p>}{section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}</section>)}</div> : <p className="answer-text">{text}</p>}
+    {sections.length > 0 ? journey ? <JourneyGuidance sections={sections} /> : <div className="guided-answer">{sections.map((section, index) => <section key={`${section.type}-${index}`} className={`guided-section ${section.type}`}><h3>{t(sectionHeadingKey(section))}</h3>{section.content && <p>{section.content}</p>}{section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}</section>)}</div> : <p className="answer-text">{text}</p>}
     {(suggestedActions?.length ?? 0) > 0 && onSuggestedAction && <div className="suggested-replies" role="group" aria-label="Suggested replies">{suggestedActions!.map(action => <button type="button" key={action.label} disabled={busy} onClick={() => onSuggestedAction(action)}>{action.label}</button>)}</div>}
     {citations.length > 0 && (journey ? <JourneySources citations={citations} /> : <section className="sources" aria-label={`${displayedSourceHeading} (${citations.length})`}><h3>{displayedSourceHeading} <span>{citations.length}</span></h3><div className="citation-list">{citations.map(c => <CitationCard key={`${c.citation_id}-${c.chunk_id}`} citation={c} />)}</div></section>)}
   </article>;

@@ -2,6 +2,7 @@ import type { AnswerSection, ChatResponse, Citation } from '../types/chat';
 import type { ComplianceProfile } from '../types/compliance';
 import { useLanguage } from '../i18n/LanguageContext';
 import { languageNames, profileLabelKeys } from '../i18n/translations';
+import { sectionHeadingKey } from '../i18n/answerSectionLabels';
 
 export type PassportStatus = 'available' | 'needs_information' | 'needs_verification';
 
@@ -53,7 +54,8 @@ function sourceRows(citations: Citation[]) {
 }
 
 function SectionList({ sections }: { sections: AnswerSection[] }) {
-  return <>{sections.map((section, index) => <section className="passport-subsection" key={`${section.type}-${section.title}-${index}`}><h3>{section.title}</h3>{section.content && <p>{section.content}</p>}{section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}</section>)}</>;
+  const { t } = useLanguage();
+  return <>{sections.map((section, index) => <section className="passport-subsection" key={`${section.type}-${section.title}-${index}`}><h3>{t(sectionHeadingKey(section))}</h3>{section.content && <p>{section.content}</p>}{section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}</section>)}</>;
 }
 
 export function CompliancePassportContent({ profile, guidance, generatedAt }: { profile: ComplianceProfile; guidance: ChatResponse; generatedAt: Date }) {
@@ -70,12 +72,12 @@ export function CompliancePassportContent({ profile, guidance, generatedAt }: { 
   const statusLabel = status === 'available' ? t('passportAvailable') : status === 'needs_information' ? t('passportNeedsInformation') : t('passportNeedsVerification');
   const id = compliancePassportId(profile, guidance);
   return <>
-    <header className="passport-heading"><p className="eyebrow">{t('passportTitle')}</p><h2>{t('passportTitle')}</h2><p className={`passport-status ${status}`}>{statusLabel}</p><dl className="passport-metadata"><dt>{t('passportReportId')}</dt><dd>{id}</dd><dt>{t('passportGenerated')}</dt><dd><time dateTime={generatedAt.toISOString()}>{generatedAt.toLocaleString(language)}</time></dd><dt>{t('passportLanguage')}</dt><dd>{languageNames[language]}</dd></dl><p className="passport-notice">{t('passportNotice')}</p></header>
-    <section className="passport-section"><h2>{t('passportProductProfile')}</h2><p className="passport-user-provided">{t('passportUserProvided')}</p><dl><dt>{t('profileProduct')}</dt><dd>{profile.product_description}</dd><dt>{t('profilePower')}</dt><dd>{label(profile.power_type)}</dd><dt>{t('profileAge')}</dt><dd>{label(profile.intended_age_group)}</dd><dt>{t('profileStage')}</dt><dd>{label(profile.application_stage)}</dd><dt>{t('profileGoal')}</dt><dd>{label(profile.goal)}</dd></dl></section>
+    <header className="passport-heading"><div className="passport-identity"><p className="eyebrow">{t('passportTitle')}</p><h2>{t('passportTitle')}</h2></div><p className={`passport-status ${status}`}>{statusLabel}</p><dl className="passport-metadata"><dt>{t('passportReportId')}</dt><dd className="passport-report-id">{id}</dd><dt>{t('passportGenerated')}</dt><dd><time dateTime={generatedAt.toISOString()}>{generatedAt.toLocaleString(language)}</time></dd><dt>{t('passportLanguage')}</dt><dd>{languageNames[language]}</dd></dl><p className="passport-notice">{t('passportNotice')}</p></header>
+    <section className="passport-section passport-profile"><h2>{t('passportProductProfile')}</h2><p className="passport-user-provided">{t('passportUserProvided')}</p><dl><dt>{t('profileProduct')}</dt><dd>{profile.product_description}</dd><dt>{t('profilePower')}</dt><dd>{label(profile.power_type)}</dd><dt>{t('profileAge')}</dt><dd>{label(profile.intended_age_group)}</dd><dt>{t('profileStage')}</dt><dd>{label(profile.application_stage)}</dd><dt>{t('profileGoal')}</dt><dd>{label(profile.goal)}</dd></dl></section>
     {direct.length > 0 && <section className="passport-section"><h2>{t('passportApplicable')}</h2><SectionList sections={direct} /></section>}
-    {findings.length > 0 && <section className="passport-section"><h2>{t('passportFindings')}</h2><SectionList sections={findings} /></section>}
+    {findings.length > 0 && <section className="passport-section"><h2>{t('passportFindings')}</h2><p className="passport-section-label">{t('sectionExplanation')}</p><SectionList sections={findings} /></section>}
     <section className="passport-section"><h2>{t('passportMissingProfile')}</h2>{missingProfile.length > 0 ? <ul>{missingProfile.map((field) => <li key={field}>{field}</li>)}</ul> : <p>{t('passportNoMissing')}</p>}</section>
-    <section className="passport-section"><h2>{t('passportVerificationNeeded')}</h2>{limitations.length > 0 ? <SectionList sections={limitations} /> : status === 'needs_verification' ? <p>{t('passportEvidenceVerification')}</p> : <p>{t('passportNoVerification')}</p>}</section>
+    <section className="passport-section"><h2>{t('passportVerificationNeeded')}</h2><p className="passport-section-label">{t('sectionImportant')}</p>{limitations.length > 0 ? <SectionList sections={limitations} /> : status === 'needs_verification' ? <p>{t('passportEvidenceVerification')}</p> : <p>{t('passportNoVerification')}</p>}</section>
     <section className="passport-section"><h2>{t('passportNextActions')}</h2>{actions.length > 0 ? <ol>{actions.map((action, index) => <li key={index}>{action}</li>)}</ol> : <p>{t('passportNoActions')}</p>}</section>
     <section className="passport-section"><h2>{t('passportSources')}</h2>{sourceRows(sources).map((source) => <article className="passport-source" key={source.id}><p><strong>{source.id}</strong> — <span className="passport-filename">{source.filename}</span> — {t('pages')} {source.pages}</p><p>{source.excerpt}</p></article>)}</section>
   </>;

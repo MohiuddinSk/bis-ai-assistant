@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { ChatMessage } from './ChatMessage';
+import { LanguageProvider } from '../i18n/LanguageContext';
+import { translations } from '../i18n/translations';
 
 const response = {
   answer: 'A grounded answer.', grounded: true, insufficient_evidence: false, evidence_count: 2,
@@ -28,7 +30,7 @@ it('presents guided sections before the trusted sources', () => {
     { type: 'direct_answer', title: 'Direct answer', content: 'IS 15644 is primary.', items: [], citation_ids: ['S1'] },
     { type: 'next_steps', title: 'What you should do', content: null, items: ['Check the applicable standard.'], citation_ids: ['S1'] },
   ] }} />);
-  expect(screen.getByRole('heading', { name: 'Direct answer' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'What this means for you' })).toBeInTheDocument();
   expect(screen.getByText('Check the applicable standard.')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /sources 2/i })).toBeInTheDocument();
 });
@@ -47,15 +49,54 @@ it('groups a compliance journey once per category without losing distinct backen
     { type: 'important' as const, title: 'Another condition', content: 'Verify before relying on this guidance.', items: [], citation_ids: ['S2'] },
   ] };
   render(<ChatMessage role="assistant" text={journeyResponse.answer} response={journeyResponse} presentation="compliance-journey" />);
-  for (const heading of ['Applicable standards', 'Why these standards apply', 'Your compliance checklist', 'Important conditions', 'Recommended next action']) expect(screen.getAllByRole('heading', { name: heading })).toHaveLength(1);
+  for (const heading of ['Applicable standards', 'What this means for you', 'Your compliance checklist', 'Important to know']) expect(screen.getAllByRole('heading', { name: heading }).length).toBeGreaterThan(0);
   expect(screen.getAllByRole('heading', { name: /Verified sources 2/i })).toHaveLength(1);
   expect(screen.getAllByText('IS 15644 is primary.')).toHaveLength(1);
-  for (const text of ['IS 9873 may apply.', 'The cited material covers electric toys.', 'This is user-provided context, not BIS evidence.', 'Preparation steps', 'Documents to prepare', 'First checklist item.', 'Second checklist item.', 'Open the cited primary standard.', 'Evidence is limited to the cited material.', 'Verify before relying on this guidance.']) expect(screen.getByText(text)).toBeInTheDocument();
-  expect(document.querySelector('.journey-next-action')).toHaveTextContent('Open the cited primary standard.');
-  expect(document.querySelector('.journey-checklist')).toHaveTextContent('Preparation steps');
-  expect(document.querySelector('.journey-checklist')).toHaveTextContent('Documents to prepare');
+  for (const text of ['IS 9873 may apply.', 'The cited material covers electric toys.', 'This is user-provided context, not BIS evidence.', 'First checklist item.', 'Second checklist item.', 'Open the cited primary standard.', 'Evidence is limited to the cited material.', 'Verify before relying on this guidance.']) expect(screen.getByText(text)).toBeInTheDocument();
+  expect(document.querySelector('.journey-checklist')).toHaveTextContent('Open the cited primary standard.');
   expect(screen.getByRole('link', { name: 'Page 4' })).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: /View evidence/i })).toHaveLength(2);
+});
+
+it('localizes Tamil and Bengali journey headings without translating evidence content', () => {
+  const journeyResponse = { ...response, answer_sections: [
+    { type: 'explanation' as const, title: 'Why it applies', content: 'IS 15644 is primary.', items: [], citation_ids: ['S1'] },
+    { type: 'important' as const, title: 'Important condition', content: 'IS 9873 may apply where applicable.', items: [], citation_ids: ['S1'] },
+  ] };
+  for (const [language, headings] of [
+    ['ta', ['எளிய சொற்களில்', 'தெரிந்துகொள்ள முக்கியம்']],
+    ['bn', ['সহজ ভাষায়', 'জানা গুরুত্বপূর্ণ']],
+  ] as const) {
+    localStorage.setItem('bis-assistant-language', language);
+    render(<LanguageProvider><ChatMessage role="assistant" text={journeyResponse.answer} response={journeyResponse} presentation="compliance-journey" /></LanguageProvider>);
+    for (const heading of headings) expect(screen.getAllByRole('heading', { name: heading }).length).toBeGreaterThan(0);
+    expect(screen.getByText('IS 15644 is primary.')).toBeInTheDocument();
+    expect(screen.getByText('IS 9873 may apply where applicable.')).toBeInTheDocument();
+    cleanup();
+  }
+});
+
+it('uses structural labels and localized source controls for every journey locale', () => {
+  const journeyResponse = { ...response, answer_sections: [
+    { type: 'direct_answer' as const, title: 'Standards found', content: 'IS 15644 is primary.', items: [], citation_ids: ['S1'] },
+    { type: 'explanation' as const, title: 'Reason', content: 'The cited material covers electric toys.', items: [], citation_ids: ['S1'] },
+    { type: 'next_steps' as const, title: 'Your next action', content: null, items: ['Review the cited source.'], citation_ids: ['S1'] },
+    { type: 'important' as const, title: 'Important condition', content: 'Verify before relying on this guidance.', items: [], citation_ids: ['S1'] },
+  ] };
+  for (const language of ['en', 'hi', 'mr', 'ta', 'bn'] as const) {
+    const labels = translations[language];
+    localStorage.setItem('bis-assistant-language', language);
+    render(<LanguageProvider><ChatMessage role="assistant" text={journeyResponse.answer} response={journeyResponse} presentation="compliance-journey" /></LanguageProvider>);
+    for (const heading of [labels.journeyApplicable, labels.sectionSummary, labels.sectionExplanation, labels.journeyChecklist, labels.sectionNextSteps, labels.sectionImportant]) expect(screen.getAllByRole('heading', { name: heading }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: new RegExp(`${labels.verifiedSources} 2`) })).toBeInTheDocument();
+    expect(screen.getByText(labels.viewVerifiedDetails)).toBeInTheDocument();
+    expect(screen.getByText('IS 15644 is primary.')).toBeInTheDocument();
+    expect(screen.getAllByText('a very long trusted source filename.pdf').length).toBeGreaterThan(0);
+    if (language !== 'en') {
+      for (const english of ['In simple terms', 'Important to know', 'What this means for you', 'What to do next', 'Your compliance checklist', 'Verified sources', 'View verified source details', 'Applicable standards']) expect(screen.queryByText(english, { exact: true })).toBeNull();
+    }
+    cleanup();
+  }
 });
 
 it('renders typed accessible suggested actions and submits one once', async () => {

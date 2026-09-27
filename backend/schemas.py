@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
-ResponseLanguage = Literal["en", "hi", "mr"]
+ResponseLanguage = Literal["en", "hi", "mr", "ta", "bn"]
 
 
 Question = Annotated[

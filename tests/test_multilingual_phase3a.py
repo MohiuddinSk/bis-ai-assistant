@@ -41,10 +41,27 @@ class MultilingualPhase3ATests(unittest.TestCase):
             role="manufacturer", product_description="Toy car", power_type="battery_operated",
             intended_age_group="3_to_8", goal="identify_standards", application_stage="researching",
         ).response_language, "en")
-        for language in ("en", "hi", "mr"):
+        for language in ("en", "hi", "mr", "ta", "bn"):
             self.assertEqual(ChatRequest(question="toy standards", response_language=language).response_language, language)
         with self.assertRaises(Exception):
             ChatRequest(question="toy standards", response_language="fr")
+
+    def test_reviewed_tamil_and_bengali_questions_use_the_same_canonical_plans(self):
+        cases = (
+            ("Which standard applies to a battery-operated toy?", "மின்கலத்தில் இயங்கும் பொம்மைக்கு எந்த தரநிலை பொருந்தும்?", "ব্যাটারিচালিত খেলনার জন্য কোন মান প্রযোজ্য?"),
+            ("Explain IS 15644 in simple words.", "IS 15644 ஐ எளிய வார்த்தைகளில் விளக்கவும்.", "IS 15644 সহজ ভাষায় ব্যাখ্যা করুন।"),
+            ("When does IS 15644 apply?", "IS 15644 எப்போது பொருந்தும்?", "IS 15644 কখন প্রযোজ্য?"),
+            ("Explain IS 9873 Part 2 in simple words.", "IS 9873 பகுதி 2 ஐ எளிய வார்த்தைகளில் விளக்கவும்.", "IS 9873 পার্ট 2 সহজ ভাষায় ব্যাখ্যা করুন।"),
+            ("What are the steps to obtain BIS certification for a toy?", "ஒரு பொம்மைக்கான BIS சான்றிதழைப் பெறுவதற்கான படிகள் என்ன?", "একটি খেলনার জন্য BIS সার্টিফিকেশন পাওয়ার ধাপগুলি কী?"),
+            ("Which IS 9873 parts may apply to a battery-operated toy?", "மின்கலத்தில் இயங்கும் பொம்மைக்கு IS 9873 இன் எந்த பகுதிகள் பொருந்தலாம்?", "ব্যাটারিচালিত খেলনার জন্য IS 9873 এর কোন অংশগুলি প্রযোজ্য হতে পারে?"),
+        )
+        for english, tamil, bengali in cases:
+            with self.subTest(english=english):
+                expected = ChatService._build_evidence_plan(english, evidence(), understanding=understand_question(english))
+                for question, language in ((tamil, "ta"), (bengali, "bn")):
+                    actual = ChatService._build_evidence_plan(question, evidence(), understanding=understand_question(question))
+                    self.assertEqual(actual.category, expected.category)
+                    self.assertEqual(set(actual.roles), set(expected.roles))
 
     def test_reviewed_hindi_and_marathi_questions_resolve_to_english_categories_and_roles(self):
         cases = (
@@ -113,6 +130,41 @@ class MultilingualPhase3ATests(unittest.TestCase):
         section = AnswerSection(type="important", title="Important condition", content="English evidence-bound answer")
         self.assertIsNone(localize_reviewed_sections("hi", "exemption", [section], None))
         self.assertIsNone(localize_reviewed_sections("mr", "transition", [section], None))
+
+    def test_reviewed_battery_wizard_roadmap_localizes_copy_without_changing_evidence_metadata(self):
+        english = [
+            AnswerSection(type="direct_answer", title="Applicable standard", content="IS 15644 is the primary standard. The cited IS 9873 parts are secondary requirements where applicable.", citation_ids=["S1", "S2"]),
+            AnswerSection(type="explanation", title="Selected power type", content="You described the toy as battery-operated. This is user-provided context, not BIS evidence.", citation_ids=[]),
+            AnswerSection(type="next_steps", title="Your next action", items=["Start by reviewing the cited primary standard and the secondary parts that may apply."], citation_ids=["S1", "S2"]),
+            AnswerSection(type="next_steps", title="Supported application steps", items=["Create a Manakonline account and apply through it.", "Choose the Indian Standard matching the toy type.", "Provide the cited product and factory details, including raw materials, manufacturing process, machinery, layout and testing personnel."], citation_ids=["S3", "S4", "S5"]),
+            AnswerSection(type="next_steps", title="Documents or declarations", content="The indexed material provides only this partial checklist, not the complete official application package.", items=["Include the cited declaration when applying to add a series.", "Provide model and series details, including starting ages.", "Include the cited requisite-fee declaration for an extension of scope; the evidence does not state an exact amount."], citation_ids=["S6", "S7", "S8"]),
+            AnswerSection(type="important", title="What the indexed documents do not establish", content="The selected evidence does not establish exact current fees, a guaranteed timeline, a recommended laboratory, every current form, or every remaining certification step.", citation_ids=[]),
+        ]
+        for language in ("hi", "mr", "ta", "bn"):
+            with self.subTest(language=language):
+                localized = localize_reviewed_sections(
+                    language, "roadmap_battery", english,
+                    "battery_compliance_roadmap_researching",
+                )
+                self.assertIsNotNone(localized)
+                assert localized is not None
+                self.assertEqual(
+                    [section.citation_ids for section in localized],
+                    [section.citation_ids for section in english],
+                )
+                visible = " ".join(
+                    [section.content or "" for section in localized]
+                    + [item for section in localized for item in section.items]
+                )
+                for identifier in ("IS 15644", "IS 9873", "Manakonline"):
+                    self.assertIn(identifier, visible)
+                self.assertNotIn("partial checklist", visible.lower())
+                self.assertNotIn("scope extension", visible.lower())
+                self.assertNotEqual(visible, " ".join(section.content or "" for section in english))
+        self.assertIsNone(localize_reviewed_sections(
+            "hi", "roadmap_battery", english,
+            "battery_compliance_roadmap_not_sure",
+        ))
 
     def test_canonical_english_and_localized_transition_forms_share_the_reviewed_family(self):
         english = "What does the 2026 transition order do?"

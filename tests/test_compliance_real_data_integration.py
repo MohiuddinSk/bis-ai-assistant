@@ -115,6 +115,31 @@ class ComplianceRealDataTests(unittest.TestCase):
         self.assertIn("you described the toy as battery-operated", hostile["answer"].lower())
         self.assertNotIn("you described the toy as mains-powered", hostile["answer"].lower())
 
+    def test_reviewed_battery_roadmap_locales_preserve_evidence_identity(self):
+        values = {
+            "product_description": "Battery-operated toy car",
+            "power_type": "battery_operated",
+            "intended_age_group": "3_to_8",
+            "goal": "complete_roadmap",
+            "application_stage": "researching",
+        }
+        english = self.guide(**values, response_language="en")
+        self.assertTrue(english["grounded"])
+        english_section_ids = [section["citation_ids"] for section in english["answer_sections"]]
+        for language in ("hi", "mr", "ta", "bn"):
+            with self.subTest(language=language):
+                localized = self.guide(**values, response_language=language)
+                self.assertTrue(localized["grounded"])
+                self.assertFalse(localized["needs_clarification"])
+                self.assertEqual(localized["citations"], english["citations"])
+                self.assertEqual(
+                    [section["citation_ids"] for section in localized["answer_sections"]],
+                    english_section_ids,
+                )
+                self.assertNotEqual(localized["answer"], english["answer"])
+                for identifier in ("IS 15644", "IS 9873", "Manakonline"):
+                    self.assertIn(identifier, localized["answer"])
+
     def test_artisan_roadmap_preserves_exemption_qualifications(self):
         result = self.guide(
             role="artisan", product_description="Handmade non-electric toy",

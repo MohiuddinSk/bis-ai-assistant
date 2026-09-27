@@ -5,6 +5,7 @@ import { ComplianceWizard } from './ComplianceWizard';
 import { printComplianceReport } from './printComplianceReport';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import { ChatHeader } from './ChatHeader';
+import { translations } from '../i18n/translations';
 
 const guidance = { answer: 'Grounded answer.', grounded: true, insufficient_evidence: false, evidence_count: 1, citations: [{ citation_id: 'S1', source_filename: 'manual.pdf', page_start: 4, page_end: 4, chunk_id: 'c1', excerpt: 'IS 15644 applies.' }], model: 'fake', generation_mode: 'extractive_fallback' as const, disclaimer: 'Verify.', answer_sections: [
   { type: 'direct_answer' as const, title: 'Standards found', content: 'IS 15644 applies.', items: [], citation_ids: ['S1'] },
@@ -28,7 +29,7 @@ async function reachFinal(user = userEvent.setup(), role: 'Consumer' | 'Manufact
   return user;
 }
 
-function renderWizardIn(language: 'hi' | 'mr') {
+function renderWizardIn(language: 'hi' | 'mr' | 'ta' | 'bn') {
   localStorage.setItem('bis-assistant-language', language);
   return render(<LanguageProvider><ComplianceWizard /></LanguageProvider>);
 }
@@ -56,6 +57,68 @@ it('uses the selected language in the printable report while preserving citation
   localStorage.setItem('bis-assistant-language', 'hi'); vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(response))); render(<LanguageProvider><ComplianceWizard /></LanguageProvider>);
   const user = userEvent.setup(); await user.click(screen.getByRole('button', { name: 'निर्माता' })); await user.type(screen.getByLabelText('उत्पाद विवरण या प्रकार'), 'Toy car'); await user.click(screen.getByRole('button', { name: 'जारी रखें' })); for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: 'जारी रखें' })); await user.click(screen.getByRole('button', { name: 'मेरा मार्गदर्शन बनाएँ' }));
   const report = within(await screen.findByRole('article', { name: 'अनुपालन पासपोर्ट' })); expect(report.getByRole('heading', { name: 'अनुपालन पासपोर्ट' })).toBeInTheDocument(); expect(report.getByRole('heading', { name: 'लागू मानक' })).toBeInTheDocument(); expect(report.getAllByText('IS 15644 applies.')).not.toHaveLength(0); expect(report.getAllByText(/manual\.pdf/).length).toBeGreaterThan(0); expect(screen.getAllByText('पृष्ठ 4')).not.toHaveLength(0);
+});
+
+it('uses localized structural labels in Tamil and Bengali wizard results and print reports', async () => {
+  for (const language of ['ta', 'bn'] as const) {
+    cleanup();
+    localStorage.clear();
+    const labels = translations[language];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(response)));
+    renderWizardIn(language);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: labels.roleManufacturer }));
+    await user.type(screen.getByLabelText(labels.productDescription), 'Toy car');
+    await user.click(screen.getByRole('button', { name: labels.continue }));
+    for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: labels.continue }));
+    await user.click(screen.getByRole('button', { name: labels.generate }));
+    await screen.findAllByText('IS 15644 applies.');
+    for (const heading of [labels.journeyApplicable, labels.sectionSummary, labels.sectionExplanation, labels.journeyChecklist, labels.sectionNextSteps, labels.sectionImportant]) expect(screen.getAllByRole('heading', { name: heading }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: new RegExp(`${labels.verifiedSources} 1`) })).toBeInTheDocument();
+    expect(screen.getByText(labels.viewVerifiedDetails)).toBeInTheDocument();
+    for (const english of ['In simple terms', 'Important to know', 'What this means for you', 'What to do next', 'Your compliance checklist', 'Verified sources', 'View verified source details', 'Applicable standards']) expect(screen.queryByText(english, { exact: true })).toBeNull();
+    const report = document.querySelector<HTMLElement>('article.compliance-print-report');
+    expect(report).not.toBeNull();
+    expect(within(report!).getAllByText(labels.sectionExplanation).length).toBeGreaterThan(0);
+    expect(within(report!).getAllByText(labels.sectionImportant).length).toBeGreaterThan(0);
+  }
+});
+
+it('does not retain generic English presentation labels in any localized Wizard or Passport result', async () => {
+  const englishPhrases = [
+    'Your grounded guidance', 'Compliance journey',
+    'Use the verified sources below to review the evidence behind this guidance.',
+    'Your product profile',
+    'User-provided details help route this guidance. They are not verified BIS evidence.',
+    'Grounded answer',
+  ];
+  for (const language of ['hi', 'mr', 'ta', 'bn'] as const) {
+    cleanup();
+    localStorage.clear();
+    const labels = translations[language];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(response)));
+    renderWizardIn(language);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: labels.roleManufacturer }));
+    await user.type(screen.getByLabelText(labels.productDescription), 'Toy car');
+    await user.click(screen.getByRole('button', { name: labels.continue }));
+    for (let index = 0; index < 3; index += 1) await user.click(screen.getByRole('button', { name: labels.continue }));
+    await user.click(screen.getByRole('button', { name: labels.generate }));
+    await screen.findAllByText('IS 15644 applies.');
+    expect(screen.getByText(labels.groundedGuidance)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: labels.journeyTitle })).toBeInTheDocument();
+    expect(screen.getByText(labels.journeyDescription)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: labels.profileTitle })).toBeInTheDocument();
+    expect(screen.getByText(labels.profileNote)).toBeInTheDocument();
+    expect(screen.getByText(labels.evidenceGrounded)).toBeInTheDocument();
+    const report = document.querySelector<HTMLElement>('article.compliance-print-report');
+    expect(report).not.toBeNull();
+    expect(within(report!).getByText(labels.passportProductProfile)).toBeInTheDocument();
+    for (const english of englishPhrases) {
+      expect(screen.queryByText(english, { exact: true })).toBeNull();
+      expect(within(report!).queryByText(english, { exact: true })).toBeNull();
+    }
+  }
 });
 
 it('preserves entered profile data when language switches during the wizard', async () => {
@@ -93,7 +156,7 @@ it('does not turn untrusted profile text into displayed evidence or citations', 
 
 it('renders one coherent grounded roadmap with profile, categories, and verified sources', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(response))); const user = await reachFinal(); await user.click(screen.getByRole('button', { name: 'Generate my guidance' }));
-  for (const heading of ['Your product profile', 'Applicable standards', 'Why these standards apply', 'Your compliance checklist', 'Important conditions']) expect((await journey().findAllByRole('heading', { name: heading })).length).toBeGreaterThan(0);
+  for (const heading of ['Your product profile', 'Applicable standards', 'What this means for you', 'Your compliance checklist', 'Important to know']) expect((await journey().findAllByRole('heading', { name: heading })).length).toBeGreaterThan(0);
   expect((await journey().findAllByRole('heading', { name: /Verified sources 1/i })).length).toBeGreaterThan(0);
   expect(journey().getAllByText(/not verified BIS evidence/i).length).toBeGreaterThan(0);
   expect(journey().getAllByRole('heading', { name: /Verified sources/i }).length).toBeGreaterThan(0); expect(journey().getByRole('link', { name: /manual.pdf.*page 4/i })).toBeInTheDocument();
