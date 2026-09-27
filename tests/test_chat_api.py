@@ -457,7 +457,7 @@ class GroundedChatApiTests(unittest.TestCase):
         self.assertEqual(response.json()["evidence_count"], 0)
         self.assertEqual(generator.calls, [])
 
-    def test_provider_unavailable_returns_503(self):
+    def test_provider_unavailable_generic_route_returns_safe_http_200(self):
         def unavailable():
             raise ProviderUnavailableError("not configured")
 
@@ -467,8 +467,9 @@ class GroundedChatApiTests(unittest.TestCase):
         )
         with TestClient(app) as client:
             response = client.post("/api/chat", json={"question": "Tell me about BIS toy regulation"})
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json(), {"detail": "Chat generation is unavailable."})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.json()["generation_mode"], {"extractive_fallback", "abstention"})
+        self.assertNotIn("configured", response.text)
 
     def test_provider_authentication_failure_returns_safe_503(self):
         generator = FakeGenerator([ProviderUnavailableError("secret auth body")])
@@ -786,7 +787,7 @@ class GroundedChatApiTests(unittest.TestCase):
 
 
 class VersionedChatApiTests(unittest.TestCase):
-    def test_v1_chat_matches_legacy_and_rate_limit_keeps_headers(self):
+    def test_v1_chat_matches_legacy_and_generic_rate_limit_uses_safe_limitation(self):
         payload = {"question": "Tell me about BIS toy regulation"}
         legacy_app = create_app(retriever_factory=FakeRetriever, generator_factory=lambda: FakeGenerator([valid_output(["S1"])]))
         with TestClient(legacy_app) as client:
@@ -799,8 +800,10 @@ class VersionedChatApiTests(unittest.TestCase):
         rate_limited_app = create_app(retriever_factory=FakeRetriever, generator_factory=lambda: FakeGenerator([ProviderRateLimitError("17")]))
         with TestClient(rate_limited_app) as client:
             response = client.post("/api/v1/chat", json=payload)
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.headers["retry-after"], "17")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["response_kind"], "limitation")
+        self.assertTrue(response.json()["insufficient_evidence"])
+        self.assertNotIn("retry-after", response.headers)
         self.assertIn("x-request-id", response.headers)
 
 

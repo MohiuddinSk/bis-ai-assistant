@@ -132,6 +132,32 @@ class GenerationOutput(BaseModel):
     insufficient_evidence: bool
 
 
+class SynthesisSectionOutput(BaseModel):
+    """Provider prose bound to backend fact and citation IDs. No source metadata."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["direct_answer", "explanation", "next_steps", "important"]
+    content: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] = ""
+    items: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]] = Field(
+        default_factory=list, max_length=8,
+    )
+    citation_ids: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=16)]] = Field(
+        default_factory=list, max_length=8,
+    )
+    source_fact_ids: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=16)]] = Field(
+        default_factory=list, max_length=16,
+    )
+
+
+class SynthesisOutput(BaseModel):
+    """Closed synthesis contract. It does not replace GenerationOutput."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sections: list[SynthesisSectionOutput] = Field(min_length=1, max_length=8)
+
+
 class ChatCitation(BaseModel):
     citation_id: str
     source_filename: str | None = None
@@ -161,6 +187,9 @@ class ChatResponse(BaseModel):
     citations: list[ChatCitation]
     model: str | None
     generation_mode: str
+    # A stable presentation semantic.  ``generation_mode`` describes how text
+    # was produced; this field describes what the user can safely do with it.
+    response_kind: Literal["conversation", "grounded_guidance", "clarification", "limitation"] = "grounded_guidance"
     disclaimer: str
     answer_sections: list[AnswerSection] = Field(default_factory=list)
     needs_clarification: bool = False

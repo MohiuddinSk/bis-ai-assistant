@@ -2,8 +2,10 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import json
 import logging
 import re
+import time
 from typing import ContextManager, Literal
 
 from pydantic import ValidationError
@@ -11,6 +13,9 @@ from pydantic import ValidationError
 from backend.generation import (
     GenerationProvider,
     ProviderCompletionExhaustedError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+    ProviderTimeoutError,
     ProviderUnavailableError,
 )
 from backend.schemas import (
@@ -22,9 +27,17 @@ from backend.schemas import (
     GenerationOutput,
     RetrieveRequest,
     RetrievalResult,
+    SynthesisOutput,
 )
 from backend.retrieval_provider import RetrievalHit, RetrieverProtocol
 from backend.service import RetrievalService
+from backend.conversation import (
+    classify_conversation,
+    conversation_copy,
+    is_bounded_follow_up,
+    is_social_route,
+)
+from backend.grounded_claims import claim_answers_question, claim_sections, extract_grounded_claims
 from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
 from backend.response_localization import (
     localized_abstention,
@@ -35,6 +48,7 @@ from backend.response_localization import (
 from backend.settings import (
     INSUFFICIENT_EVIDENCE_ANSWER,
     LEGAL_INFORMATION_DISCLAIMER,
+    synthesis_enabled,
 )
 
 
@@ -186,6 +200,20 @@ class ChatService:
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
     ) -> ChatResponse:
+        if routing_context is None:
+            route = classify_conversation(request.question, request.response_language, request.assistant_context)
+            if is_social_route(route):
+                return self._conversation_response(route, request.assistant_context)
+            if (
+                is_bounded_follow_up(request.question)
+                and request.assistant_context
+                and request.assistant_context.original_question
+            ):
+                understanding = understand_question(
+                    request.question,
+                    request.assistant_context.original_question,
+                    request.assistant_context,
+                )
         if routing_context is None and understanding is None:
             original = request.clarification_context.original_question if request.clarification_context else None
             understanding = understand_question(request.question, original, request.assistant_context)
@@ -286,14 +314,43 @@ class ChatService:
             if plan.category == "explain_is_general" and not plan.complete:
                 return self._abstention(evidence=[], citations=[], response_language=request.response_language)
             if "requested_standard_identity" in plan.roles or plan.complete:
-                return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
+                return self._complete_plan_response(
+                    evidence, plan, request.audience, routing_context, understanding,
+                    request.response_language, request.question,
+                )
             return self._abstention(evidence=[], citations=[], response_language=request.response_language)
-        # Complete trusted evidence plans bypass Groq: this removes avoidable
-        # latency and cannot weaken citation or qualification controls.
+        # Complete plans stay deterministic unless fact-constrained synthesis is
+        # explicitly enabled. Invalid synthesis returns the same deterministic answer.
         if plan.complete:
-            return self._fallback_or_abstain(evidence, plan, request.audience, routing_context, understanding, request.response_language)
+            return self._complete_plan_response(
+                evidence, plan, request.audience, routing_context, understanding,
+                request.response_language, request.question,
+            )
+        # Generic routes are claim-first. Known-but-incomplete plans retain
+        # their existing narrowly validated generation behavior so route
+        # safety checks and deterministic fallbacks remain unchanged.
+        if understanding is not None and understanding.intent == "general":
+            dynamic = self._dynamic_claim_response(evidence, request, understanding)
+            if dynamic is not None:
+                return dynamic
+            # Retrieval rank alone is not evidence that answers the question.
+            # Keep this fixed diagnostic free of user text and retrieved content.
+            self._log_synthesis_attempt(
+                plan_category="generic",
+                attempt=0,
+                outcome="fallback",
+                code="QUESTION_CONCEPT_NOT_COVERED",
+                elapsed_ms=0,
+            )
+            return self._abstention(
+                evidence=evidence,
+                response_language=request.response_language,
+                question=request.question,
+            )
+        # An unavailable provider is never a reason to return a 503 for an
+        # answerable route: no validated claim means a safe limitation.
         if self._generator is None:
-            raise ProviderUnavailableError("Chat generation is unavailable")
+            return self._abstention(evidence=evidence, response_language=request.response_language)
 
         prompt_evidence = [item.prompt_mapping() for item in evidence]
         generation_question = self._generation_question(effective_question, request.response_language)
@@ -806,12 +863,524 @@ class ChatService:
             citations=citations,
             model=model,
             generation_mode=generation_mode,
+            response_kind=(
+                "conversation" if generation_mode == "conversation" else
+                "clarification" if needs_clarification or generation_mode == "clarification" else
+                "limitation" if insufficient_evidence else
+                "grounded_guidance"
+            ),
             disclaimer=disclaimer,
             answer_sections=finalized_sections,
             needs_clarification=needs_clarification,
             suggested_replies=suggested_replies or [],
             assistant_context=assistant_context,
         )
+
+    def _complete_plan_response(
+        self,
+        evidence: list[TrustedEvidence],
+        plan: EvidencePlan,
+        audience: str,
+        routing_context: ComplianceRoutingContext | None,
+        understanding: QuestionUnderstanding | None,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"],
+        question: str,
+    ) -> ChatResponse:
+        deterministic = self._fallback_or_abstain(
+            evidence, plan, audience, routing_context, understanding, response_language,
+        )
+        if not self._synthesis_eligible(deterministic, plan, response_language):
+            return deterministic
+        packet = self._synthesis_packet(plan, deterministic, evidence, question)
+        try:
+            with self._generation_lock:
+                return self._synthesize_packet(
+                    packet, deterministic, evidence, question, understanding, routing_context, plan.category,
+                    response_language,
+                )
+        except Exception:
+            self._log_synthesis_attempt(
+                plan_category=plan.category, attempt=1, outcome="fallback", code="UNEXPECTED", elapsed_ms=0,
+            )
+            return deterministic
+
+    def _synthesis_eligible(
+        self,
+        response: ChatResponse,
+        plan: EvidencePlan,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"],
+    ) -> bool:
+        # Reviewed deterministic locale templates remain the only path for
+        # known plans.  Provider localization is confined to generic claim
+        # packets, where it cannot change route semantics.
+        if not synthesis_enabled() or self._generator is None or response_language != "en":
+            return False
+        if not plan.complete or not plan.category or plan.category in {"clarification", "transition"}:
+            return False
+        if (
+            response.generation_mode != "extractive_fallback"
+            or not response.grounded
+            or response.insufficient_evidence
+            or response.needs_clarification
+        ):
+            return False
+        return not any(section.type == "clarification" for section in response.answer_sections)
+
+    @staticmethod
+    def _synthesis_packet(
+        plan: EvidencePlan,
+        deterministic: ChatResponse,
+        evidence: list[TrustedEvidence],
+        question: str,
+    ) -> dict[str, object]:
+        fact_plan = ChatService._fact_plan(plan)
+        published = {item.citation_id: item for item in deterministic.citations}
+        role_excerpts = {
+            item.citation_id: excerpt for item, excerpt in plan.roles.values()
+        }
+        evidence_by_id = {item.citation_id: item for item in evidence}
+        facts: list[dict[str, object]] = []
+        evidence_records: list[dict[str, object]] = []
+        seen_evidence: set[str] = set()
+        for fact in fact_plan.facts:
+            facts.append({
+                "fact_id": fact.fact_id,
+                "statement": fact.statement,
+                "qualifiers": list(fact.qualifiers),
+                "citation_ids": list(fact.evidence_ids),
+            })
+            for citation_id in fact.evidence_ids:
+                if citation_id in seen_evidence:
+                    continue
+                seen_evidence.add(citation_id)
+                trusted = evidence_by_id.get(citation_id)
+                published_citation = published.get(citation_id)
+                if trusted is None:
+                    continue
+                evidence_records.append({
+                    "citation_id": citation_id,
+                    "excerpt": published_citation.excerpt if published_citation is not None else role_excerpts.get(citation_id, ""),
+                    "source_filename": trusted.source_filename,
+                    "page_start": trusted.page_start,
+                    "page_end": trusted.page_end,
+                    "chunk_id": trusted.chunk_id,
+                })
+        next_steps: list[str] = []
+        limitations = list(fact_plan.limitations)
+        for section in deterministic.answer_sections:
+            fragments = [section.content, *section.items]
+            if section.type == "next_steps":
+                next_steps.extend(fragment for fragment in fragments if fragment and fragment.strip())
+            elif section.type == "important":
+                limitations.extend(fragment for fragment in fragments if fragment and fragment.strip())
+        return {
+            "untrusted_question": question,
+            "facts": facts,
+            "next_steps": list(dict.fromkeys(next_steps)),
+            "limitations": list(dict.fromkeys(limitations)),
+            "evidence": evidence_records,
+        }
+
+    def _synthesize_packet(
+        self,
+        packet: Mapping[str, object],
+        deterministic: ChatResponse,
+        evidence: list[TrustedEvidence],
+        question: str,
+        understanding: QuestionUnderstanding | None,
+        routing_context: ComplianceRoutingContext | None,
+        plan_category: str,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
+        invalid_output_response: ChatResponse | None = None,
+    ) -> ChatResponse:
+        feedback: str | None = None
+        for attempt in (1, 2):
+            started = time.perf_counter()
+            try:
+                raw_output = self._generator.generate(
+                    self._generation_question(question, response_language),
+                    [],
+                    repair=attempt == 2,
+                    repair_feedback=feedback,
+                    synthesis_packet=packet,
+                )
+                published = self._publish_synthesis(
+                    raw_output, packet, deterministic, evidence, question, understanding, routing_context, response_language,
+                )
+            except (ProviderUnavailableError, ProviderTimeoutError, ProviderRateLimitError, ProviderResponseError, ProviderCompletionExhaustedError) as exc:
+                self._log_synthesis_attempt(
+                    plan_category=plan_category,
+                    attempt=attempt,
+                    outcome="provider_error",
+                    code=self._synthesis_provider_code(exc),
+                    elapsed_ms=int((time.perf_counter() - started) * 1000),
+                )
+                return deterministic
+            except (ValidationError, ValueError) as exc:
+                code = exc.code if isinstance(exc, EvidenceCompletenessError) else "MALFORMED_SYNTHESIS"
+                outcome = "validation_error" if isinstance(exc, EvidenceCompletenessError) else "parse_error"
+                if attempt == 2:
+                    outcome = "fallback"
+                self._log_synthesis_attempt(
+                    plan_category=plan_category,
+                    attempt=attempt,
+                    outcome=outcome,
+                    code=code,
+                    elapsed_ms=int((time.perf_counter() - started) * 1000),
+                )
+                if attempt == 2:
+                    return invalid_output_response or deterministic
+                feedback = code
+                continue
+            self._log_synthesis_attempt(
+                plan_category=plan_category,
+                attempt=attempt,
+                outcome="success",
+                code="OK",
+                elapsed_ms=int((time.perf_counter() - started) * 1000),
+            )
+            return published
+        return deterministic
+
+    def _log_synthesis_attempt(
+        self,
+        *,
+        plan_category: str,
+        attempt: int,
+        outcome: str,
+        code: str,
+        elapsed_ms: int,
+    ) -> None:
+        provider = "provider"
+        model = "unconfigured"
+        generator = self._generator
+        if generator is not None:
+            class_name = type(generator).__name__
+            if class_name == "GroqGenerator":
+                provider = "groq"
+            elif class_name == "OpenAICompatibleGenerator":
+                provider = "openai_compatible"
+            candidate = getattr(generator, "model", "")
+            if isinstance(candidate, str) and re.fullmatch(r"[A-Za-z0-9_./:-]{1,80}", candidate):
+                model = candidate
+        category = plan_category if re.fullmatch(r"[a-z0-9_]{1,64}", plan_category or "") else "unknown"
+        safe_code = code if re.fullmatch(r"[A-Z0-9_,]{1,240}", code or "") else "INVALID_CODE"
+        safe_outcome = outcome if outcome in {"success", "provider_error", "parse_error", "validation_error", "fallback"} else "fallback"
+        safe_attempt = attempt if attempt in {1, 2} else 0
+        elapsed = elapsed_ms if isinstance(elapsed_ms, int) and 0 <= elapsed_ms <= 120_000 else 0
+        logger.warning(
+            "event=synthesis_attempt provider=%s model=%s plan_category=%s attempt=%s outcome=%s code=%s elapsed_ms=%s",
+            provider,
+            model,
+            category,
+            safe_attempt,
+            safe_outcome,
+            safe_code,
+            elapsed,
+        )
+
+    @staticmethod
+    def _synthesis_provider_code(exc: Exception) -> str:
+        if isinstance(exc, ProviderTimeoutError):
+            return "TIMEOUT"
+        if isinstance(exc, ProviderRateLimitError):
+            return "RATE_LIMIT"
+        if isinstance(exc, ProviderUnavailableError):
+            return "UNAVAILABLE"
+        if isinstance(exc, ProviderCompletionExhaustedError):
+            return "COMPLETION_EXHAUSTED"
+        return "RESPONSE_ERROR"
+
+    @staticmethod
+    def _parse_synthesis_output(raw_output: str) -> SynthesisOutput:
+        try:
+            payload = json.loads(raw_output)
+        except json.JSONDecodeError:
+            raise ValueError("MALFORMED_SYNTHESIS")
+        if not isinstance(payload, dict):
+            raise ValueError("MALFORMED_SYNTHESIS")
+        section_keys = ("direct_answer", "explanation", "next_steps", "important")
+        if "sections" not in payload and any(key in payload for key in section_keys):
+            sections = []
+            for key in section_keys:
+                value = payload.get(key)
+                if not isinstance(value, dict):
+                    continue
+                sections.append({
+                    "type": key,
+                    "content": value.get("content", ""),
+                    "items": value.get("items", []),
+                    "citation_ids": value.get("citation_ids", []),
+                    "source_fact_ids": value.get("source_fact_ids", []),
+                })
+            payload = {"sections": sections}
+        return SynthesisOutput.model_validate(payload)
+
+    def _publish_synthesis(
+        self,
+        raw_output: str,
+        packet: Mapping[str, object],
+        deterministic: ChatResponse,
+        evidence: list[TrustedEvidence],
+        question: str,
+        understanding: QuestionUnderstanding | None,
+        routing_context: ComplianceRoutingContext | None,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
+    ) -> ChatResponse:
+        generated = self._parse_synthesis_output(raw_output)
+        explanation = self._validated_provider_explanation(
+            generated, packet, deterministic, response_language, routing_context,
+        )
+        # Direct facts, procedures, limitations, and all public source metadata
+        # are backend-owned. The provider contributes one optional explanatory
+        # section and can never replace, omit, or reorder those locked sections.
+        sections = list(deterministic.answer_sections)
+        insert_at = next((index + 1 for index, section in enumerate(sections) if section.type == "direct_answer"), 0)
+        sections.insert(insert_at, explanation)
+        return self._guided_response(
+            sections=sections,
+            grounded=True,
+            insufficient_evidence=False,
+            evidence_count=deterministic.evidence_count,
+            citations=list(deterministic.citations),
+            model=self._generator.model,
+            generation_mode="llm",
+            disclaimer=deterministic.disclaimer,
+            suggested_replies=list(deterministic.suggested_replies),
+            assistant_context=deterministic.assistant_context,
+            response_language=response_language,
+        )
+
+    @staticmethod
+    def _validate_synthesis(
+        generated: SynthesisOutput,
+        packet: Mapping[str, object],
+        evidence: list[TrustedEvidence],
+        question: str,
+        understanding: QuestionUnderstanding | None,
+        routing_context: ComplianceRoutingContext | None,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
+    ) -> None:
+        facts = packet.get("facts")
+        limitations = packet.get("limitations")
+        next_steps = packet.get("next_steps")
+        evidence_records = packet.get("evidence")
+        if not isinstance(facts, list) or not isinstance(limitations, list) or not isinstance(next_steps, list) or not isinstance(evidence_records, list):
+            raise EvidenceCompletenessError("INVALID_FACT_PACKET")
+        fact_map: dict[str, Mapping[str, object]] = {}
+        for fact in facts:
+            if isinstance(fact, Mapping) and isinstance(fact.get("fact_id"), str):
+                fact_map[str(fact["fact_id"])] = fact
+        evidence_map = {item.citation_id: item for item in evidence}
+        record_map: dict[str, Mapping[str, object]] = {}
+        for record in evidence_records:
+            if isinstance(record, Mapping) and isinstance(record.get("citation_id"), str):
+                record_map[str(record["citation_id"])] = record
+        codes: list[str] = []
+        required_types = {"direct_answer", "explanation", "important"}
+        if next_steps:
+            required_types.add("next_steps")
+        present_types = {section.type for section in generated.sections}
+        if not required_types <= present_types:
+            codes.append("MISSING_SECTION")
+        used_fact_ids: set[str] = set()
+        seen_fragments: set[str] = set()
+        prose: list[str] = []
+        for section in generated.sections:
+            fragments = [section.content, *section.items]
+            visible = [fragment.strip() for fragment in fragments if fragment and fragment.strip()]
+            if section.type == "next_steps" and not next_steps:
+                if visible:
+                    codes.append("UNSUPPORTED_NEXT_STEP")
+                continue
+            if not visible:
+                codes.append("EMPTY_SECTION")
+            grounded = section.type in {"direct_answer", "explanation", "next_steps"}
+            if grounded and not section.citation_ids:
+                codes.append("MISSING_SECTION_CITATION")
+            if grounded and not section.source_fact_ids:
+                codes.append("MISSING_SOURCE_FACT")
+            allowed_citations: set[str] = set()
+            for fact_id in section.source_fact_ids:
+                fact = fact_map.get(fact_id)
+                if fact is None:
+                    codes.append("UNKNOWN_FACT_ID")
+                    continue
+                used_fact_ids.add(fact_id)
+                citation_ids = fact.get("citation_ids")
+                if isinstance(citation_ids, list):
+                    allowed_citations.update(str(citation_id) for citation_id in citation_ids)
+            if section.citation_ids and not set(section.citation_ids) <= allowed_citations:
+                codes.append("UNALLOWED_CITATION_ID")
+            for citation_id in section.citation_ids:
+                record = record_map.get(citation_id)
+                trusted = evidence_map.get(citation_id)
+                if record is None or trusted is None or str(record.get("chunk_id")) != trusted.chunk_id:
+                    codes.append("UNKNOWN_CITATION_ID")
+            for fragment in visible:
+                prose.append(fragment)
+                normalized = " ".join(fragment.split()).casefold()
+                if normalized in seen_fragments:
+                    codes.append("DUPLICATE_CONTENT")
+                seen_fragments.add(normalized)
+        for fact_id, fact in fact_map.items():
+            if fact_id not in used_fact_ids:
+                codes.append("MISSING_REQUIRED_FACT")
+                continue
+            cited: set[str] = set()
+            for section in generated.sections:
+                if fact_id in section.source_fact_ids:
+                    cited.update(section.citation_ids)
+            citation_ids = fact.get("citation_ids")
+            if isinstance(citation_ids, list) and not set(map(str, citation_ids)) <= cited:
+                codes.append("MISSING_FACT_CITATION")
+        answer = " ".join(prose)
+        lowered = answer.casefold()
+        qualifier_text = " ".join(
+            str(qualifier)
+            for fact in fact_map.values()
+            if isinstance(fact.get("qualifiers"), list)
+            for qualifier in fact["qualifiers"]
+        ).casefold()
+        limitation_text = " ".join(str(item) for item in limitations).casefold()
+        approved_prose = " ".join((
+            " ".join(str(fact.get("statement", "")) for fact in fact_map.values()),
+            " ".join(str(item) for item in next_steps),
+            limitation_text,
+        )).casefold()
+        if response_language == "en" and "where applicable" in qualifier_text and "where applicable" not in lowered:
+            codes.append("DROPPED_QUALIFIER")
+        for phrase in (("partial checklist", "partial procedure", "subject to conditions") if response_language == "en" else ()):
+            if phrase in qualifier_text and phrase in approved_prose and phrase not in lowered:
+                codes.append("DROPPED_QUALIFIER")
+        if response_language == "en" and "partial" in qualifier_text and "partial" in approved_prose and not re.search(r"\bpartial\b", lowered):
+            codes.append("DROPPED_QUALIFIER")
+        if response_language == "en" and "subject to" in qualifier_text and "subject to" in approved_prose and "subject to" not in lowered:
+            codes.append("DROPPED_QUALIFIER")
+        if response_language == "en" and re.search(r"\bonly\b", qualifier_text) and not re.search(r"\bonly\b", lowered):
+            codes.append("DROPPED_QUALIFIER")
+        if response_language == "en" and re.search(r"\bmay\b", qualifier_text) and not re.search(r"\bmay\b", lowered):
+            codes.append("DROPPED_QUALIFIER")
+        if response_language == "en" and ("no calendar date" in qualifier_text or "does not establish" in limitation_text) and "does not establish" not in lowered and "calendar date" not in lowered:
+            codes.append("DROPPED_QUALIFIER")
+        normalized_answer = " ".join(answer.split()).casefold()
+        for limitation in (limitations if response_language == "en" else []):
+            required = " ".join(str(limitation).split()).casefold()
+            if required and required not in normalized_answer:
+                codes.append("MISSING_LIMITATION")
+        if response_language == "en" and not limitations:
+            important = " ".join(
+                section.content for section in generated.sections
+                if section.type == "important" and section.content
+            )
+            if not re.search(r"\b(does not|do not|not|only|where applicable)\b", important, re.I):
+                codes.append("MISSING_LIMITATION")
+        permitted_modals = {
+            word for word in ("must", "shall", "required", "always", "every", "mandatory", "compulsory", "guaranteed")
+            if re.search(rf"\b{word}\b", qualifier_text)
+        }
+        limitation_modals = {
+            word for word in ("must", "shall", "required", "always", "every", "mandatory", "compulsory", "guaranteed")
+            if re.search(rf"\b{word}\b", limitation_text)
+        }
+        for sentence in re.split(r"(?<=[.!?])\s+", answer):
+            modals = {word.lower() for word in re.findall(r"\b(must|shall|required|always|every|mandatory|compulsory|guaranteed)\b", sentence, re.I)}
+            negated = re.search(r"\b(not|no|cannot|does not|do not)\b", sentence, re.I)
+            for word in modals:
+                if word in permitted_modals or (negated and word in limitation_modals):
+                    continue
+                codes.append("UNSUPPORTED_MODAL")
+            if re.search(r"\bpartial\b", f"{qualifier_text} {limitation_text}") and re.search(r"\bcomplete\b", sentence, re.I) and re.search(r"\b(package|checklist|application)\b", sentence, re.I):
+                if not re.search(r"\b(not|partial|does not|do not)\b", sentence, re.I):
+                    codes.append("UNSUPPORTED_COMPLETENESS")
+        allowed_text = " ".join([
+            " ".join(str(fact.get("statement", "")) for fact in fact_map.values()),
+            qualifier_text,
+            " ".join(str(item) for item in next_steps),
+            " ".join(str(item) for item in limitations),
+            " ".join(str(record.get("excerpt", "")) for record in record_map.values()),
+        ])
+        allowed_standards = {
+            re.sub(r"\s+", "", match).upper()
+            for match in re.findall(r"\bIS\s*\d{3,6}\b", allowed_text, re.I)
+        }
+        output_standards = {
+            re.sub(r"\s+", "", match).upper()
+            for match in re.findall(r"\bIS\s*\d{3,6}\b", answer, re.I)
+        }
+        if output_standards - allowed_standards:
+            codes.append("UNSUPPORTED_STANDARD")
+        allowed_years = set(re.findall(r"\b(?:19|20)\d{2}\b", allowed_text))
+        if set(re.findall(r"\b(?:19|20)\d{2}\b", answer)) - allowed_years:
+            codes.append("UNSUPPORTED_DATE")
+        for pattern, code in (
+            (r"\b(?:rs\.?|inr|rupees?)\s*[\d,]+(?:\.\d+)?\b", "UNSUPPORTED_FEE"),
+            (r"\bform\s*(?:no\.?|number)?\s*[A-Za-z]-?\d+\b", "UNSUPPORTED_FORM"),
+            (r"\bwithin\s+\d+\s+(?:hours?|days?|weeks?|months?|years?)\b", "UNSUPPORTED_TIMELINE"),
+            (r"\b(?:nabl|recommended laboratory|accredited laboratory)\b", "UNSUPPORTED_LABORATORY"),
+        ):
+            for match in re.finditer(pattern, answer, re.I):
+                if match.group(0).casefold() not in allowed_text.casefold():
+                    codes.append(code)
+        for match in re.finditer(r"\bministry of [a-z]+(?:\s+[a-z]+)?\b", answer, re.I):
+            if match.group(0).casefold() not in allowed_text.casefold():
+                codes.append("UNSUPPORTED_AUTHORITY")
+        for fact in fact_map.values():
+            statement = str(fact.get("statement", ""))
+            for number in re.findall(r"\bIS\s*\d{3,6}\b", statement, re.I):
+                if re.sub(r"\s+", "", number).upper() not in output_standards:
+                    codes.append("MISSING_REQUIRED_FACT")
+        if not ChatService._matches_response_language(answer, response_language):
+            codes.append("OUTPUT_LANGUAGE_MISMATCH")
+        if understanding is not None and not ChatService._answer_matches_understanding(answer, understanding):
+            codes.append("QUESTION_INTENT_MISMATCH")
+        if routing_context is not None and ChatService._route_text_mismatches(routing_context, answer):
+            codes.append("PROFILE_ROUTE_MISMATCH")
+        ordered_pairs = []
+        seen_pairs: set[str] = set()
+        for section in generated.sections:
+            for citation_id in section.citation_ids:
+                if citation_id in seen_pairs or citation_id not in record_map:
+                    continue
+                seen_pairs.add(citation_id)
+                ordered_pairs.append((citation_id, str(record_map[citation_id].get("excerpt", ""))))
+        try:
+            ChatService._validate_universal_scope(question, answer, ordered_pairs)
+        except ValueError:
+            codes.append("UNIVERSAL_SCOPE")
+        if response_language == "en":
+            try:
+                ChatService._validate_evidence_completeness(question, answer, ordered_pairs, evidence, False)
+            except EvidenceCompletenessError as exc:
+                codes.append(exc.code)
+        if codes:
+            raise EvidenceCompletenessError(",".join(dict.fromkeys(codes)))
+
+    @staticmethod
+    def _route_text_mismatches(routing_context: ComplianceRoutingContext, answer: str) -> bool:
+        """Mirror compliance-route wording checks before a synthesized answer is published."""
+        lowered = answer.lower()
+        if routing_context.goal == "identify_standards":
+            if routing_context.power_type == "non_electric":
+                return "is 15644" in lowered or "battery-operated" in lowered or "mains-powered" in lowered
+            if routing_context.power_type == "mains_electric":
+                return "battery-operated" in lowered
+            if routing_context.power_type == "battery_operated":
+                return "mains-powered" in lowered or "non-electric toy" in lowered
+            return True
+        if routing_context.goal in {"check_exemption", "add_new_series", "understand_transition"}:
+            return "primary standard is is 15644" in lowered or "battery-operated electric toy" in lowered
+        if routing_context.goal == "complete_roadmap":
+            if routing_context.power_type == "non_electric":
+                return "is 15644" in lowered or "battery-operated electric toy" in lowered
+            if routing_context.power_type == "mains_electric":
+                return "battery-operated" in lowered
+            if routing_context.power_type == "battery_operated":
+                return "mains-powered" in lowered or "non-electric toy" in lowered
+            return True
+        if routing_context.goal == "new_licence":
+            return "battery-operated electric toy" in lowered or "primary standard is is 15644" in lowered
+        return routing_context.goal == "not_sure"
 
     def _fallback_or_abstain(
         self,
@@ -1182,6 +1751,12 @@ class ChatService:
         candidates: list[tuple[RetrievalResult, int, int]] = [
             (item, 0, index) for index, item in enumerate(base)
         ]
+        prior_question = request.assistant_context.original_question if request.assistant_context else None
+        if prior_question and is_bounded_follow_up(request.question):
+            prior = service.retrieve(RetrieveRequest(
+                question=prior_question, top_k=8, include_guidance=False,
+            )).results
+            candidates.extend((item, 2, index) for index, item in enumerate(prior))
         for coverage_index, coverage_question in enumerate(
             self._coverage_queries(routing_question, routing_context, understanding), start=1
         ):
@@ -2054,15 +2629,272 @@ class ChatService:
             )
         return mapped
 
+    def _conversation_response(self, route, assistant_context: AssistantContext | None) -> ChatResponse:
+        direct, limitation, replies = conversation_copy(route.kind, route.language)
+        sections = [
+            AnswerSection(type="direct_answer", title="BIS Saarthi", content=direct, citation_ids=[]),
+            AnswerSection(type="important", title="Important to know", content=limitation, citation_ids=[]),
+        ]
+        return self._guided_response(
+            sections=sections,
+            grounded=False,
+            insufficient_evidence=route.kind == "out_of_scope",
+            evidence_count=0,
+            citations=[],
+            model=self._model_name,
+            generation_mode="conversation",
+            disclaimer=localized_disclaimer(route.language),
+            suggested_replies=list(replies) if route.kind in {"greeting", "capabilities", "out_of_scope"} else [],
+            assistant_context=assistant_context,
+            response_language=route.language,
+        )
+
+    def _dynamic_claim_response(
+        self,
+        evidence: list[TrustedEvidence],
+        request: ChatRequest,
+        understanding: QuestionUnderstanding,
+    ) -> ChatResponse | None:
+        claims = extract_grounded_claims(request.question, evidence)
+        if not claims:
+            return None
+        # Claim extraction already applies the anchor gate. Keep this explicit
+        # final guard at the publication boundary: citations alone never make a
+        # generic answer grounded.
+        if not all(claim_answers_question(request.question, claim.claim_text) for claim in claims):
+            self._log_synthesis_attempt(
+                plan_category="generic", attempt=0, outcome="fallback",
+                code="DIRECT_ANSWER_NOT_RELEVANT", elapsed_ms=0,
+            )
+            return None
+        composed = claim_sections(claims)
+        evidence_by_id = {item.citation_id: item for item in evidence}
+        ordered_ids: list[str] = []
+        quotes: dict[str, str] = {}
+        for claim in claims:
+            quotes.setdefault(claim.citation_id, claim.supporting_quote)
+            if claim.citation_id not in ordered_ids:
+                ordered_ids.append(claim.citation_id)
+        citations = [
+            ChatCitation(
+                citation_id=citation_id,
+                source_filename=evidence_by_id[citation_id].source_filename,
+                page_start=evidence_by_id[citation_id].page_start,
+                page_end=evidence_by_id[citation_id].page_end,
+                chunk_id=evidence_by_id[citation_id].chunk_id,
+                excerpt=quotes[citation_id],
+            )
+            for citation_id in ordered_ids
+        ]
+        sections = [
+            AnswerSection(
+                type="direct_answer", title="Direct answer", content=str(composed["direct"]),
+                citation_ids=list(composed["direct_citations"]),
+            ),
+            AnswerSection(
+                type="explanation", title="What this means", content=str(composed["explanation"]),
+                citation_ids=list(composed["explanation_citations"]),
+            ),
+        ]
+        steps = list(composed["steps"])
+        if steps:
+            sections.append(AnswerSection(
+                type="next_steps", title="What you should do", items=steps,
+                citation_ids=list(composed["explanation_citations"]),
+            ))
+        limitation = " ".join(str(item) for item in composed["limitations"])
+        sections.append(AnswerSection(
+            type="important", title="Important limitation", content=limitation, citation_ids=[],
+        ))
+        deterministic = self._guided_response(
+            sections=sections,
+            grounded=True,
+            insufficient_evidence=False,
+            evidence_count=len(evidence),
+            citations=citations,
+            model="extractive-evidence-fallback",
+            generation_mode="extractive_fallback",
+            disclaimer=localized_disclaimer(request.response_language),
+            assistant_context=understanding.assistant_context,
+            response_language=request.response_language,
+        )
+        # Extracted evidence is deliberately never machine-translated.  When
+        # synthesis is off (or unavailable), return a localized limitation and
+        # retain the original excerpts solely in citation metadata.
+        if request.response_language != "en":
+            deterministic = self._localized_generic_limitation(
+                citations=citations,
+                evidence_count=len(evidence),
+                response_language=request.response_language,
+                assistant_context=understanding.assistant_context,
+            )
+            return deterministic
+        if not synthesis_enabled() or self._generator is None:
+            return deterministic
+        packet = {
+            "untrusted_question": request.question,
+            "facts": [
+                {
+                    "fact_id": claim.claim_id,
+                    "statement": claim.claim_text,
+                    "qualifiers": [claim.qualifier] if claim.qualifier else [],
+                    "citation_ids": [claim.citation_id],
+                }
+                for claim in claims
+            ],
+            "next_steps": steps,
+            "limitations": list(composed["limitations"]),
+            "evidence": [
+                {
+                    "citation_id": citation.citation_id,
+                    "excerpt": citation.excerpt,
+                    "source_filename": citation.source_filename,
+                    "page_start": citation.page_start,
+                    "page_end": citation.page_end,
+                    "chunk_id": citation.chunk_id,
+                }
+                for citation in citations
+            ],
+        }
+        try:
+            with self._generation_lock:
+                return self._synthesize_packet(
+                    packet, deterministic, evidence, request.question, understanding, None, "generic",
+                    request.response_language,
+                    invalid_output_response=self._abstention(
+                        evidence=[], citations=[], response_language=request.response_language,
+                        question=request.question,
+                    ),
+                )
+        except Exception:
+            self._log_synthesis_attempt(
+                plan_category="generic", attempt=1, outcome="fallback", code="UNEXPECTED", elapsed_ms=0,
+            )
+            return deterministic
+
+    def _localized_generic_limitation(
+        self,
+        *,
+        citations: list[ChatCitation],
+        evidence_count: int,
+        response_language: Literal["hi", "mr", "ta", "bn"],
+        assistant_context: AssistantContext | None,
+    ) -> ChatResponse:
+        copy = {
+            "hi": "प्रासंगिक BIS साक्ष्य मिला है, लेकिन इस सामग्री के लिए समीक्षित हिंदी उत्तर उपलब्ध नहीं है। मूल साक्ष्य नीचे दिया गया है; वर्तमान आवश्यकताओं की BIS से पुष्टि करें।",
+            "mr": "संबंधित BIS पुरावा सापडला आहे, परंतु या सामग्रीसाठी पुनरावलोकित मराठी उत्तर उपलब्ध नाही. मूळ पुरावा खाली दिला आहे; सध्याच्या आवश्यकतांची BIS कडून पडताळणी करा.",
+            "ta": "தொடர்புடைய BIS சான்று கிடைத்துள்ளது; ஆனால் இந்த உள்ளடக்கத்திற்கான மதிப்பாய்வு செய்யப்பட்ட தமிழ் பதில் இல்லை. மூலச் சான்று கீழே உள்ளது; தற்போதைய தேவைகளை BIS உடன் சரிபார்க்கவும்.",
+            "bn": "প্রাসঙ্গিক BIS প্রমাণ পাওয়া গেছে, কিন্তু এই উপাদানের জন্য পর্যালোচিত বাংলা উত্তর উপলব্ধ নয়। মূল প্রমাণ নিচে আছে; বর্তমান প্রয়োজনীয়তা BIS-এর সঙ্গে যাচাই করুন।",
+        }[response_language]
+        return self._guided_response(
+            sections=[AnswerSection(type="important", title="Important limitation", content=copy, citation_ids=[])],
+            grounded=False,
+            insufficient_evidence=True,
+            evidence_count=evidence_count,
+            citations=citations,
+            model=self._generator.model if self._generator else self._model_name,
+            generation_mode="abstention",
+            disclaimer=localized_disclaimer(response_language),
+            assistant_context=assistant_context,
+            response_language=response_language,
+        )
+
+    @staticmethod
+    def _validated_provider_explanation(
+        generated: SynthesisOutput,
+        packet: Mapping[str, object],
+        deterministic: ChatResponse,
+        response_language: Literal["en", "hi", "mr", "ta", "bn"],
+        routing_context: ComplianceRoutingContext | None,
+    ) -> AnswerSection:
+        """Accept one plain-language addition without reopening locked facts."""
+        explanations = [section for section in generated.sections if section.type == "explanation" and section.content.strip()]
+        if len(explanations) != 1:
+            raise EvidenceCompletenessError("MISSING_EXPLANATION")
+        section = explanations[0]
+        fragments = [section.content, *section.items]
+        normalized_fragments = [re.sub(r"\s+", " ", fragment).casefold().strip() for fragment in fragments if fragment.strip()]
+        if len(normalized_fragments) != len(set(normalized_fragments)):
+            raise EvidenceCompletenessError("DUPLICATE_CONTENT")
+        text = " ".join(fragments).strip()
+        if not ChatService._matches_response_language(text, response_language):
+            raise EvidenceCompletenessError("OUTPUT_LANGUAGE_MISMATCH")
+        lowered = text.casefold()
+        if re.search(
+            r"\b(?:none of (?:the )?(?:passages|evidence)|(?:the )?(?:indexed )?evidence does not "
+            r"(?:mention|address|establish)|no retrieved evidence answers)\b",
+            lowered,
+        ):
+            raise EvidenceCompletenessError("SELF_DECLARED_INSUFFICIENT_EVIDENCE")
+        if (
+            "batteryoperated" in lowered
+            or "no other standards apply" in lowered
+            or "no other standard applies" in lowered
+            or lowered.startswith("passage:")
+            or "\n" in text
+        ):
+            raise EvidenceCompletenessError("UNSAFE_EXPLANATION")
+        if routing_context is not None and routing_context.power_type == "battery_operated" and "mains-powered" in lowered:
+            raise EvidenceCompletenessError("PROFILE_ROUTE_MISMATCH")
+        locked = " ".join(
+            [item.content or "" for item in deterministic.answer_sections]
+            + [entry for item in deterministic.answer_sections for entry in item.items]
+        )
+        normalized = lambda value: re.sub(r"\W+", " ", value.casefold()).strip()
+        if normalized(text) in normalized(locked) or ChatService._semantic_overlap(text, locked) >= 0.72:
+            raise EvidenceCompletenessError("SEMANTIC_REPETITION")
+        facts = {
+            str(item.get("fact_id")): item for item in packet.get("facts", [])
+            if isinstance(item, Mapping) and isinstance(item.get("fact_id"), str)
+        }
+        if not section.source_fact_ids or not set(section.source_fact_ids) <= set(facts):
+            raise EvidenceCompletenessError("UNKNOWN_FACT_ID")
+        allowed_citations = {
+            str(citation_id)
+            for fact_id in section.source_fact_ids
+            for citation_id in facts[fact_id].get("citation_ids", [])
+        }
+        public_citations = {citation.citation_id for citation in deterministic.citations}
+        if not section.citation_ids or not set(section.citation_ids) <= allowed_citations | public_citations:
+            raise EvidenceCompletenessError("UNALLOWED_CITATION_ID")
+        allowed_ids = set(re.findall(r"\bIS\s+\d{3,6}(?:\s+Part\s+\d{1,2})?\b|\b(?:19|20)\d{2}\b", locked, re.I))
+        output_ids = set(re.findall(r"\bIS\s+\d{3,6}(?:\s+Part\s+\d{1,2})?\b|\b(?:19|20)\d{2}\b", text, re.I))
+        if {item.casefold() for item in output_ids} - {item.casefold() for item in allowed_ids}:
+            raise EvidenceCompletenessError("UNSUPPORTED_IDENTIFIER")
+        return AnswerSection(
+            type="explanation", title="What this means", content=section.content,
+            items=list(section.items), citation_ids=list(section.citation_ids),
+        )
+
+    @staticmethod
+    def _semantic_overlap(left: str, right: str) -> float:
+        ignored = {"the", "and", "for", "with", "that", "this", "from", "where", "only", "does", "not"}
+        left_words = {word for word in re.findall(r"[a-z0-9]+", left.casefold()) if len(word) > 2 and word not in ignored}
+        right_words = {word for word in re.findall(r"[a-z0-9]+", right.casefold()) if len(word) > 2 and word not in ignored}
+        return len(left_words & right_words) / len(left_words) if left_words else 1.0
+
     def _abstention(
         self,
         *,
         evidence: list[TrustedEvidence],
         citations: list[ChatCitation] | None = None,
         response_language: Literal["en", "hi", "mr", "ta", "bn"] = "en",
+        question: str | None = None,
     ) -> ChatResponse:
-        return ChatResponse(
-            answer=localized_abstention(response_language),
+        answer = localized_abstention(response_language)
+        if question and self._is_acoustic_subcontract_question(question):
+            answer = {
+                "en": (
+                    "The indexed evidence does not establish whether acoustic testing for toys may be "
+                    "subcontracted. Check the current applicable standard, product manual, or BIS requirements."
+                ),
+                "hi": "सूचीबद्ध साक्ष्य यह स्थापित नहीं करता कि खिलौनों के ध्वनिक परीक्षण का काम उप-ठेके पर दिया जा सकता है या नहीं। वर्तमान लागू मानक, उत्पाद मैनुअल या BIS आवश्यकताओं की जाँच करें।",
+                "mr": "अनुक्रमित पुरावा खेळण्यांच्या ध्वनिक चाचणीचे उपकंत्राट देता येते की नाही हे स्थापित करत नाही. सध्याचे लागू मानक, उत्पादन पुस्तिका किंवा BIS आवश्यकता तपासा.",
+                "ta": "பொம்மைகளுக்கான ஒலியியல் சோதனையை துணை ஒப்பந்தமாக வழங்கலாமா என்பதை அட்டவணைப்படுத்தப்பட்ட சான்று நிறுவவில்லை. நடப்பில் பொருந்தும் தரநிலை, தயாரிப்பு கையேடு அல்லது BIS தேவைகளைச் சரிபார்க்கவும்.",
+                "bn": "সূচিকৃত প্রমাণটি খেলনার শব্দ-সংক্রান্ত পরীক্ষা উপ-ঠিকাদারে দেওয়া যায় কি না তা প্রতিষ্ঠা করে না। বর্তমান প্রযোজ্য মান, পণ্যের ম্যানুয়াল বা BIS-এর প্রয়োজনীয়তা যাচাই করুন।",
+            }[response_language]
+        return self._guided_response(
+            sections=[AnswerSection(type="important", title="Important limitation", content=answer, citation_ids=[])],
             grounded=False,
             insufficient_evidence=True,
             evidence_count=len(evidence),
@@ -2070,6 +2902,15 @@ class ChatService:
             model=self._generator.model if self._generator else self._model_name,
             generation_mode="abstention",
             disclaimer=localized_disclaimer(response_language),
+            response_language=response_language,
+        )
+
+    @staticmethod
+    def _is_acoustic_subcontract_question(question: str) -> bool:
+        lowered = question.casefold()
+        return (
+            any(term in lowered for term in ("acoustic", "acoustics", "sound"))
+            and any(term in lowered for term in ("subcontract", "outsource", "external laborator"))
         )
 
     def _clarification(

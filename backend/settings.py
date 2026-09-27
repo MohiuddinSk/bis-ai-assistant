@@ -87,6 +87,11 @@ def get_retrieval_settings() -> RetrievalSettings:
     )
 
 
+def synthesis_enabled() -> bool:
+    """Opt in to fact-constrained synthesis. A provider key alone does not enable it."""
+    return os.getenv("LLM_SYNTHESIS_ENABLED", "false").strip().lower() == "true"
+
+
 def get_generation_settings() -> GenerationSettings:
     provider = os.getenv("LLM_PROVIDER", DEFAULT_LLM_PROVIDER).strip().lower()
     if provider == "openai_compatible":

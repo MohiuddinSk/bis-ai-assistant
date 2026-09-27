@@ -412,7 +412,7 @@ def _power(query: str) -> PowerClassification:
         query,
     ):
         return "non_electric"
-    if re.search(r"\bbattery-operated\b", query):
+    if re.search(r"\b(battery-operated|runs on batteries|powered by batteries|battery powered)\b", query):
         return "battery_operated"
     if re.search(r"\b(mains-powered|plug[ -]?in|ac-powered)\b", query):
         return "mains_electric"
@@ -644,7 +644,11 @@ def understand_question(
 
     context = None
     if clarification:
-        expected = list(dict.fromkeys(asked_slots or missing))
+        allowed_slots = {
+            "role", "product_description", "product_scope", "power_type", "age_group",
+            "application_stage", "goal", "standard_reference",
+        }
+        expected = [slot for slot in dict.fromkeys(asked_slots or missing) if slot in allowed_slots]
         context = AssistantContext(
             original_question=(active_context.original_question if active_context and active_context.original_question else question),
             expected_slots=expected,

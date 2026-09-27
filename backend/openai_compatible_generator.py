@@ -11,13 +11,19 @@ import httpx
 
 from backend.generation import (
     GROQ_RESPONSE_SCHEMA,
+    SYNTHESIS_RESPONSE_SCHEMA,
     ProviderCompletionExhaustedError,
     ProviderRateLimitError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
-from backend.prompts import SYSTEM_PROMPT, build_user_prompt
+from backend.prompts import (
+    SYNTHESIS_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_synthesis_user_prompt,
+    build_user_prompt,
+)
 from backend.settings import GenerationSettings
 
 logger = logging.getLogger(__name__)
@@ -127,13 +133,23 @@ class OpenAICompatibleGenerator:
     def model(self) -> str:
         return self._settings.model
 
-    def generate(self, question: str, evidence: Sequence[Mapping[str, object]], *, repair: bool = False, concise: bool = False, repair_feedback: str | None = None) -> str:
+    def generate(self, question: str, evidence: Sequence[Mapping[str, object]], *, repair: bool = False, concise: bool = False, repair_feedback: str | None = None, synthesis_packet: Mapping[str, object] | None = None) -> str:
+        if synthesis_packet is not None:
+            system_prompt = SYNTHESIS_SYSTEM_PROMPT
+            user_prompt = build_synthesis_user_prompt(synthesis_packet, repair=repair, repair_feedback=repair_feedback)
+            schema_name = "grounded_fact_synthesis"
+            schema = SYNTHESIS_RESPONSE_SCHEMA
+        else:
+            system_prompt = SYSTEM_PROMPT
+            user_prompt = build_user_prompt(question, evidence, repair=repair, concise=concise, repair_feedback=repair_feedback)
+            schema_name = "grounded_bis_answer"
+            schema = GROQ_RESPONSE_SCHEMA
         response_format: dict[str, object]
         if self._settings.structured_output_mode == "json_schema":
-            response_format = {"type": "json_schema", "json_schema": {"name": "grounded_bis_answer", "strict": True, "schema": GROQ_RESPONSE_SCHEMA}}
+            response_format = {"type": "json_schema", "json_schema": {"name": schema_name, "strict": True, "schema": schema}}
         else:
             response_format = {"type": "json_object"}
-        payload = {"model": self.model, "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": build_user_prompt(question, evidence, repair=repair, concise=concise, repair_feedback=repair_feedback)}], "temperature": 0, "max_completion_tokens": self._settings.max_completion_tokens, "response_format": response_format, "stream": False}
+        payload = {"model": self.model, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}], "temperature": 0, "max_completion_tokens": self._settings.max_completion_tokens, "response_format": response_format, "stream": False}
         headers = {"Content-Type": "application/json"}
         if self._settings.api_key:
             headers["Authorization"] = f"Bearer {self._settings.api_key}"

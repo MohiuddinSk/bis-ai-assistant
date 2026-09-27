@@ -74,11 +74,12 @@ class ProviderUnavailableApiTests(unittest.TestCase):
         self.assertEqual(response.json()["generation_mode"], "extractive_fallback")
         self.assertTrue(response.json()["grounded"])
 
-    def test_disabled_generation_required_request_is_sanitized_503_with_request_id(self):
+    def test_disabled_generic_request_returns_a_safe_http_200_limitation(self):
         with self.assert_no_provider_construction("disabled") as client:
             response = client.post("/api/chat", json={"question": "Tell me about BIS toy regulation"})
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json(), {"detail": "Chat generation is unavailable."})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.json()["generation_mode"], {"extractive_fallback", "abstention"})
+        self.assertIn(response.json()["response_kind"], {"grounded_guidance", "limitation"})
         self.assertIn("x-request-id", response.headers)
         self.assertNotIn("provider", response.text.lower())
 
@@ -89,8 +90,8 @@ class ProviderUnavailableApiTests(unittest.TestCase):
             response = client.post("/api/chat", json={"question": "Tell me about BIS toy regulation"})
         self.assertEqual(health.status_code, 200)
         self.assertEqual(retrieve.status_code, 200)
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json(), {"detail": "Chat generation is unavailable."})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.json()["generation_mode"], {"extractive_fallback", "abstention"})
 
 
 if __name__ == "__main__":

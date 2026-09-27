@@ -5,7 +5,12 @@ import logging
 import re
 from typing import Any, Protocol
 
-from backend.prompts import SYSTEM_PROMPT, build_user_prompt
+from backend.prompts import (
+    SYNTHESIS_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_synthesis_user_prompt,
+    build_user_prompt,
+)
 from backend.settings import GenerationSettings, get_generation_settings
 
 
@@ -33,6 +38,43 @@ GROQ_RESPONSE_SCHEMA: dict[str, object] = {
         },
     },
     "required": ["answer", "insufficient_evidence", "citations"],
+    "additionalProperties": False,
+}
+
+# Separate from GROQ_RESPONSE_SCHEMA. Groq strict decoding only guarantees fields
+# that this object requires, so every synthesis section is a required property.
+# direct_answer and explanation must carry at least one fact and citation id.
+_SYNTHESIS_SECTION_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "content": {"type": "string"},
+        "items": {"type": "array", "items": {"type": "string"}},
+        "citation_ids": {"type": "array", "items": {"type": "string"}},
+        "source_fact_ids": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["content", "items", "citation_ids", "source_fact_ids"],
+    "additionalProperties": False,
+}
+_SYNTHESIS_GROUNDED_SECTION_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "content": {"type": "string"},
+        "items": {"type": "array", "items": {"type": "string"}},
+        "citation_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "source_fact_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    },
+    "required": ["content", "items", "citation_ids", "source_fact_ids"],
+    "additionalProperties": False,
+}
+SYNTHESIS_RESPONSE_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "direct_answer": _SYNTHESIS_GROUNDED_SECTION_SCHEMA,
+        "explanation": _SYNTHESIS_GROUNDED_SECTION_SCHEMA,
+        "next_steps": _SYNTHESIS_SECTION_SCHEMA,
+        "important": _SYNTHESIS_SECTION_SCHEMA,
+    },
+    "required": ["direct_answer", "explanation", "next_steps", "important"],
     "additionalProperties": False,
 }
 
@@ -79,6 +121,7 @@ class GenerationProvider(Protocol):
         repair: bool = False,
         concise: bool = False,
         repair_feedback: str | None = None,
+        synthesis_packet: Mapping[str, object] | None = None,
     ) -> str: ...
 
 
@@ -112,22 +155,32 @@ class GroqGenerator:
         repair: bool = False,
         concise: bool = False,
         repair_feedback: str | None = None,
+        synthesis_packet: Mapping[str, object] | None = None,
     ) -> str:
+        if synthesis_packet is not None:
+            system_prompt = SYNTHESIS_SYSTEM_PROMPT
+            user_prompt = build_synthesis_user_prompt(
+                synthesis_packet, repair=repair, repair_feedback=repair_feedback,
+            )
+            schema_name = "grounded_fact_synthesis"
+            schema = SYNTHESIS_RESPONSE_SCHEMA
+        else:
+            system_prompt = SYSTEM_PROMPT
+            user_prompt = build_user_prompt(
+                question,
+                evidence,
+                repair=repair,
+                concise=concise,
+                repair_feedback=repair_feedback,
+            )
+            schema_name = "grounded_bis_answer"
+            schema = GROQ_RESPONSE_SCHEMA
         try:
             completion = self._client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": build_user_prompt(
-                            question,
-                            evidence,
-                            repair=repair,
-                            concise=concise,
-                            repair_feedback=repair_feedback,
-                        ),
-                    },
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
                 temperature=0,
                 max_completion_tokens=self._settings.max_completion_tokens,
@@ -136,9 +189,9 @@ class GroqGenerator:
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
-                        "name": "grounded_bis_answer",
+                        "name": schema_name,
                         "strict": True,
-                        "schema": GROQ_RESPONSE_SCHEMA,
+                        "schema": schema,
                     },
                 },
                 tool_choice="none",
@@ -148,7 +201,10 @@ class GroqGenerator:
 
         if not completion.choices:
             raise ProviderResponseError("Generation provider returned no choices")
-        return completion.choices[0].message.content or ""
+        choice = completion.choices[0]
+        if getattr(choice, "finish_reason", None) == "length":
+            raise ProviderCompletionExhaustedError("Generation provider exhausted completion tokens")
+        return choice.message.content or ""
 
     @staticmethod
     def _sanitized_provider_message(exc: Exception) -> str:
