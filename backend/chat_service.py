@@ -722,8 +722,9 @@ class ChatService:
 
     @staticmethod
     def _deduplicate_section_citations(sections: list[AnswerSection]) -> list[AnswerSection]:
-        """Preserve first-seen citation order within each user-visible section."""
+        """Preserve evidence while enforcing one visible section per semantic role."""
         normalized: list[AnswerSection] = []
+        by_role: dict[str, int] = {}
         for section in sections:
             citation_ids = list(dict.fromkeys(section.citation_ids))
             seen_items: set[str] = set()
@@ -733,8 +734,57 @@ class ChatService:
                 if key and key not in seen_items:
                     seen_items.add(key)
                     items.append(item)
-            normalized.append(section.model_copy(update={"citation_ids": citation_ids, "items": items}))
+            cleaned = section.model_copy(update={"citation_ids": citation_ids, "items": items})
+            if section.type not in {"direct_answer", "explanation", "next_steps", "important"}:
+                normalized.append(cleaned)
+                continue
+            role_key = (
+                "user_context" if section.type == "explanation"
+                and section.title.strip().casefold() == "your product context"
+                and not section.citation_ids else f"{section.type}:{section.title.strip().casefold()}"
+            )
+            if role_key not in by_role:
+                by_role[role_key] = len(normalized)
+                normalized.append(cleaned)
+                continue
+            index = by_role[role_key]
+            prior = normalized[index]
+            fragments = [value for value in (prior.content, cleaned.content) if value]
+            content = " ".join(dict.fromkeys(fragments)) or None
+            merged_items = list(dict.fromkeys([*prior.items, *cleaned.items]))
+            merged_citations = list(dict.fromkeys([*prior.citation_ids, *cleaned.citation_ids]))
+            normalized[index] = prior.model_copy(update={
+                "content": content, "items": merged_items, "citation_ids": merged_citations,
+            })
         return normalized
+
+    @staticmethod
+    def _merge_roadmap_next_steps(sections: list[AnswerSection]) -> list[AnswerSection]:
+        """Keep the established roadmap's application/document actions together."""
+        result: list[AnswerSection] = []
+        merged: AnswerSection | None = None
+        next_step_count = 0
+        for section in sections:
+            if section.type != "next_steps":
+                result.append(section)
+                continue
+            next_step_count += 1
+            # The first action is the standards review; only the later
+            # application/document fragments form the established combined row.
+            if next_step_count == 1:
+                result.append(section)
+                continue
+            if merged is None:
+                merged = section
+                result.append(merged)
+                continue
+            merged = merged.model_copy(update={
+                "content": " ".join(dict.fromkeys(value for value in (merged.content, section.content) if value)) or None,
+                "items": list(dict.fromkeys([*merged.items, *section.items])),
+                "citation_ids": list(dict.fromkeys([*merged.citation_ids, *section.citation_ids])),
+            })
+            result[-1] = merged
+        return result
 
     @staticmethod
     def _localized_or_english_fallback(
@@ -1617,6 +1667,8 @@ class ChatService:
             ]
         fact_plan = self._fact_plan(plan)
         sections = self._deduplicate_section_citations(sections)
+        if plan.category.startswith("roadmap_"):
+            sections = self._merge_roadmap_next_steps(sections)
         self._validate_sections(sections, fact_plan, citations)
         reviewed_family = understanding.reviewed_question_family if understanding else None
         reviewed_family = self._reviewed_localization_family(

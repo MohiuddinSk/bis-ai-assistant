@@ -253,6 +253,10 @@ def _explanation_intent(query: str, refs: tuple[StandardReference, ...]) -> Inte
         return "is_general_meaning"
     if len(refs) >= 2 and _COMPARISON_CUE.search(query):
         return "standard_comparison"
+    # A bare identifier is a structural standard request, never a generic
+    # retrieval query. Spacing and punctuation have already been normalized.
+    if refs and re.fullmatch(r"is\s*\d{3,6}(?:\s*(?:parts?|pt\.?)\s*\d{1,2})?", query.strip(), re.I):
+        return "standard_explanation"
     if refs and (_EXPLANATION_CUE.search(query) or _SIMPLIFY_CUE.search(query)):
         return "standard_explanation"
     if refs and _HI_MR_EXPLANATION_CUE.search(query):
@@ -529,7 +533,18 @@ def understand_question(
     suggestions: tuple[str, ...] = ()
 
     ambiguous_kitchen = "kitchen_set" in signals and "children_play" not in signals
-    if ambiguous_kitchen:
+    ambiguous_electric_car = (
+        "car" in current and power == "electric_unspecified" and "toy" not in signals
+    )
+    if ambiguous_electric_car:
+        ambiguity.append("electric_car_product_scope")
+        missing.append("product_scope")
+        clarification = (
+            "Do you mean a battery-operated toy car, or a road-going electric vehicle? "
+            "The indexed material is toy-focused; I cannot infer automotive requirements."
+        )
+        suggestions = ("Battery-operated toy car", "Road-going electric vehicle")
+    elif ambiguous_kitchen:
         ambiguity.append("kitchen_set_may_not_be_a_toy")
         missing.append("product_scope")
         clarification = "Is this a children's toy intended for play, or an actual household kitchen product?"
@@ -612,6 +627,16 @@ def understand_question(
                 suggestions = ("Manufacturer", "Importer", "Artisan")
             elif "application_stage" in next_missing:
                 suggestions = ("First BIS licence", "Add to an existing licence")
+    elif (
+        intent == "standard_explanation" and refs and refs[0].number == "9873"
+        and refs[0].part is None and reviewed_question_family != "battery_q11_parts"
+    ):
+        missing.append("standard_reference")
+        asked_slots = ["standard_reference"]
+        clarification = (
+            "IS 9873 is a family of parts with different roles. Which part, or what toy context, do you mean?"
+        )
+        suggestions = ("IS 9873 Part 1", "IS 9873 Part 2", "IS 9873 Part 3", "IS 9873 Part 4")
     elif intent in {"standard_explanation", "standard_comparison"} and not refs:
         missing.append("standard_reference")
         asked_slots = ["standard_reference"]

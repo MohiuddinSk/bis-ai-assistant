@@ -1,4 +1,6 @@
 import unittest
+import os
+from unittest.mock import patch
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -247,24 +249,27 @@ class RetrievalApiTests(unittest.TestCase):
         )
 
     def test_cors_allows_configured_origin_and_rejects_other_origin(self):
-        client, _ = self.make_client()
-        with client:
-            allowed = client.options(
-                "/api/retrieve",
-                headers={
-                    "Origin": "http://localhost:5173",
-                    "Access-Control-Request-Method": "POST",
-                    "Access-Control-Request-Headers": "Content-Type",
-                },
-            )
-            denied = client.options(
-                "/api/retrieve",
-                headers={
-                    "Origin": "https://example.com",
-                    "Access-Control-Request-Method": "POST",
-                },
-            )
-            exposed = client.get("/health", headers={"Origin": "http://localhost:5173"})
+        # The CORS contract is deterministic and must not inherit a developer's
+        # deployment origin when discovery runs through Docker.
+        with patch.dict(os.environ, {"ALLOWED_ORIGINS": "http://localhost:5173"}):
+            client, _ = self.make_client()
+            with client:
+                allowed = client.options(
+                    "/api/retrieve",
+                    headers={
+                        "Origin": "http://localhost:5173",
+                        "Access-Control-Request-Method": "POST",
+                        "Access-Control-Request-Headers": "Content-Type",
+                    },
+                )
+                denied = client.options(
+                    "/api/retrieve",
+                    headers={
+                        "Origin": "https://example.com",
+                        "Access-Control-Request-Method": "POST",
+                    },
+                )
+                exposed = client.get("/health", headers={"Origin": "http://localhost:5173"})
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(
             allowed.headers.get("access-control-allow-origin"),

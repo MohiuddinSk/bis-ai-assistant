@@ -176,8 +176,10 @@ def _localize_battery_roadmap(
     stage = family.removeprefix(prefix)
     if stage not in {"researching", "preparing_application", "existing_licence", "scope_extension"}:
         return None
-    expected_types = ["direct_answer", "explanation", "next_steps", "next_steps", "next_steps", "important"]
-    if [section.type for section in sections] != expected_types:
+    five_section_types = ["direct_answer", "explanation", "next_steps", "next_steps", "important"]
+    legacy_six_section_types = ["direct_answer", "explanation", "next_steps", "next_steps", "next_steps", "important"]
+    section_types = [section.type for section in sections]
+    if section_types != five_section_types and section_types != legacy_six_section_types:
         return None
     source_copy = " ".join(
         [section.content or "" for section in sections]
@@ -253,14 +255,22 @@ def _localize_battery_roadmap(
         "ta": ("பொருந்தும் தரநிலை", "உங்கள் தயாரிப்பு சூழல்", "அடுத்த படி", "ஆதரிக்கப்படும் விண்ணப்ப படிகள்", "ஆவணங்கள் அல்லது அறிவிப்புகள்", "ஆவணங்கள் நிறுவாதவை"),
         "bn": ("প্রযোজ্য মান", "আপনার পণ্যের প্রেক্ষিত", "পরবর্তী পদক্ষেপ", "সমর্থিত আবেদন ধাপ", "নথি বা ঘোষণা", "নথি যা প্রতিষ্ঠা করে না"),
     }[language]
-    replacements = [
-        (titles[0], copy["standard"], None),
-        (titles[1], copy["context"], None),
-        (titles[2], None, [copy["next"][stage]]),
-        (titles[3], None, copy["application"]),
-        (titles[4], copy["documents"], copy["document_items"]),
-        (titles[5], copy["limits"], None),
-    ]
+    replacements = (
+        [
+            (titles[0], copy["standard"], None),
+            (titles[1], copy["context"], None),
+            (titles[2], None, [copy["next"][stage]]),
+            (titles[3], copy["documents"], [*copy["application"], *copy["document_items"]]),
+            (titles[5], copy["limits"], None),
+        ] if section_types == five_section_types else [
+            (titles[0], copy["standard"], None),
+            (titles[1], copy["context"], None),
+            (titles[2], None, [copy["next"][stage]]),
+            (titles[3], None, copy["application"]),
+            (titles[4], copy["documents"], copy["document_items"]),
+            (titles[5], copy["limits"], None),
+        ]
+    )
     return [_replace(section, title=title, content=content, items=items) for section, (title, content, items) in zip(sections, replacements)]
 
 

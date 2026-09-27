@@ -6,6 +6,21 @@ from backend.question_understanding import normalize_question, understand_questi
 
 
 class QuestionUnderstandingTests(unittest.TestCase):
+    def test_bare_standard_identifiers_use_structural_explanation_routing(self):
+        for question in ("IS 15644", "What is IS 15644?", "IS9873", "What is IS 9873?", "IS 9873 Part 2"):
+            with self.subTest(question=question):
+                understood = understand_question(question)
+                self.assertEqual(understood.intent, "standard_explanation")
+        family = understand_question("tell me in detail what is IS9873")
+        self.assertTrue(family.clarification_required)
+        self.assertIn("family of parts", family.clarification_question)
+
+    def test_ambiguous_electric_car_requires_product_scope(self):
+        understood = understand_question("but the car is electrical doesn’t it need compliance")
+        self.assertTrue(understood.clarification_required)
+        self.assertIn("toy car", understood.clarification_question)
+        self.assertIn("road-going electric vehicle", understood.clarification_question)
+
     def test_conservative_typo_corrections(self):
         understood = understand_question("how to certify mt toys")
         self.assertEqual(understood.intent, "certification")
