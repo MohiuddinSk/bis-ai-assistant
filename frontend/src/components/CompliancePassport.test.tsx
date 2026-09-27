@@ -5,7 +5,6 @@ import { CompliancePrintReport } from './CompliancePrintReport';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import type { ChatResponse } from '../types/chat';
 import type { ComplianceProfile } from '../types/compliance';
-
 const profile: ComplianceProfile = { role: 'manufacturer', product_description: 'Battery toy', power_type: 'battery_operated', intended_age_group: '3_to_8', goal: 'identify_standards', application_stage: 'researching', additional_context: null };
 const guidance: ChatResponse = { answer: 'Grounded guidance.', grounded: true, insufficient_evidence: false, evidence_count: 1, citations: [{ citation_id: 'S1', source_filename: 'manual.pdf', page_start: 4, page_end: 4, chunk_id: 'chunk-1', excerpt: 'IS 15644 applies where applicable.' }, { citation_id: 'S2', source_filename: 'unlinked.pdf', page_start: 9, page_end: 9, chunk_id: 'chunk-2', excerpt: 'This evidence is not used.' }], model: 'test', generation_mode: 'extractive_fallback', disclaimer: 'Verify before relying on this guidance.', answer_sections: [
   { type: 'direct_answer', title: 'Standards', content: 'IS 15644 applies.', items: [], citation_ids: ['S1'] },
@@ -33,7 +32,7 @@ it('renders cited findings, verification limits, and at most three actions witho
   const passport = within(screen.getByRole('region', { name: 'Compliance Passport' }));
   expect(passport.getByText(compliancePassportId(profile, guidance))).toBeInTheDocument();
   expect(passport.getByText('User-provided information — not verified BIS evidence.')).toBeInTheDocument();
-  expect(passport.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(passport.queryByText('IS 15644 applies where applicable.')).not.toBeInTheDocument();
   expect(passport.getByText('manual.pdf')).toBeInTheDocument();
   expect(passport.queryByText('unlinked.pdf')).not.toBeInTheDocument();
   expect(passport.queryByText('Battery toy context from the user.')).not.toBeInTheDocument();
@@ -72,13 +71,13 @@ it('localizes passport UI labels without changing sources or standard identifier
   renderPassport('hi');
   expect(screen.getByRole('region', { name: 'अनुपालन पासपोर्ट' })).toBeInTheDocument();
   expect(screen.getByText('उद्धृत साक्ष्य')).toBeInTheDocument();
-  expect(screen.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(screen.queryByText('IS 15644 applies where applicable.')).not.toBeInTheDocument();
   expect(screen.getByText('manual.pdf')).toBeInTheDocument();
   cleanup();
   renderPassport('mr');
   expect(screen.getByRole('region', { name: 'अनुपालन पासपोर्ट' })).toBeInTheDocument();
   expect(screen.getByText('उद्धृत पुरावा')).toBeInTheDocument();
-  expect(screen.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(screen.queryByText('IS 15644 applies where applicable.')).not.toBeInTheDocument();
   expect(screen.getByText('manual.pdf')).toBeInTheDocument();
 });
 
@@ -143,8 +142,8 @@ it('keeps the responsive header, metadata, profile rows, and localized section c
     expect(header!.querySelector('.passport-notice')).not.toBeNull();
     expect(header!.querySelector('.passport-report-id')).toHaveTextContent(compliancePassportId(profile, guidance));
     expect(passport!.querySelectorAll('.passport-profile dl > dt')).toHaveLength(5);
-    expect(screen.getAllByText(simpleTerms).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(important).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(simpleTerms).length).toBe(1);
+    expect(screen.getAllByText(important).length).toBe(1);
     if (language !== 'en') {
       expect(within(passport!).queryByText('In simple terms', { exact: true })).toBeNull();
       expect(within(passport!).queryByText('Important to know', { exact: true })).toBeNull();
@@ -157,8 +156,61 @@ it('keeps the responsive header, metadata, profile rows, and localized section c
     expect(report).not.toBeNull();
     expect(report!.querySelector('.passport-heading .passport-metadata')).not.toBeNull();
     expect(report!.querySelectorAll('.passport-profile dl > dt')).toHaveLength(5);
-    expect(within(report!).getAllByText(simpleTerms).length).toBeGreaterThan(0);
-    expect(within(report!).getAllByText(important).length).toBeGreaterThan(0);
+    expect(within(report!).getAllByText(simpleTerms).length).toBe(1);
+    expect(within(report!).getAllByText(important).length).toBe(1);
     if (language !== 'en') expect(within(report!).queryByText('In simple terms', { exact: true })).toBeNull();
   }
+});
+
+it('prints a validated supporting quote instead of a noisy excerpt while preserving citation identity', () => {
+  const noisy = 'Noisy OCR excerpt | Column 1 | Column 2 | repeated source material.';
+  const quote = 'IS 15644 applies where applicable.';
+  const response = { ...guidance, citations: [{ ...guidance.citations[0], excerpt: noisy, supporting_quote: quote }] };
+  renderPrintReport('en', response);
+  const source = document.querySelector<HTMLElement>('.passport-source')!;
+  expect(source).toHaveTextContent('S1');
+  expect(source).toHaveTextContent('manual.pdf');
+  expect(source).toHaveTextContent('Pages 4');
+  expect(source).toHaveTextContent(quote);
+  expect(source).not.toHaveTextContent(noisy);
+  const paragraphs = source.querySelectorAll('p');
+  expect(paragraphs).toHaveLength(2);
+  expect(paragraphs[0].parentElement).toBe(source);
+  expect(paragraphs[1].parentElement).toBe(source);
+  expect(paragraphs[1]).toHaveTextContent(quote);
+});
+
+it('prints metadata only when no supporting quote is available and preserves source order', () => {
+  const first = { ...guidance.citations[0], excerpt: 'Raw evidence one.' };
+  const second = { ...guidance.citations[1], citation_id: 'S3', source_filename: 'second.pdf', page_start: 7, page_end: 7, chunk_id: 'chunk-3', excerpt: 'Raw evidence two.' };
+  const response = { ...guidance, citations: [first, second], answer_sections: guidance.answer_sections!.map((section) => ({ ...section, citation_ids: section.citation_ids.includes('S1') ? ['S1', 'S3'] : section.citation_ids })) };
+  renderPrintReport('en', response);
+  const blocks = Array.from(document.querySelectorAll<HTMLElement>('.passport-source'));
+  expect(blocks).toHaveLength(2);
+  expect(blocks[0]).toHaveTextContent('S1');
+  expect(blocks[0]).toHaveTextContent('manual.pdf');
+  expect(blocks[0]).toHaveTextContent('Pages 4');
+  expect(blocks[1]).toHaveTextContent('S3');
+  expect(blocks[1]).toHaveTextContent('second.pdf');
+  expect(blocks[1]).toHaveTextContent('Pages 7');
+  expect(blocks[0]).not.toHaveTextContent('Raw evidence one.');
+  expect(blocks[1]).not.toHaveTextContent('Raw evidence two.');
+  for (const block of blocks) {
+    expect(block.querySelectorAll('p')).toHaveLength(1);
+    expect(block.querySelector('p')?.parentElement).toBe(block);
+  }
+});
+
+it('keeps all printable citation metadata and evidence in the protected citation wrapper', () => {
+  const quote = 'Validated verbatim supporting quote.';
+  const response = { ...guidance, citations: [{ ...guidance.citations[0], supporting_quote: quote }] };
+  renderPrintReport('en', response);
+  const source = document.querySelector<HTMLElement>('.compliance-print-report .passport-source')!;
+  expect(source).toBeInstanceOf(HTMLElement);
+  expect(source.tagName).toBe('ARTICLE');
+  expect(source).toHaveTextContent('S1');
+  expect(source).toHaveTextContent('manual.pdf');
+  expect(source).toHaveTextContent('Pages 4');
+  expect(source).toHaveTextContent(quote);
+  expect(source.parentElement?.querySelectorAll('.passport-source')).toHaveLength(1);
 });

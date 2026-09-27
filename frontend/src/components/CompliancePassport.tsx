@@ -50,7 +50,7 @@ export function passportStatus(profile: ComplianceProfile, guidance: ChatRespons
 }
 
 function sourceRows(citations: Citation[]) {
-  return citations.map((citation) => ({ id: citation.citation_id, filename: citation.source_filename, pages: citation.page_start === citation.page_end ? String(citation.page_start ?? '') : `${citation.page_start ?? ''}–${citation.page_end ?? ''}`, excerpt: citation.excerpt }));
+  return citations.map((citation) => ({ id: citation.citation_id, filename: citation.source_filename, pages: citation.page_start === citation.page_end ? String(citation.page_start ?? '') : `${citation.page_start ?? ''}–${citation.page_end ?? ''}`, quote: citation.supporting_quote }));
 }
 
 function SectionList({ sections }: { sections: AnswerSection[] }) {
@@ -75,11 +75,11 @@ export function CompliancePassportContent({ profile, guidance, generatedAt }: { 
     <header className="passport-heading"><div className="passport-identity"><p className="eyebrow">{t('passportTitle')}</p><h2>{t('passportTitle')}</h2></div><p className={`passport-status ${status}`}>{statusLabel}</p><dl className="passport-metadata"><dt>{t('passportReportId')}</dt><dd className="passport-report-id">{id}</dd><dt>{t('passportGenerated')}</dt><dd><time dateTime={generatedAt.toISOString()}>{generatedAt.toLocaleString(language)}</time></dd><dt>{t('passportLanguage')}</dt><dd>{languageNames[language]}</dd></dl><p className="passport-notice">{t('passportNotice')}</p></header>
     <section className="passport-section passport-profile"><h2>{t('passportProductProfile')}</h2><p className="passport-user-provided">{t('passportUserProvided')}</p><dl><dt>{t('profileProduct')}</dt><dd>{profile.product_description}</dd><dt>{t('profilePower')}</dt><dd>{label(profile.power_type)}</dd><dt>{t('profileAge')}</dt><dd>{label(profile.intended_age_group)}</dd><dt>{t('profileStage')}</dt><dd>{label(profile.application_stage)}</dd><dt>{t('profileGoal')}</dt><dd>{label(profile.goal)}</dd></dl></section>
     {direct.length > 0 && <section className="passport-section"><h2>{t('passportApplicable')}</h2><SectionList sections={direct} /></section>}
-    {findings.length > 0 && <section className="passport-section"><h2>{t('passportFindings')}</h2><p className="passport-section-label">{t('sectionExplanation')}</p><SectionList sections={findings} /></section>}
+    {findings.length > 0 && <section className="passport-section"><h2>{t('passportFindings')}</h2><SectionList sections={findings} /></section>}
     <section className="passport-section"><h2>{t('passportMissingProfile')}</h2>{missingProfile.length > 0 ? <ul>{missingProfile.map((field) => <li key={field}>{field}</li>)}</ul> : <p>{t('passportNoMissing')}</p>}</section>
-    <section className="passport-section"><h2>{t('passportVerificationNeeded')}</h2><p className="passport-section-label">{t('sectionImportant')}</p>{limitations.length > 0 ? <SectionList sections={limitations} /> : status === 'needs_verification' ? <p>{t('passportEvidenceVerification')}</p> : <p>{t('passportNoVerification')}</p>}</section>
+    <section className="passport-section"><h2>{t('passportVerificationNeeded')}</h2>{limitations.length > 0 ? <SectionList sections={limitations} /> : status === 'needs_verification' ? <p>{t('passportEvidenceVerification')}</p> : <p>{t('passportNoVerification')}</p>}</section>
     <section className="passport-section"><h2>{t('passportNextActions')}</h2>{actions.length > 0 ? <ol>{actions.map((action, index) => <li key={index}>{action}</li>)}</ol> : <p>{t('passportNoActions')}</p>}</section>
-    <section className="passport-section"><h2>{t('passportSources')}</h2>{sourceRows(sources).map((source) => <article className="passport-source" key={source.id}><p><strong>{source.id}</strong> — <span className="passport-filename">{source.filename}</span> — {t('pages')} {source.pages}</p><p>{source.excerpt}</p></article>)}</section>
+    <section className="passport-section"><h2>{t('passportSources')}</h2>{sourceRows(sources).map((source) => <article className="passport-source" key={source.id}><p><strong>{source.id}</strong> — <span className="passport-filename">{source.filename}</span> — {t('pages')} {source.pages}</p>{source.quote && <p>{source.quote}</p>}</article>)}</section>
   </>;
 }
 

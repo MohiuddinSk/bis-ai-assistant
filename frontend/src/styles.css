@@ -149,3 +149,16 @@ footer { font-size: .85rem; padding: 22px 0; color: var(--muted-text); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+@media print {
+  @page { size: A4; margin: 16mm; }
+  .compliance-print-report .passport-source {
+    display: block;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .compliance-print-report .passport-section:has(.passport-source) > h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
