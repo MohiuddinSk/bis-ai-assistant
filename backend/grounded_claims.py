@@ -36,6 +36,25 @@ _INJECTION = re.compile(
 )
 _ABSENCE = re.compile(r"\bno other standards apply\b|\bno other standard applies\b", re.IGNORECASE)
 _IS_NUMBER = re.compile(r"\bIS\s*\d{3,6}\b", re.IGNORECASE)
+_TABLE_SERIALIZATION = re.compile(
+    r"\b(?:left[- ]to[- ]right|row\s*\d+|column\s*\d+|cells?)\b|"
+    r"(?:\b-do-\b|\|\s*[^|]{1,40}\s*\|)|"
+    r"(?:\b(?:sl\.?\s*no|particulars?)\b.{0,40}\b(?:column|row)\b)",
+    re.IGNORECASE,
+)
+
+
+def is_publishable_claim_text(value: str) -> bool:
+    """Fail closed on OCR/table serialization; evidence itself stays verbatim."""
+    normalized = " ".join(unicodedata.normalize("NFKC", value).split())
+    if _TABLE_SERIALIZATION.search(normalized):
+        return False
+    if len(re.findall(r"\b\d+(?:\.\d+){1,3}\b", normalized)) >= 4:
+        return False
+    if re.search(r"(?:[;,:|]\s*){4,}", normalized) or re.search(r"[.!?]{2,}", normalized):
+        return False
+    # A claim must contain a proposition, not only a fragment/header.
+    return bool(re.search(r"\b(?:is|are|may|can|appl(?:y|ies)|include|provide|submit|does|will)\b", normalized, re.I))
 
 
 class EvidenceSpan(Protocol):
@@ -236,6 +255,8 @@ def extract_grounded_claims(question: str, evidence: list[EvidenceSpan]) -> list
             continue
         for sentence in sentences:
             if not 20 <= len(sentence) <= 500:
+                continue
+            if not is_publishable_claim_text(sentence):
                 continue
             if sentence not in item.text and sentence not in " ".join(item.text.split()):
                 continue

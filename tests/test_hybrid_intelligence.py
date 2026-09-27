@@ -11,6 +11,7 @@ from backend.grounded_claims import (
     anchors_cover_text,
     extract_grounded_claims,
     extract_question_anchors,
+    is_publishable_claim_text,
     validate_modality,
 )
 from backend.main import create_app
@@ -84,6 +85,25 @@ class HybridApiTests(unittest.TestCase):
         self.assertTrue(outside["insufficient_evidence"])
         self.assertNotIn("IS 15644", outside["answer"])
         self.assertEqual(outside["citations"], [])
+
+    def test_acknowledgements_are_conversation_without_retrieval_or_provider(self):
+        for language, question in {
+            "en": "okay", "hi": "ठीक है", "mr": "समजले", "ta": "சரி", "bn": "ঠিক আছে",
+        }.items():
+            with self.subTest(language=language):
+                generator = ExplodingGenerator()
+                body = self.post({"question": question, "response_language": language}, generator=generator).json()
+                self.assertEqual(body["response_kind"], "conversation")
+                self.assertEqual(body["citations"], [])
+                self.assertFalse(body["insufficient_evidence"])
+                self.assertEqual(generator.calls, [])
+
+    def test_substantive_question_with_acknowledgement_remains_grounded(self):
+        self.assertIsNone(classify_conversation("Okay, what documents are required for a new toy series?", "en"))
+
+    def test_table_serialization_is_never_a_publishable_claim(self):
+        self.assertFalse(is_publishable_claim_text("Column 1 | Column 2 | -do- | left-to-right cells"))
+        self.assertTrue(is_publishable_claim_text("The application may include the declared series details."))
 
     def test_provider_disabled_greeting_still_responds(self):
         def unavailable():

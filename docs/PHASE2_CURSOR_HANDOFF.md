@@ -571,3 +571,71 @@ PDF / Print** and confirm the isolated print view contains only the Passport.
   101 tests**, all passing; production build passed. `git diff --check` and
   protected-path status checks passed. Nothing was staged, committed, pushed,
   merged, or deployed.
+
+### 36. Conversation and standard-answer quality repair (28 September 2026)
+
+- **Root causes:** short acknowledgements were outside the closed social route;
+  bare `IS` references could reach generic retrieval; and generic claim
+  extraction did not reject structural table/OCR serialization before answer
+  composition. Repeated semantic roles could also survive when localized
+  sections had distinct visible headings.
+- **Repair:** acknowledgements now return localized citation-free conversation
+  responses without retrieval/provider use. Bare standard IDs enter structural
+  standard-explanation routing; unqualified `IS 9873` asks for a part or toy
+  context, while explicit parts retain their existing route. The bounded
+  standard context remains server-recognised only. Ambiguous electric-car
+  wording requests toy-car versus road-vehicle clarification rather than
+  inventing automotive obligations. Generic claims reject table rows, column
+  serialization, ditto markers, clause-number runs, malformed punctuation, and
+  non-propositional fragments before publication. Response assembly merges
+  duplicate semantic roles while retaining the separately labelled uncited
+  user-product context.
+- **Part 7 audit (read-only):** `product_manual_2026.pdf` page 4 (PM/9873/14,
+  May 2026, Annex A) genuinely lists IS 9873 Part 7 among secondary standards
+  “(As Applicable)” for the broad Electric Toys row; it identifies Part 7 as
+  finger paints elsewhere in the manual. A more specific extracted electric
+  battery-toy scope row lists Parts 2, 3, 4, 9, 10, and 11. Therefore the
+  existing battery-operated-toy deterministic list is retained: Part 7 is not
+  a blanket battery-toy requirement, and the indexed material needs product
+  purpose/function context before it can be added.
+- **Validation:** focused Docker suites for hybrid intelligence, question
+  understanding, and standard explanations ran **62 tests**, all passing.
+  The host `python`/venv launcher is unavailable; use the documented Docker
+  command for any further backend runs. No protected source or index file was
+  modified during the audit.
+
+### 37. Q11 precedence and deterministic CORS tests (28 September 2026)
+
+- The first semantic-role consolidation changed the section shape expected by
+  the reviewed Q11 locale renderer, which caused its safe English-fallback
+  notice. Consolidation now applies only to duplicate canonical type/title
+  pairs, preserving distinct reviewed Q11 facts and their citations.
+- `IS 9873` family clarification remains limited to bare/family requests;
+  reviewed battery-parts questions retain `battery_q11_parts` precedence and
+  the approved battery list (Parts 2, 3, 4, 9, 10, and 11).
+- CORS production validation is unchanged. `tests/test_api.py` now creates its
+  CORS app inside an explicit `ALLOWED_ORIGINS=http://localhost:5173` patch, so
+  local Docker discovery cannot inherit a deployment origin. Docker commands
+  should likewise pass that explicit test-only value.
+
+### 38. Roadmap/Q11 section-topology isolation (28 September 2026)
+
+- Q11 needs its reviewed multi-section evidence shape, but the battery roadmap
+  has a separate established topology. Roadmap-only handling now retains the
+  first standards-review next action and combines only its later
+  application/document fragments, preserving first-seen S3–S8 citations in
+  one section. This leaves the Q11 family untouched.
+- Focused real-data compliance integration: **12 tests passed** with explicit
+  `ALLOWED_ORIGINS=http://localhost:5173` and a read-only repository mount.
+
+### 39. Direct roadmap-localizer contract repair (28 September 2026)
+
+- The roadmap localizer had been changed to accept only the new five-section
+  post-merge topology, while the direct multilingual contract still supplied
+  the legacy six-section deterministic fixture. Its exact type-sequence guard
+  returned `None` before localization. The roadmap-specific localizer now
+  accepts both validated shapes: it preserves legacy six-section input exactly
+  and directly localizes the established five-section S3–S8 combined shape.
+  Q11 remains isolated to `battery_q11_parts`.
+- Focused multilingual Phase 3A suite: **10 tests passed** with explicit test
+  CORS configuration and a read-only mount.

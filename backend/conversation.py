@@ -11,6 +11,7 @@ from backend.schemas import AssistantContext, ResponseLanguage
 ConversationKind = Literal[
     "greeting",
     "thanks",
+    "acknowledgement",
     "goodbye",
     "capabilities",
     "compliance_question",
@@ -26,7 +27,7 @@ class ConversationRoute:
     language: ResponseLanguage
 
 
-_SOCIAL_KINDS = frozenset({"greeting", "thanks", "goodbye", "capabilities", "out_of_scope"})
+_SOCIAL_KINDS = frozenset({"greeting", "thanks", "acknowledgement", "goodbye", "capabilities", "out_of_scope"})
 
 _GREETINGS = frozenset({
     "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
@@ -42,6 +43,13 @@ _THANKS = frozenset({
     "धन्यवाद", "आभार",
     "நன்றி", "மிக்க நன்றி",
     "ধন্যবাদ", "অনেক ধন্যবাদ",
+})
+_ACKNOWLEDGEMENTS = frozenset({
+    "ok", "okay", "got it", "understood", "yes", "no", "continue", "tell me more",
+    "ठीक है", "समझ गया", "समझ गई", "हाँ", "नहीं", "आगे बताइए",
+    "ठीक", "समजले", "हो", "नाही", "पुढे सांगा",
+    "சரி", "புரிந்தது", "ஆம்", "இல்லை", "தொடரவும்", "மேலும் சொல்லுங்கள்",
+    "ঠিক আছে", "বুঝেছি", "হ্যাঁ", "না", "চালিয়ে যান", "আরও বলুন",
 })
 _GOODBYES = frozenset({
     "bye", "goodbye", "good bye", "see you",
@@ -100,6 +108,13 @@ def classify_conversation(
         return ConversationRoute("greeting", language)
     if text in _THANKS:
         return ConversationRoute("thanks", language)
+    # "Tell me more" becomes a bounded evidence route only when a prior
+    # server-recognised topic exists. A standalone acknowledgement never reads
+    # the transcript, retrieves, or calls a provider.
+    if text in _ACKNOWLEDGEMENTS and not (
+        text == "tell me more" and assistant_context and assistant_context.original_question
+    ):
+        return ConversationRoute("acknowledgement", language)
     if text in _GOODBYES:
         return ConversationRoute("goodbye", language)
     if text in _CAPABILITIES:
@@ -234,5 +249,7 @@ def conversation_copy(kind: ConversationKind, language: ResponseLanguage) -> tup
             ),
         },
     }
-    direct, limitation = catalog[language][kind]
+    # Acknowledgements intentionally use the existing reviewed thanks copy in
+    # each locale rather than invoking retrieval or a translation service.
+    direct, limitation = catalog[language]["thanks" if kind == "acknowledgement" else kind]
     return direct, limitation, replies
