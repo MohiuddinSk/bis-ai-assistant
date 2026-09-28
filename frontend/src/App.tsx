@@ -196,16 +196,21 @@ function AppContent() {
 
   const translatedBuiltInActions = builtInSuggestedActions.map((action, index) => ({ ...action, label: t(builtInSuggestionKeys[index]) }));
 
-  return <main>
+  return <main className="app-shell">
     <ChatHeader status={status} />
-    <nav aria-label={t('guidanceMode')}>
+    <nav className="mode-nav" aria-label={t('guidanceMode')}>
       <button onClick={() => switchMode('chat')} aria-pressed={mode === 'chat'}>{t('askQuestion')}</button>
       <button onClick={() => switchMode('wizard')} aria-pressed={mode === 'wizard'}>{t('complianceWizard')}</button>
     </nav>
     {mode === 'wizard' ? <div ref={wizardEntry} tabIndex={-1}><ComplianceWizard /></div> : <>
       <section className="hero">
+        <span className="hero-kicker">BIS BANDHU · {t('guidanceMode')}</span>
         <h2>{t('heroTitle')}</h2>
         <p>{t('heroDescription')}</p>
+        <div className="hero-actions">
+          <button type="button" onClick={() => document.getElementById('question')?.focus()}>{t('askQuestion')} <span aria-hidden="true">↗</span></button>
+          <button type="button" className="secondary" onClick={() => switchMode('wizard')}>{t('choiceRoadmap')} <span aria-hidden="true">→</span></button>
+        </div>
       </section>
       {messages.length === 0 && <SuggestedQuestions actions={translatedBuiltInActions} busy={busy} onSelect={action => dispatchSuggestedAction(action)} />}
       <section className="chat" aria-live="polite">

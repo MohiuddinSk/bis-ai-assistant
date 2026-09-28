@@ -162,3 +162,96 @@ footer { font-size: .85rem; padding: 22px 0; color: var(--muted-text); }
     page-break-after: avoid;
   }
 }
+
+/* BIS Bandhu screening interface, adapted from the teammate's paper-and-ink design. */
+:root {
+  --primary-blue: #17466b;
+  --dark-text: #101a24;
+  --muted-text: #55636e;
+  --saffron: #b5651d;
+  --card-border: #d9dbd4;
+  --card-background: #fff;
+  --focus: #2a6ba1;
+  font-family: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  background: #f7f6f2;
+}
+html { scroll-behavior: smooth; }
+body { background: #f7f6f2; }
+.app-shell { max-width: 1200px; padding: 0 28px 34px; }
+.site-header {
+  padding: 18px 0;
+  border-bottom: 1px solid #d9dbd4;
+  background: #f7f6f2;
+}
+.brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.brand-mark {
+  display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px;
+  background: #0c2438; color: #fff; border-radius: 11px; font-size: 1.4rem;
+  font-weight: 800; letter-spacing: -.07em;
+}
+.brand-mark span { color: #d79a58; }
+.site-header h1 { font-size: 1.18rem; letter-spacing: -.025em; color: #101a24; }
+.site-header p { font-size: .73rem; color: #55636e; max-width: 340px; }
+.header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.header-controls label { color: #55636e; font-size: .82rem; font-weight: 650; }
+.header-controls select { width: auto; min-width: 116px; margin: 0; border-color: #cbd0ce; }
+.status { font-size: .72rem; white-space: nowrap; }
+.mode-nav { display: flex; gap: 0; margin-top: 0 !important; padding: 12px 0; border-bottom: 1px solid #d9dbd4; }
+.mode-nav button { border-radius: 0; background: transparent; color: #55636e; padding: 11px 19px; font-weight: 650; }
+.mode-nav button[aria-pressed="true"] { background: transparent; color: #123653; box-shadow: inset 0 -3px #b5651d; }
+.mode-nav button[aria-pressed="false"] { background: transparent; color: #55636e; }
+.mode-nav button:hover { color: #123653; background: #e6eef4; }
+.hero {
+  position: relative; overflow: hidden; margin-top: 22px; padding: 60px 6%;
+  min-height: 335px; border: 1px solid #d9dbd4; border-radius: 16px;
+  color: #fff; background: radial-gradient(circle at 95% 15%, #285b7d 0, transparent 36%), linear-gradient(120deg, #0c2438, #17466b);
+  box-shadow: 0 18px 42px #0c243816;
+}
+.hero::after { content: ""; position: absolute; width: 310px; height: 310px; border-radius: 50%; border: 1px solid #ffffff28; right: -70px; bottom: -190px; box-shadow: 0 0 0 58px #ffffff0a, 0 0 0 116px #ffffff08; pointer-events: none; }
+.hero-kicker, .section-kicker { font-size: .72rem; font-weight: 800; letter-spacing: .14em; }
+.hero-kicker { color: #e9b77c; }
+.hero h2 { max-width: 720px; margin: 15px 0 15px; font-size: clamp(2.1rem, 4.2vw, 3.65rem); line-height: 1.1; letter-spacing: -.05em; color: #fff; }
+.hero p { max-width: 720px; margin: 0; line-height: 1.65; color: #e0e9ee; }
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.hero-actions button { min-height: 46px; border-radius: 8px; background: #b5651d; font-weight: 700; padding: 11px 18px; }
+.hero-actions button:hover { background: #9a5416; }
+.hero-actions button.secondary { border: 1px solid #a5c0d0; color: #fff; background: #ffffff14; }
+.hero-actions button.secondary:hover { background: #ffffff25; }
+.hero-actions button span { margin-left: .5rem; }
+.suggestions { margin-top: 34px; padding: 0; background: transparent; box-shadow: none; }
+.section-kicker { color: #9a5416; }
+.section-heading h2 { margin: 6px 0 19px; font-size: 1.55rem; letter-spacing: -.035em; }
+.suggestion-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.suggestion-grid button {
+  display: flex; flex-direction: column; gap: 17px; min-height: 163px; margin: 0; padding: 18px;
+  border: 1px solid #d9dbd4; border-radius: 11px; color: #172c3e; background: #fff;
+  box-shadow: 0 5px 18px #0c243808; font-size: .95rem; font-weight: 700; line-height: 1.35;
+}
+.suggestion-grid button:hover { transform: translateY(-2px); background: #fff; border-color: #6e96ae; box-shadow: 0 10px 24px #0c24381a; }
+.suggestion-icon { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 8px; background: #e6eef4; color: #17466b; font-size: .8rem; letter-spacing: .04em; }
+.suggestion-arrow { margin-top: auto; align-self: flex-end; color: #b5651d; }
+.chat, .input-wrap, .wizard { border: 1px solid #d9dbd4; box-shadow: 0 7px 25px #0c24380c; }
+.chat { min-height: 100px; }
+.chat:has(.message) { margin-top: 30px; }
+.message { border-radius: 12px; }
+.message.assistant { background: #f2f6f9; }
+.message.user { background: #17466b; }
+.guided-section.important, .guided-section.clarification, .journey-important, .report-disclaimer { border-color: #b5651d; background: #fcf4ec; }
+.citation-card { border-left-color: #b5651d; }
+.input-wrap { margin-top: 16px; }
+.input-wrap textarea { resize: vertical; min-height: 96px; }
+.input-wrap button, .wizard-actions button, .result-actions button { min-height: 44px; }
+.journey-card, .compliance-passport, .journey-category { box-shadow: 0 4px 14px #0c243808; }
+.manufacturer-card { background: #e6eef4; }
+footer { border-top: 1px solid #d9dbd4; margin-top: 36px; }
+@media (max-width: 900px) { .suggestion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .app-shell { padding: 0 16px 22px; }
+  .site-header { align-items: flex-start; flex-direction: column; }
+  .header-controls { width: 100%; }
+  .hero { padding: 35px 22px; min-height: 0; }
+  .hero::after { display: none; }
+  .suggestion-grid { grid-template-columns: 1fr; }
+  .suggestion-grid button { min-height: 112px; gap: 10px; }
+  .mode-nav button { flex: 1; padding-inline: 6px; }
+}
