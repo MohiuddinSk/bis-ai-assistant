@@ -1,0 +1,557 @@
+{
+  "candidate": "bis_corpus_v4_candidate_01346f7d11f1",
+  "total": 28,
+  "passed": 28,
+  "failed": [],
+  "results": [
+    {
+      "id": "toy_battery",
+      "query": "Which standard applies to a battery-operated toy?",
+      "language": "en",
+      "expected_response_kind": [
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "grounded_guidance",
+      "grounded": true,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [
+        "product_manual_2026.pdf",
+        "product_manual_2026.pdf"
+      ],
+      "citation_count": 2,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "toy_steps",
+      "query": "What are the toy certification steps?",
+      "language": "en",
+      "expected_response_kind": [
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "grounded_guidance",
+      "grounded": true,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [
+        "10-steps-for-BIS-toy-certification.pdf",
+        "10-steps-for-BIS-toy-certification.pdf",
+        "10-steps-for-BIS-toy-certification.pdf",
+        "10-steps-for-BIS-toy-certification.pdf"
+      ],
+      "citation_count": 4,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "toy_series",
+      "query": "What documents are needed for a new toy series?",
+      "language": "en",
+      "expected_response_kind": [
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "grounded_guidance",
+      "grounded": true,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [
+        "product_manual_2026.pdf",
+        "product_manual_2026.pdf",
+        "product_manual_2026.pdf"
+      ],
+      "citation_count": 3,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "toy_acoustic",
+      "query": "Can acoustic testing be subcontracted for toys?",
+      "language": "en",
+      "expected_response_kind": [
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "toy_electric_car",
+      "query": "Does electric car mean toy or road vehicle?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fmcs_form",
+      "query": "What is Form V used for?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fmcs_checklist",
+      "query": "What documents are in the FMCS application checklist?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fmcs_domestic",
+      "query": "Can an Indian domestic manufacturer use Form V for every BIS application?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fmcs_ambiguous",
+      "query": "Which BIS application form do I need?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "jewellery_current",
+      "query": "What is the current BIS jeweller guidance?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "jewellery_hallmark",
+      "query": "What is BIS hallmarking guidance for registration?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "helmet_current",
+      "query": "What is the current IS 4151 product manual?",
+      "language": "en",
+      "expected_response_kind": [
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "helmet_old",
+      "query": "Use the January 2019 helmet manual.",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "labs_indexed",
+      "query": "Where is BIS recognized laboratory information indexed?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "labs_current",
+      "query": "Recommend an exact currently valid BIS laboratory.",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "labs_mumbai",
+      "query": "Which is the nearest Mumbai laboratory?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "labs_scope",
+      "query": "What is this laboratory current test scope?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fees_indexed",
+      "query": "What BIS certification fee snapshot is indexed?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "grounded_guidance",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fees_current",
+      "query": "What exact current fee must I pay?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fees_scheme",
+      "query": "What is the fee without specifying a scheme?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "vague",
+      "query": "What applies to my product?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "unrelated",
+      "query": "How do I repair a bicycle chain?",
+      "language": "en",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "greeting",
+      "query": "Hello",
+      "language": "en",
+      "expected_response_kind": [
+        "conversation"
+      ],
+      "actual_response_kind": "conversation",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "acknowledgement",
+      "query": "Thank you",
+      "language": "en",
+      "expected_response_kind": [
+        "conversation"
+      ],
+      "actual_response_kind": "conversation",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fees_hi",
+      "query": "\u092c\u0940\u0906\u0908\u090f\u0938 \u092a\u094d\u0930\u092e\u093e\u0923\u0928 \u0936\u0941\u0932\u094d\u0915 \u0915\u0939\u093e\u0901 \u0926\u0947\u0916\u0947\u0902?",
+      "language": "hi",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "fmcs_mr",
+      "query": "FMCS \u092b\u0949\u0930\u094d\u092e V \u0915\u0936\u093e\u0938\u093e\u0920\u0940 \u0906\u0939\u0947?",
+      "language": "mr",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "helmet_ta",
+      "query": "IS 4151 \u0bb9\u0bc6\u0bb2\u0bcd\u0bae\u0bc6\u0b9f\u0bcd \u0b95\u0bc8\u0baf\u0bc7\u0b9f\u0bc1 \u0b8e\u0ba9\u0bcd\u0ba9?",
+      "language": "ta",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "limitation",
+      "grounded": false,
+      "insufficient_evidence": true,
+      "cited_source_filenames": [
+        "PM_IS_4151_-Dec-24.pdf",
+        "PM_IS_4151_-Dec-24.pdf",
+        "PM_IS_4151_-Dec-24.pdf"
+      ],
+      "citation_count": 3,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    },
+    {
+      "id": "labs_bn",
+      "query": "BIS \u09aa\u09b0\u09c0\u0995\u09cd\u09b7\u09be\u0997\u09be\u09b0\u09c7\u09b0 \u09a4\u09a5\u09cd\u09af \u0995\u09cb\u09a5\u09be\u09af\u09bc?",
+      "language": "bn",
+      "expected_response_kind": [
+        "clarification",
+        "limitation"
+      ],
+      "actual_response_kind": "clarification",
+      "grounded": false,
+      "insufficient_evidence": false,
+      "cited_source_filenames": [],
+      "citation_count": 0,
+      "citations_ok": true,
+      "sections_ok": true,
+      "historical_source": false,
+      "secret_or_injection_leak": false,
+      "passed": true
+    }
+  ]
+}

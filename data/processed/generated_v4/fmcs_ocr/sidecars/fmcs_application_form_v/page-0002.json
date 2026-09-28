@@ -1,0 +1,53 @@
+{
+  "accepted_lines": [
+    "These documents are required to be submitted along with the application",
+    "1 Name and Address Proof of Office (Certificate from Registrar of Firm or Certificate from Directorate of Industries or",
+    "Certificate from Industries Centre or Memorandum of Articles etc.",
+    "Name and Address Proof of Factory (Certificate from Registrar of Firm or Certificate from Directorate of Industries or",
+    "2 Certificate from Industries Centre or Memorandum of Articles or Valid Lease deed showing lawful occupancy of the firm",
+    "over the premises etc.",
+    "Valid MSME certificate, if applicable |",
+    "Auhtorized representative letter, in case application signed by person other than CEO of the firm ;",
+    "| 5 antactring Process Flow Char |",
+    "Whether, any manufaturing operation outsourced fs",
+    "| ok Agreement of outsourcing of manufacturing operation, if applicable |",
+    "Any testing arrangment outside the factory P|",
+    "Valid Calibration Certifcates of Testing equipments |",
+    "Third party laboratory test report(s) as per Indian Standard, if applicable |",
+    "Note: For more details, you may please visit our website https://www.bis.gov.in/"
+  ],
+  "detected_title": "These documents are required to be submitted along with the application",
+  "dpi": 300,
+  "extraction_method": "ocr",
+  "filename": "ApplicationFormV.pdf",
+  "language": "eng",
+  "normalized_ocr_text": "These documents are required to be submitted along with the application 1 Name and Address Proof of Office (Certificate from Registrar of Firm or Certificate from Directorate of Industries or Certificate from Industries Centre or Memorandum of Articles etc. Name and Address Proof of Factory (Certificate from Registrar of Firm or Certificate from Directorate of Industries or 2 Certificate from Industries Centre or Memorandum of Articles or Valid Lease deed showing lawful occupancy of the firm over the premises etc. Valid MSME certificate, if applicable | Auhtorized representative letter, in case application signed by person other than CEO of the firm ; | 5 antactring Process Flow Char | |_| anuictring Machines ist | Whether, any manufaturing operation outsourced fs | ok Agreement of outsourcing of manufacturing operation, if applicable | | 9 restingequipmentsist Any testing arrangment outside the factory P| Valid Calibration Certifcates of Testing equipments | Third party laboratory test report(s) as per Indian Standard, if applicable | Note: For more details, you may please visit our website https://www.bis.gov.in/",
+  "oem": 1,
+  "official_url": "https://www.bis.gov.in/wp-content/uploads/2019/04/Application-Form-V.pdf",
+  "page_number": 2,
+  "psm": 6,
+  "raw_ocr_text": "These documents are required to be submitted along with the application\n1 Name and Address Proof of Office (Certificate from Registrar of Firm or Certificate from Directorate of Industries or\nCertificate from Industries Centre or Memorandum of Articles etc.\nName and Address Proof of Factory (Certificate from Registrar of Firm or Certificate from Directorate of Industries or\n2 Certificate from Industries Centre or Memorandum of Articles or Valid Lease deed showing lawful occupancy of the firm\nover the premises etc.\nValid MSME certificate, if applicable |\nAuhtorized representative letter, in case application signed by person other than CEO of the firm ;\n| 5 antactring Process Flow Char |\n|_| anuictring Machines ist |\nWhether, any manufaturing operation outsourced fs\n| ok Agreement of outsourcing of manufacturing operation, if applicable |\n| 9 restingequipmentsist\nAny testing arrangment outside the factory P|\nValid Calibration Certifcates of Testing equipments |\nThird party laboratory test report(s) as per Indian Standard, if applicable |\nNote: For more details, you may please visit our website https://www.bis.gov.in/\n",
+  "rejected_lines": [
+    {
+      "reason": "low_confidence",
+      "text": "|_| anuictring Machines ist |"
+    },
+    {
+      "reason": "low_confidence",
+      "text": "| 9 restingequipmentsist"
+    }
+  ],
+  "rendered_page_sha256": "43a49edde09a65b6eb9872534cd9daf64e4dc6db834fa81ca811276c9b65f38e",
+  "source_id": "fmcs_application_form_v",
+  "source_sha256": "3d15850b2863091ffe20a18183ca33332ded340c30fe3b6b57c3cf5a499c69a7",
+  "tool_versions": {
+    "pdftoppm": "pdftoppm version 22.12.0",
+    "tesseract": "tesseract 5.3.0"
+  },
+  "tsv_confidence_summary": {
+    "maximum_confidence": 97.01,
+    "mean_confidence": 87.82,
+    "minimum_confidence": 0.0,
+    "word_count": 171
+  }
+}

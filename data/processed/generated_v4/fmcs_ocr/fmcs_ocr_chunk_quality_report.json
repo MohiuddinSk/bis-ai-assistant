@@ -1,0 +1,32 @@
+{
+  "below_normal_minimum": 0,
+  "character_length": {
+    "maximum": 824,
+    "mean": 349.43,
+    "median": 275.5,
+    "minimum": 42
+  },
+  "complete_units": {
+    "checklist_or_instruction_or_field_group": 30
+  },
+  "duplicate_chunks": 0,
+  "grouped_chunks": 30,
+  "input_line_chunks": 200,
+  "isolated_row_or_serial": 0,
+  "label_only": 0,
+  "low_ocr_confidence": 0,
+  "near_duplicate_chunks": 0,
+  "no_meaningful_alphabetic_content": 0,
+  "per_source": {
+    "fmcs_application_checklist": 26,
+    "fmcs_application_form_v": 4
+  },
+  "repeated_headers_footers": 0,
+  "symbol_dominated": 0,
+  "word_distribution": {
+    "maximum": 140,
+    "mean": 55.1,
+    "median": 42.5,
+    "minimum": 5
+  }
+}

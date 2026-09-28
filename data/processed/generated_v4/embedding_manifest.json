@@ -1,0 +1,13 @@
+{
+  "chunk_count": 1160,
+  "corpus_sha256": "01346f7d11f12d3c92d2bfa78afe41303f19ff60e29761ef0c4a181613b443a2",
+  "dimension": 384,
+  "distance": "cosine",
+  "model": "intfloat/multilingual-e5-small",
+  "model_revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "normalize_embeddings": true,
+  "passage_prefix": "passage: ",
+  "query_prefix": "query: ",
+  "schema_version": "v4_embedding_manifest/1",
+  "source_artifact": "chunks_complete.jsonl"
+}

@@ -1,0 +1,14 @@
+{
+  "candidate": "bis_corpus_v4_candidate_01346f7d11f1",
+  "queries": [
+    "BIS product certification fee snapshot as of date",
+    "BIS সার্টিফিকেশন ফি স্ন্যাপশট",
+    "Which standard applies to a battery-operated toy?",
+    "What is Form V used for in FMCS?",
+    "Current product manual for IS 4151 helmet",
+    "What applies to my product?"
+  ],
+  "result": "evaluator wrapper and Retriever.search returned identical ordered chunk IDs for every query",
+  "tests": 1,
+  "status": "pass"
+}

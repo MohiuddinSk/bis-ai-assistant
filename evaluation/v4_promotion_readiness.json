@@ -1,0 +1,21 @@
+{
+  "decision": "READY FOR MANUAL PROMOTION REVIEW",
+  "candidate_contract": "passed",
+  "candidate_identity": "01346f7d11f1",
+  "candidate_path": "data/chroma_v4_candidate_01346f7d11f1",
+  "collection": "bis_corpus_v4_candidate_01346f7d11f1",
+  "corpus_sha256": "01346f7d11f12d3c92d2bfa78afe41303f19ff60e29761ef0c4a181613b443a2",
+  "manifest_sha256": "0541AEDE22946BB6534CFFA729A7E01F791D4520ED6D44A0466FBD55695239EA",
+  "records": 1160,
+  "eligible": 1084,
+  "sources": 15,
+  "source_ids": ["10_steps_for_BIS_toy_certification", "Notification_of_Transition_Facilitation_Quality_Control_Order_2026", "Toy_QC_order", "Toys_Extension", "Toys_QCO_2024", "Toys_Quality_Control_Second_Amendment_Order_2020", "bis_jewellers_guidelines_2026", "bis_pm_is_4151_dec_2024", "bis_recognised_labs_group_1_2026_08_24", "bis_recognised_labs_group_2_2026_08_07", "bis_scheme_i_fees_snapshot_2026", "fmcs_application_checklist", "fmcs_application_form_v", "product_manual_2026", "toys_faqs"],
+  "retrieval": {"cases": 44, "passed": 44, "top1": 0.8824, "top3": 1.0, "top5": 1.0, "mrr": 0.9412},
+  "response_safety": {"cases": 28, "passed": 28},
+  "v3_v4_regression": {"cases": 6, "passed": 6},
+  "backend_discovery": {"tests": 487, "status": "OK", "skipped": 1},
+  "old_candidate_blocker": "f899313eaaac: missing retrieval eligibility metadata",
+  "known_limitation": "IS 15644 is absent from the battery dense top-five in both V3 and V4; deterministic/hybrid routing preserves the approved battery answer path.",
+  "rollback_prerequisite": "take a reviewed backup and preserve unchanged active V3 before any separate manual promotion",
+  "active_v3_and_chroma_modified": false
+}

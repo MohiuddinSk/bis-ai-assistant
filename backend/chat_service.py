@@ -265,6 +265,18 @@ class ChatService:
             )
         if routing_context is None and understanding and understanding.intent == "out_of_domain":
             return self._abstention(evidence=[], response_language=request.response_language)
+        # A question with no identified product, standard, or regulatory subject
+        # cannot safely inherit whichever corpus category happens to rank first.
+        # Ask for scope before retrieval; this is deliberately category-neutral.
+        if (
+            routing_context is None and understanding and understanding.intent == "general"
+            and not understanding.product_signals and not understanding.standard_references
+        ):
+            return self._clarification(
+                "Please describe the product and the BIS scheme or standard you need help with.",
+                suggested_replies=["Describe the product", "Give the BIS standard", "Give the certification scheme"],
+                response_language=request.response_language,
+            )
         if routing_context is None and understanding and understanding.intent in {
             "timeline", "fee", "laboratory", "form",
         }:

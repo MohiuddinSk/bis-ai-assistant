@@ -74,11 +74,17 @@ class RetrievalDisabledApiTests(unittest.TestCase):
                 return [RetrievalHit("chunk", "text", {"source_filename": "source.pdf", "page_start": 1, "page_end": 1}, 0.1)]
 
         provider = LocalProvider()
-        with self.environment(RETRIEVAL_PROVIDER="chroma_local", LLM_PROVIDER="disabled"), patch("backend.retrieval_factory.LocalChromaRetriever", return_value=provider) as local:
+        configured_retriever = object()
+        with self.environment(RETRIEVAL_PROVIDER="chroma_local", LLM_PROVIDER="disabled"), patch("backend.retrieval_factory.Retriever", return_value=configured_retriever) as raw, patch("backend.retrieval_factory.LocalChromaRetriever", return_value=provider) as local:
             with TestClient(create_app()) as client:
                 health = client.get("/health")
                 retrieve = client.post("/api/retrieve", json={"question": "question-sentinel"})
-        local.assert_called_once_with()
+        raw.assert_called_once_with(
+            data_path="data/processed/generated_v3",
+            persist_path="data/chroma",
+            collection_name="bis_toys_v3_e73aab14a72f7908_39b347ab687e",
+        )
+        local.assert_called_once_with(configured_retriever)
         self.assertEqual(health.status_code, 200)
         self.assertEqual(retrieve.status_code, 200)
         self.assertEqual(retrieve.json()["results"][0]["chunk_id"], "chunk")

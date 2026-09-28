@@ -1,4 +1,22 @@
 services:
+  ingestion-ocr:
+    profiles: ["ingestion"]
+    build:
+      context: ./ingestion
+      dockerfile: Dockerfile.ocr
+    image: bis-saarthi-ingestion-ocr:local
+    network_mode: "none"
+    volumes:
+      - ./ingestion:/workspace/ingestion:ro
+      - ./retrieval:/workspace/retrieval:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./docs:/workspace/docs:ro
+      - ./data/raw:/workspace/data/raw:ro
+      - ./data/processed/generated_v4:/workspace/data/processed/generated_v4
+      - ./data/processed/generated_v3:/workspace/data/processed/generated_v3:ro
+      - ./tests:/workspace/tests:ro
+    working_dir: /workspace
+    command: ["python", "--version"]
   backend:
     build:
       context: .
@@ -17,6 +35,10 @@ services:
     environment:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       RETRIEVAL_PROVIDER: ${RETRIEVAL_PROVIDER:-chroma_local}
+      RETRIEVAL_CORPUS_VERSION: ${RETRIEVAL_CORPUS_VERSION:-v3}
+      RETRIEVAL_DATA_PATH: ${RETRIEVAL_DATA_PATH:-data/processed/generated_v3}
+      RETRIEVAL_CHROMA_PATH: ${RETRIEVAL_CHROMA_PATH:-data/chroma}
+      RETRIEVAL_COLLECTION_NAME: ${RETRIEVAL_COLLECTION_NAME:-bis_toys_v3_e73aab14a72f7908_39b347ab687e}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-groq}
       LLM_SYNTHESIS_ENABLED: ${LLM_SYNTHESIS_ENABLED:-false}

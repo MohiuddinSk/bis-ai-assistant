@@ -32,7 +32,34 @@ The pinned dependencies are `chromadb==0.5.23`, `sentence-transformers==3.4.1`, 
 - `embedding_manifest.json`: model revision, prefixes, distance metric, chunk-file hash, and collection name
 - `summary.json`: counts and pages needing review
 
+## Corpus V4 staging (not production)
+
+`data/processed/generated_v4` and `data/chroma_v4_staging` are an isolated,
+opt-in corpus package and collection. They must never replace `generated_v3` or
+`data/chroma`. Build only after the source-verification manifest approves the
+input hashes:
+
+```powershell
+python ingestion\extract_v4.py
+python ingestion\build_chroma_v4.py
+python -m unittest discover -s tests -p "test_corpus_v4_contract.py" -v
+```
+
+V4 snapshot sources retain their live-verification metadata. A laboratory
+snapshot cannot recommend a lab without checking live LIMS scope and validity;
+fee snapshots require an as-of date and scheme. Roll back V4 by ceasing use of
+the staging package/collection; never delete or alter V3 as part of rollback.
+
 The builder validates its input, requires exact collection membership, and does not delete old collections. Repeating a build is idempotent. Do not manually copy chunks from older generated packages into the v3 collection.
+
+### FMCS OCR and candidate index
+
+The approved FMCS forms use deterministic offline OCR sidecars under
+`generated_v4/fmcs_ocr`. The candidate persistence path is
+`data/chroma_v4_candidate`; production `data/chroma` is refused by the builder.
+Candidate collection names include the complete-artifact hash, so changed
+artifacts cannot silently reuse stale membership. Candidate artifacts do not
+activate V4 at runtime.
 
 ## Local Chroma and Git hygiene
 
@@ -65,3 +92,7 @@ Use `Retriever.page_context(hit_metadata)` to recover the cited page when condit
 `evaluation/questions.json` contains ten evidence-location checks. `retrieval/test_retrieval.py` writes passages, distances, and timings to `evaluation/retrieval_results.json` and exits nonzero for a missing expected source or page. An evidence hit is not proof that every condition needed for an answer is present. Review each saved result for complete conditions, authoritative source, correct citation, and conflicting amendments.
 
 The first query includes model startup time; later timings are warm. These checks are diagnostic, not a production performance benchmark. Do not loosen expected pages solely to make tests pass.
+
+## V4 candidate pre-promotion gate
+
+Use only `data/chroma_v4_candidate_01346f7d11f1` and `bis_corpus_v4_candidate_01346f7d11f1` for the reviewed candidate. It remains isolated from active `data/chroma`. Candidate response safety uses explicit Retriever overrides with synthesis disabled. Laboratory and fee snapshots require live official verification for current scope, recognition, or fee claims.

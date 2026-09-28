@@ -1,0 +1,16 @@
+{
+  "production_filter": {"default_retrieval": true},
+  "type": "boolean",
+  "missing_behavior": "not returned by the normal Chroma where filter",
+  "old_candidate": {"collection": "bis_corpus_v4_candidate_f899313eaaac", "status": "blocked_missing_v4_default_retrieval"},
+  "new_candidate": {"collection": "bis_corpus_v4_candidate_01346f7d11f1", "persist_path": "data/chroma_v4_candidate_01346f7d11f1", "eligible_records": 1084},
+  "v4_policy": {
+    "fmcs_application_form_v": {"default_retrieval": true, "scope": "fmcs_only", "direct_recommendation_allowed": false, "universal_claim_allowed": false},
+    "fmcs_application_checklist": {"default_retrieval": true, "scope": "fmcs_only", "direct_recommendation_allowed": false, "universal_claim_allowed": false},
+    "bis_jewellers_guidelines_2026": {"default_retrieval": true},
+    "bis_pm_is_4151_dec_2024": {"default_retrieval": true},
+    "bis_recognised_labs_group_1_2026_08_24": {"default_retrieval": true, "requires_live_verification": true, "direct_recommendation_allowed": false},
+    "bis_recognised_labs_group_2_2026_08_07": {"default_retrieval": true, "requires_live_verification": true, "direct_recommendation_allowed": false},
+    "bis_scheme_i_fees_snapshot_2026": {"default_retrieval": true, "requires_live_verification": true, "universal_claim_allowed": false}
+  }
+}

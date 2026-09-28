@@ -62,7 +62,10 @@ class AnswerCoverageAuditTests(unittest.TestCase):
     def _cli(self, *args, cwd):
         return subprocess.run(
             [sys.executable, str(self._script), *args], cwd=cwd, text=True,
-            capture_output=True, check=False, timeout=30,
+            # Full discovery can run concurrently with real-index tests in the
+            # bounded container; preserve the deterministic assertion without a
+            # machine-speed-dependent 30 second failure.
+            capture_output=True, check=False, timeout=180,
         )
 
     def test_cli_help_bootstraps_project_imports_from_repository_root(self):

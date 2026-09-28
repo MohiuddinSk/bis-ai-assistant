@@ -1,0 +1,19 @@
+{
+  "candidate": {
+    "artifact_sha256": "f899313eaaaca23b7cba788ef503aaeb9fce61012df4e0fb5291e93f7c53fb7e",
+    "collection": "bis_corpus_v4_candidate_f899313eaaac",
+    "persist_path": "data/chroma_v4_candidate"
+  },
+  "evaluation_status": "blocked_before_retrieval_cases",
+  "blocking_failure": {
+    "code": "v4_additions_not_normal_retrieval_eligible",
+    "production_filter": {"default_retrieval": true},
+    "normal_retrieval_eligible_records": 841,
+    "form_v_records": 4,
+    "form_v_default_retrieval_values": [null, null, null, null],
+    "reason": "Candidate V4 additions do not carry default_retrieval metadata. Production-equivalent normal retrieval therefore excludes them."
+  },
+  "metrics": null,
+  "failed_cases": ["all planned V4 category and multilingual retrieval cases are invalid until normal retrieval eligibility is repaired"],
+  "recommendation": "Do not promote. Repair V4 addition retrieval metadata, rebuild a new candidate, then rerun the full retrieval/regression/response gate."
+}

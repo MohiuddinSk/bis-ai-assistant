@@ -4,6 +4,7 @@ import logging
 import re
 
 from backend.retrieval_provider import LocalChromaRetriever, RetrieverProtocol
+from retrieval.search import Retriever
 from backend.settings import RetrievalSettings, get_retrieval_settings
 
 
@@ -29,7 +30,11 @@ def create_retrieval_provider(settings: RetrievalSettings | None = None) -> Retr
         logger.warning("Unsupported retrieval provider configuration; provider=%s", name)
         return None
     try:
-        return LocalChromaRetriever()
+        return LocalChromaRetriever(Retriever(
+            data_path=settings.data_path,
+            persist_path=settings.persist_path,
+            collection_name=settings.collection_name,
+        ))
     except Exception:
         logger.warning("Retrieval provider construction failed")
         return None

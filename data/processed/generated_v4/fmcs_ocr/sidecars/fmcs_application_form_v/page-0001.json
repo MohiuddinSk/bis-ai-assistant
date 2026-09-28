@@ -1,0 +1,82 @@
+{
+  "accepted_lines": [
+    "Form - V",
+    "a (Refer clause (g) of sub-paragraph (1) of paragraph 3 of Scheme I)",
+    "BUREAU OF INDIAN STANDARDS",
+    "Product Certification Scheme",
+    "Application for Licence to use the Standard Mark",
+    "Full Name of Firm Ps",
+    "Address",
+    "Office",
+    "Village/Ci District State Country Pin Code",
+    "Factory",
+    "Name Designation Name Designation",
+    "Management 3 Quality Control Incharge )",
+    "Name Tel E-mail",
+    "Contact Person ee",
+    "Scale Correspondence Address Sector",
+    "This application is being made to use the BIS Standard Mark ( Jon:",
+    "Part",
+    "Indian Standard Sec Grade/Type/Class etc.",
+    "Year",
+    "Units of Production Present Installed Capaci",
+    "Signature",
+    "Name",
+    "Seal of Firm Designation",
+    "Date of application",
+    "DIN no.(in case of director)",
+    "BAN no. ol Eum PAN no. (for other cases)",
+    "Important : Application should be signed by CEO of the firm, or in his absence by authorized representative",
+    "Indicate availability of the following documents:"
+  ],
+  "detected_title": "BUREAU OF INDIAN STANDARDS",
+  "dpi": 300,
+  "extraction_method": "ocr",
+  "filename": "ApplicationFormV.pdf",
+  "language": "eng",
+  "normalized_ocr_text": "Form - V a (Refer clause (g) of sub-paragraph (1) of paragraph 3 of Scheme I) BUREAU OF INDIAN STANDARDS Product Certification Scheme Application for Licence to use the Standard Mark Full Name of Firm Ps Address Office Village/Ci District State Country Pin Code Address Factory Village/Ci District State Country Pin Code ee ee ee Name Designation Name Designation 1 1 2 2 Management 3 Quality Control Incharge ) 4 4 Name Tel E-mail Contact Person ee Scale Correspondence Address Sector This application is being made to use the BIS Standard Mark ( Jon: IS Part Indian Standard Sec Grade/Type/Class etc. Year Units of Production Present Installed Capaci eT Signature Name Seal of Firm Designation Date of application DIN no.(in case of director) BAN no. ol Eum PAN no. (for other cases) Important : Application should be signed by CEO of the firm, or in his absence by authorized representative Indicate availability of the following documents:",
+  "oem": 1,
+  "official_url": "https://www.bis.gov.in/wp-content/uploads/2019/04/Application-Form-V.pdf",
+  "page_number": 1,
+  "psm": 6,
+  "raw_ocr_text": "Form - V\na (Refer clause (g) of sub-paragraph (1) of paragraph 3 of Scheme I)\nBUREAU OF INDIAN STANDARDS\nProduct Certification Scheme\nApplication for Licence to use the Standard Mark\nFull Name of Firm Ps\nAddress\nOffice\nVillage/Ci District State Country Pin Code\nAddress\nFactory\nVillage/Ci District State Country Pin Code\nee ee ee\nName Designation Name Designation\n1 1\n2 2\nManagement 3 Quality Control Incharge )\n4 4\nName Tel E-mail\nContact Person ee\nScale Correspondence Address Sector\nThis application is being made to use the BIS Standard Mark ( Jon:\nIS\nPart\nIndian Standard Sec Grade/Type/Class etc.\nYear\nUnits of Production Present Installed Capaci\neT\nSignature\nName\nSeal of Firm Designation\nDate of application\nDIN no.(in case of director)\nBAN no. ol Eum PAN no. (for other cases)\nImportant : Application should be signed by CEO of the firm, or in his absence by authorized representative\nIndicate availability of the following documents:\n",
+  "rejected_lines": [
+    {
+      "reason": "low_confidence",
+      "text": "ee ee ee"
+    },
+    {
+      "reason": "symbol_dominated_noise",
+      "text": "1 1"
+    },
+    {
+      "reason": "symbol_dominated_noise",
+      "text": "2 2"
+    },
+    {
+      "reason": "symbol_dominated_noise",
+      "text": "4 4"
+    },
+    {
+      "reason": "symbol_dominated_noise",
+      "text": "IS"
+    },
+    {
+      "reason": "low_confidence",
+      "text": "eT"
+    }
+  ],
+  "rendered_page_sha256": "8aba80060bcb429c1a5749855403eb6a109b3420256215b758edae6939dab915",
+  "source_id": "fmcs_application_form_v",
+  "source_sha256": "3d15850b2863091ffe20a18183ca33332ded340c30fe3b6b57c3cf5a499c69a7",
+  "tool_versions": {
+    "pdftoppm": "pdftoppm version 22.12.0",
+    "tesseract": "tesseract 5.3.0"
+  },
+  "tsv_confidence_summary": {
+    "maximum_confidence": 97.01,
+    "mean_confidence": 89.61,
+    "minimum_confidence": 0.0,
+    "word_count": 156
+  }
+}
