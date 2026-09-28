@@ -15,13 +15,20 @@ class RetrievalFactoryTests(unittest.TestCase):
         constructor.assert_called_once_with(configured)
 
     def test_explicit_local_provider_is_case_normalized(self):
-        with patch("backend.retrieval_factory.LocalChromaRetriever", return_value="local") as constructor:
-            self.assertEqual(create_retrieval_provider(RetrievalSettings("CHROMA_LOCAL")), "local")
-        self.assertEqual(constructor.call_count, 1)
+        configured = object()
+        settings = RetrievalSettings(provider="CHROMA_LOCAL")
+        with patch("backend.retrieval_factory.Retriever", return_value=configured) as raw, patch("backend.retrieval_factory.LocalChromaRetriever", return_value="local") as constructor:
+            self.assertEqual(create_retrieval_provider(settings), "local")
+        raw.assert_called_once_with(
+            data_path="data/processed/generated_v3",
+            persist_path="data/chroma",
+            collection_name="bis_toys_v3_e73aab14a72f7908_39b347ab687e",
+        )
+        constructor.assert_called_once_with(configured)
 
     def test_disabled_provider_returns_none_without_constructing_local_adapter(self):
         with patch("backend.retrieval_factory.LocalChromaRetriever") as constructor:
-            self.assertIsNone(create_retrieval_provider(RetrievalSettings("disabled")))
+            self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider="disabled")))
         constructor.assert_not_called()
 
     def test_disabled_provider_ignores_irrelevant_environment_values(self):
@@ -32,21 +39,21 @@ class RetrievalFactoryTests(unittest.TestCase):
 
     def test_unknown_provider_does_not_fall_back(self):
         with patch("backend.retrieval_factory.LocalChromaRetriever") as constructor:
-            self.assertIsNone(create_retrieval_provider(RetrievalSettings("unknown")))
+            self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider="unknown")))
         constructor.assert_not_called()
 
     def test_unsafe_provider_value_is_not_logged(self):
         value = "unsafe\nprovider"
         with self.assertLogs("backend.retrieval_factory", level="WARNING") as captured:
-            self.assertIsNone(create_retrieval_provider(RetrievalSettings(value)))
+            self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider=value)))
         self.assertIn("provider=invalid", "\n".join(captured.output))
         self.assertNotIn(value, "\n".join(captured.output))
 
     def test_non_string_provider_and_constructor_failure_return_none(self):
-        self.assertIsNone(create_retrieval_provider(RetrievalSettings(None)))
+        self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider=None)))
         with patch("backend.retrieval_factory.LocalChromaRetriever", side_effect=RuntimeError("private constructor detail")):
             with self.assertLogs("backend.retrieval_factory", level="WARNING") as captured:
-                self.assertIsNone(create_retrieval_provider(RetrievalSettings("chroma_local")))
+                self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider="chroma_local")))
         self.assertNotIn("private constructor detail", "\n".join(captured.output))
 
     def test_generation_environment_does_not_change_retrieval_selection(self):
