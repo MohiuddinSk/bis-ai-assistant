@@ -1,0 +1,18 @@
+{
+  "v3": {
+    "documents": 8,
+    "pages": 89,
+    "chunks": 917
+  },
+  "v4_additions": {
+    "documents": 7,
+    "pages": 107,
+    "chunks": 211
+  },
+  "duplicate_chunks_removed": 0,
+  "complete_v4": {
+    "documents": 15,
+    "pages": 196,
+    "chunks": 1128
+  }
+}

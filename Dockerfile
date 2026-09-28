@@ -36,6 +36,8 @@ COPY scripts/container_healthcheck.py ./scripts/container_healthcheck.py
 COPY data/raw ./data/raw
 COPY data/processed/generated_v3 ./data/processed/generated_v3
 COPY data/chroma ./data/chroma
+COPY data/processed/generated_v4 ./data/processed/generated_v4
+COPY data/chroma_v4_01346f7d11f1 ./data/chroma_v4_01346f7d11f1
 
 RUN groupadd --gid 10001 bis \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin bis \

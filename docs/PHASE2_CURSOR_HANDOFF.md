@@ -639,3 +639,117 @@ PDF / Print** and confirm the isolated print view contains only the Passport.
   Q11 remains isolated to `battery_q11_parts`.
 - Focused multilingual Phase 3A suite: **10 tests passed** with explicit test
   CORS configuration and a read-only mount.
+
+### 40. Incoming Drive corpus Phase 1 audit (28 September 2026)
+
+- Added `scripts/corpus_audit.py`, a deterministic read-only PDF/DOCX inventory
+  tool. It hashes files, compares incoming hashes with `data/raw` and the v3
+  registry, captures bounded first-page/paragraph metadata, preserves original
+  paths, and normalizes only audit metadata (for example `jwellery` to
+  `jewellery`). DOCX files are classified as secondary/unverified when readable.
+- Reports: `docs/incoming_drive_2026-09-28_audit.json` and matching Markdown.
+  Phase 1 found **26 files**: **5 exact duplicates**, **6 historical/superseded**,
+  **13 new candidates**, and **2 unreadable/quarantined**. No incoming file was
+  copied to raw data, indexed, approved, or used by production retrieval.
+
+### 41. Incoming Drive corpus Phase 1.5 review (28 September 2026)
+
+- Added `scripts/corpus_review.py` and focused non-destructive tests. The
+  review performs bounded PDF extraction, SHA-256 and normalized-text
+  comparisons, page/identifier/date capture, and named version comparisons.
+  It does not copy, delete, ingest, index, or alter any corpus source.
+- DOCX inspection first validates the Office ZIP/container. It uses
+  `python-docx` only when available and otherwise reports
+  `unsupported_extractor:python_docx_unavailable`, distinct from corruption;
+  neither incoming DOCX is eligible for active retrieval. Links, macros, and
+  embedded objects are not followed or executed.
+- The five raw/registry exact duplicates remain excluded. The January 2024
+  jewellery guideline was reclassified as historical after its visible date
+  was compared with the incoming 2026 guideline, making the conservative
+  Phase 1.5 total **26 files: 5 exact duplicates, 7 historical/superseded,
+  12 new candidates, and 2 structured/team-created secondary sources**.
+  This is an evidence-led reclassification from the initial filename-led
+  inventory, not ingestion approval.
+- Reports: `docs/incoming_drive_2026-09-28_review.json` and matching Markdown.
+  Any item marked active remains **pending human confirmation** of its official
+  primary URL/currentness; time-sensitive labs/fees require a freshness
+  warning. No document has been ingested or indexed.
+- Focused test result: **5 tests passed** in the repository Docker image. The
+  host Python launcher is unavailable. Protected data/index/evaluation paths
+  remain unmodified; nothing was staged, committed, pushed, merged, or
+  deployed.
+
+### 42. Corpus v4 official-source matching gate (28 September 2026)
+
+- Added `scripts/corpus_source_verification.py` and the deterministic
+  `docs/corpus_v4_source_manifest.json`/Markdown manifest. The gate excludes
+  the five exact raw/registry duplicates and retains both incoming/canonical
+  hashes and URLs; it never replaces an incoming file.
+- Exact official BIS SHA-256 matches were established for the July 2026
+  Jewellers guidelines and the two FMCS documents (Application Form V and the
+  application checklist). FMCS records have an explicit FMCS-only runtime
+  warning and cannot be generalized to domestic Scheme-I applications.
+- The incoming `IS-4151-Product-Manual helmet.pdf` has SHA-256
+  `0458…` and an 8-page January 2019 structure, which does **not** match the
+  official December 2024, 10-page BIS download (SHA-256 `bd417…`). It is
+  quarantined. Labs and fee material are only active with live-lookup/as-of
+  warnings; no lab can be recommended without checking LIMS scope and validity.
+- All unmatched summaries, declaration formats, transition material, and both
+  valid-but-unextracted DOCX files remain secondary, historical, or quarantined
+  as recorded in the manifest. No ingestion, copying, index change, staging,
+  commit, push, or deployment occurred.
+
+### 43. Corpus v4 isolated staging ingestion (28 September 2026)
+
+- Authorized V4 sources were copied byte-for-byte into new raw category paths:
+  FMCS (2), jewellery (1), laboratory snapshots (2), fee snapshot (1), and
+  the hash-verified official December 2024 IS 4151 manual (1). Existing root
+  raw files, V3 generated output, the active Chroma path, application routing,
+  and frontend were not changed.
+- `ingestion/extract_v4.py` produced `generated_v4` with **7 sources, 107
+  pages, and 211 chunks**. `ingestion/build_chroma_v4.py` built the separate
+  `bis_corpus_v4_staging` collection at `data/chroma_v4_staging` with **211
+  members**. FMCS chunks carry FMCS-only scope. Lab and fee chunks carry
+  snapshot/live-verification metadata; table-like OCR serialization is not
+  indexed.
+- Promotion is not authorized: V4 is staging-only pending the requested
+  retrieval evaluation and human review of snapshot policy/results. Rollback is
+  operationally just stop selecting the V4 staging package/collection; V3 is
+  untouched. Nothing was staged, committed, pushed, merged, or deployed.
+
+### 44. FMCS OCR grouping and V4 candidate composition (28 September 2026)
+
+- The approved FMCS Form V and checklist use an offline, page-local OCR
+  grouping layer. The 200 accepted OCR lines became 30 meaningful retrieval
+  chunks (Form V: 4; checklist: 26); sidecars retain original OCR text and page
+  provenance. No wording is corrected or inferred.
+- The V4 additions package contains 7 approved source identities / 243 chunks.
+  The complete package contains all 917 immutable V3 chunks plus additions:
+  15 source identities / 1,160 chunks. Candidate Chroma is isolated at
+  `data/chroma_v4_candidate` as `bis_corpus_v4_candidate_f899313eaaac`.
+- V4 remains inactive; active V3, `data/chroma`, runtime configuration, and
+  deployment were not changed. Remaining gates are complete retrieval
+  evaluation and V3-versus-V4 regression review.
+
+### 45. Production retrieval held-out and V3 regression gate (28 September 2026)
+
+- The evaluator calls the public `Retriever.search()` wrapper rather than an
+  evaluator-specific Chroma ranking path. Its six-query equivalence test
+  (English/Bengali fees, toy, Form V, helmet, vague product) passed with
+  identical ordered chunk IDs.
+- The corrected candidate passed 44/44 retrieval cases: Top-1 88.24%, Top-3
+  100%, Top-5 100%, MRR 0.9412. The original 32 stayed 32/32; the 12 held-out
+  cases covered fee/charges paraphrases in five languages and category controls.
+- The formal read-only V3-versus-V4 toy comparison passed 6/6. V3 and V4 had
+  the expected toy evidence and complete citation metadata. The battery probe's
+  declared `IS 15644` identifier was absent from both indexes' top-five evidence,
+  a baseline limitation rather than a V4 regression.
+- The active V3 index and candidate files were not modified. Remaining gates:
+  candidate-backed response safety, full backend discovery, and final readiness
+  review. V4 remains inactive.
+
+### 46. Candidate response safety and backend discovery (28 September 2026)
+
+- The real `ChatService` was injected with `LocalChromaRetriever` configured only for `bis_corpus_v4_candidate_01346f7d11f1`; provider synthesis was disabled. The 28-case candidate safety matrix passed 28/28, including scope/currentness limitations and four non-English cases.
+- Full backend discovery completed: **487 tests, OK, skipped=1**. The skip is the real OCR integration contract, which explicitly requires the separate verified OCR image with Poppler/Tesseract.
+- The candidate validator remains 1,160 unique records / 15 sources / 1,084 eligible records. Active V3 remains 917 records; `git diff --check` passed. No candidate was activated or promoted.

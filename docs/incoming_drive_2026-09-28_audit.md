@@ -1,0 +1,28 @@
+# Incoming corpus audit
+
+- `categories/Application Checklist/ApplicationFormV.pdf` — **new candidate**
+- `categories/Application Checklist/Checklist_for_Application_for_BIS_Licence.pdf` — **new candidate**
+- `categories/BIS LABS/BIS_Recognised_LAB_Group_1.pdf` — **new candidate**
+- `categories/BIS LABS/BIS_recognised_lab_Group_2.pdf` — **new candidate**
+- `categories/QCO and Overall Information/BIS_Compulsory_Certification_Schemes_II_IV_X_2026.docx` — **unreadable/quarantined**
+- `categories/QCO and Overall Information/BIS_QCO_Product_Manuals_Steel_Compliance_Structured_2026.docx` — **unreadable/quarantined**
+- `categories/Standard Fees/BIS Standrd certification Fees.pdf` — **new candidate**
+- `categories/helmet/IS-4151-Product-Manual helmet.pdf` — **new candidate**
+- `categories/jwellery/Guidelines-for-Jewellers.pdf` — **new candidate**
+- `categories/jwellery/Revised-Guidelines-for-JEWELLERS-Jan-24.pdf` — **new candidate**
+- `categories/process of certification/10-steps-for-BIS-toy-certification-final2.pdf` — **new candidate**
+- `categories/process of certification/Hallmarking Guidelines.pdf` — **new candidate**
+- `categories/toys/1 PM-9873-Oct-2023.pdf` — **historical/superseded**
+- `categories/toys/10-steps-for-BIS-toy-certification.pdf` — **exact duplicate**
+- `categories/toys/Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf` — **exact duplicate**
+- `categories/toys/PM-9873-Feb-2023.pdf` — **historical/superseded**
+- `categories/toys/ProductManualUpadate-9873-Oct-2023.pdf` — **historical/superseded**
+- `categories/toys/Safety_of_toys.pdf` — **new candidate**
+- `categories/toys/Toy_QC_order.pdf` — **exact duplicate**
+- `categories/toys/Toys-Extension.pdf` — **exact duplicate**
+- `categories/toys/Toys-QCO-2024.pdf` — **historical/superseded**
+- `categories/toys/Toys-Quality-Control-Second-Amendment-Order-2020.pdf` — **historical/superseded**
+- `categories/toys/Transition_2026_Transition Control.pdf` — **new candidate**
+- `categories/toys/historical.pdf` — **historical/superseded**
+- `categories/toys/toys product manual declaration format.pdf` — **new candidate**
+- `categories/toys/toys-faqs.pdf` — **exact duplicate**

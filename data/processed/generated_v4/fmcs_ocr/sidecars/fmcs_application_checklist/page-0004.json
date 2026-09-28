@@ -1,0 +1,68 @@
+{
+  "accepted_lines": [
+    "Facility translator (for translation in English) during the visits of BIS",
+    "officers to its factory?",
+    "21. | Agreement Does the applicant agree to sign a legally binding agreement",
+    "with BIS in the prescribed format?",
+    "22. |Indemnity Does the applicant agree to submit an Indemnity Bond to BIS in",
+    "Bond the prescribed format?",
+    "23. |Performance |Does the applicant agree to furnish a Performance Bank",
+    "Bank Guarantee to BIS of US $ 10000/- (from a bank having its",
+    "Guarantee branch in India) in the prescribed format on the letter-head of",
+    "the bank?"
+  ],
+  "detected_title": "with BIS in the prescribed format?",
+  "dpi": 300,
+  "extraction_method": "ocr",
+  "filename": "Checklist_for_Application_for_BIS_Licence.pdf",
+  "language": "eng",
+  "normalized_ocr_text": "Facility translator (for translation in English) during the visits of BIS officers to its factory? 21. | Agreement Does the applicant agree to sign a legally binding agreement with BIS in the prescribed format? 22. |Indemnity Does the applicant agree to submit an Indemnity Bond to BIS in Bond the prescribed format? 23. |Performance |Does the applicant agree to furnish a Performance Bank Bank Guarantee to BIS of US $ 10000/- (from a bank having its Guarantee branch in India) in the prescribed format on the letter-head of the bank? -----------X------------ 4",
+  "oem": 1,
+  "official_url": "https://www.bis.gov.in/wp-content/uploads/2018/08/Checklist_for_Application.pdf",
+  "page_number": 4,
+  "psm": 6,
+  "raw_ocr_text": "Facility translator (for translation in English) during the visits of BIS\nofficers to its factory?\n\n21. | Agreement Does the applicant agree to sign a legally binding agreement\n\nwith BIS in the prescribed format?\n\n22. |Indemnity Does the applicant agree to submit an Indemnity Bond to BIS in\nBond the prescribed format?\n\n23. |Performance |Does the applicant agree to furnish a Performance Bank\nBank Guarantee to BIS of US $ 10000/- (from a bank having its\nGuarantee branch in India) in the prescribed format on the letter-head of\n\nthe bank?\n-----------X------------\n4\n",
+  "rejected_lines": [
+    {
+      "reason": "empty",
+      "text": ""
+    },
+    {
+      "reason": "empty",
+      "text": ""
+    },
+    {
+      "reason": "empty",
+      "text": ""
+    },
+    {
+      "reason": "empty",
+      "text": ""
+    },
+    {
+      "reason": "empty",
+      "text": ""
+    },
+    {
+      "reason": "symbol_dominated_noise",
+      "text": "-----------X------------"
+    },
+    {
+      "reason": "standalone_serial_number",
+      "text": "4"
+    }
+  ],
+  "rendered_page_sha256": "2bd0d072c9792416d98cba78f173e97de6e9e72d0137da0cfff3ae64faf4e0d0",
+  "source_id": "fmcs_application_checklist",
+  "source_sha256": "b0b16b0a4142fe538a2b142a6752c202b97f1ac4def0ca211024138f442ee104",
+  "tool_versions": {
+    "pdftoppm": "pdftoppm version 22.12.0",
+    "tesseract": "tesseract 5.3.0"
+  },
+  "tsv_confidence_summary": {
+    "maximum_confidence": 96.99,
+    "mean_confidence": 94.78,
+    "minimum_confidence": 66.65,
+    "word_count": 92
+  }
+}

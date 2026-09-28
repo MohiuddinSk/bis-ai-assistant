@@ -1,0 +1,958 @@
+{
+  "scope": "Phase 1.5 provenance, version, and content-quality review only; no ingestion or indexing performed.",
+  "total_files": 26,
+  "classification_counts": {
+    "exact duplicate": 5,
+    "historical/superseded": 7,
+    "new candidate": 12,
+    "structured/team-created secondary source": 2
+  },
+  "recommended_approvals": [
+    "categories/Standard Fees/BIS Standrd certification Fees.pdf",
+    "categories/helmet/IS-4151-Product-Manual helmet.pdf",
+    "categories/jwellery/Guidelines-for-Jewellers.pdf",
+    "categories/process of certification/10-steps-for-BIS-toy-certification-final2.pdf",
+    "categories/process of certification/Hallmarking Guidelines.pdf",
+    "categories/toys/Safety_of_toys.pdf",
+    "categories/toys/toys product manual declaration format.pdf"
+  ],
+  "unresolved_provenance_questions": [
+    "categories/Application Checklist/ApplicationFormV.pdf",
+    "categories/Application Checklist/Checklist_for_Application_for_BIS_Licence.pdf",
+    "categories/BIS LABS/BIS_Recognised_LAB_Group_1.pdf",
+    "categories/BIS LABS/BIS_recognised_lab_Group_2.pdf",
+    "categories/QCO and Overall Information/BIS_Compulsory_Certification_Schemes_II_IV_X_2026.docx",
+    "categories/QCO and Overall Information/BIS_QCO_Product_Manuals_Steel_Compliance_Structured_2026.docx",
+    "categories/Standard Fees/BIS Standrd certification Fees.pdf",
+    "categories/helmet/IS-4151-Product-Manual helmet.pdf",
+    "categories/jwellery/Guidelines-for-Jewellers.pdf",
+    "categories/process of certification/10-steps-for-BIS-toy-certification-final2.pdf",
+    "categories/process of certification/Hallmarking Guidelines.pdf",
+    "categories/toys/Safety_of_toys.pdf",
+    "categories/toys/Transition_2026_Transition Control.pdf",
+    "categories/toys/toys product manual declaration format.pdf"
+  ],
+  "semantic_duplicate_version_comparisons": [
+    {
+      "comparison": "10-step guide variants",
+      "files": [
+        "categories/process of certification/10-steps-for-BIS-toy-certification-final2.pdf",
+        "categories/toys/10-steps-for-BIS-toy-certification.pdf"
+      ],
+      "normalized_text_hashes": [
+        "bd44350ca5af11f1a98c84b89b84c685e0646ea79a331653695f37cd3de4e4f4",
+        "7bdf5b81ea55d908390a0d53fef1bb0dac787df562c99380aaa3aa16216409f5"
+      ],
+      "page_counts": [
+        5,
+        9
+      ],
+      "identifiers": [
+        [
+          "IS 9873",
+          "IS 15644"
+        ],
+        [
+          "IS 9873",
+          "IS 15644"
+        ]
+      ],
+      "similarity_to_first": [
+        1.0,
+        0.0505
+      ],
+      "review_note": "Similarity supports a version/duplicate review only; it does not establish authority or currentness."
+    },
+    {
+      "comparison": "jewellery guideline variants",
+      "files": [
+        "categories/jwellery/Guidelines-for-Jewellers.pdf",
+        "categories/jwellery/Revised-Guidelines-for-JEWELLERS-Jan-24.pdf"
+      ],
+      "normalized_text_hashes": [
+        "6f18f50178f192b50be45d2704c1e681723a631edee9d263944932c9fc289401",
+        "e232fa8cad31615a2fe4e19df9cb126150c183b00fd6b72eb2653de87d310b7e"
+      ],
+      "page_counts": [
+        23,
+        15
+      ],
+      "identifiers": [
+        [],
+        []
+      ],
+      "similarity_to_first": [
+        1.0,
+        0.2009
+      ],
+      "review_note": "Similarity supports a version/duplicate review only; it does not establish authority or currentness."
+    },
+    {
+      "comparison": "October 2023 PM-9873 variants",
+      "files": [
+        "categories/toys/1 PM-9873-Oct-2023.pdf",
+        "categories/toys/ProductManualUpadate-9873-Oct-2023.pdf",
+        "categories/toys/historical.pdf"
+      ],
+      "normalized_text_hashes": [
+        "800ddfb632cd495c457b37bcf35383c10530124eaf972aaef577736b5e4e2736",
+        "800ddfb632cd495c457b37bcf35383c10530124eaf972aaef577736b5e4e2736",
+        "800ddfb632cd495c457b37bcf35383c10530124eaf972aaef577736b5e4e2736"
+      ],
+      "page_counts": [
+        54,
+        54,
+        54
+      ],
+      "identifiers": [
+        [
+          "IS 9873",
+          "IS 15644",
+          "IS 9873 Part 1",
+          "IS 9873 Part 2"
+        ],
+        [
+          "IS 9873",
+          "IS 15644",
+          "IS 9873 Part 1",
+          "IS 9873 Part 2"
+        ],
+        [
+          "IS 9873",
+          "IS 15644",
+          "IS 9873 Part 1",
+          "IS 9873 Part 2"
+        ]
+      ],
+      "similarity_to_first": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "review_note": "Similarity supports a version/duplicate review only; it does not establish authority or currentness."
+    },
+    {
+      "comparison": "2026 transition variants",
+      "files": [
+        "categories/toys/Transition_2026_Transition Control.pdf",
+        "categories/toys/Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf"
+      ],
+      "normalized_text_hashes": [
+        "23d20a35c0bc167def161e097a27ef661631e430cb5c1c1ae110505fa705365b",
+        "1f3dcba21c1f2067d974ca104d1fd71bb8eba87a83909bdea0c3993b48ac6d2a"
+      ],
+      "page_counts": [
+        11,
+        6
+      ],
+      "identifiers": [
+        [],
+        [
+          "Transition Facilitation (Quality Control) Order",
+          "Quality Control Order",
+          "Quality Control) Order"
+        ]
+      ],
+      "similarity_to_first": [
+        1.0,
+        0.0039
+      ],
+      "review_note": "Similarity supports a version/duplicate review only; it does not establish authority or currentness."
+    },
+    {
+      "comparison": "Toys QCO/order variants",
+      "files": [
+        "categories/toys/Toys-QCO-2024.pdf",
+        "categories/toys/Toy_QC_order.pdf",
+        "categories/toys/Toys-Quality-Control-Second-Amendment-Order-2020.pdf"
+      ],
+      "normalized_text_hashes": [
+        "160b0888162313abc2af9004cf06bf1dca99f03d84ba44d8781b38324349045a",
+        "053d0c9e072d1136188a517a902522f2af6f934ae4710a54c1a90ad86de8bc21",
+        "77a97b932664338b1fb1d08676d9c01a139f3a174042035942454a45cf607c47"
+      ],
+      "page_counts": [
+        2,
+        3,
+        2
+      ],
+      "identifiers": [
+        [
+          "Quality Control) Order",
+          "Quality Control) Amendment Order"
+        ],
+        [
+          "IS 9873",
+          "IS 15644",
+          "Quality Control) Order",
+          "Quality Control Order"
+        ],
+        [
+          "Quality Control) Order"
+        ]
+      ],
+      "similarity_to_first": [
+        1.0,
+        0.0345,
+        0.4993
+      ],
+      "review_note": "Similarity supports a version/duplicate review only; it does not establish authority or currentness."
+    }
+  ],
+  "files": [
+    {
+      "original_relative_path": "categories/Application Checklist/ApplicationFormV.pdf",
+      "filename": "ApplicationFormV.pdf",
+      "category": "application checklist",
+      "mime_type": "application/pdf",
+      "size_bytes": 910009,
+      "sha256": "3d15850b2863091ffe20a18183ca33332ded340c30fe3b6b57c3cf5a499c69a7",
+      "page_count": 2,
+      "detected_title": "",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "quarantine pending provenance",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Bounded text does not establish an issuing authority.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/Application Checklist/Checklist_for_Application_for_BIS_Licence.pdf",
+      "filename": "Checklist_for_Application_for_BIS_Licence.pdf",
+      "category": "application checklist",
+      "mime_type": "application/pdf",
+      "size_bytes": 104088,
+      "sha256": "b0b16b0a4142fe538a2b142a6752c202b97f1ac4def0ca211024138f442ee104",
+      "page_count": 4,
+      "detected_title": "1",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "quarantine pending provenance",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Bounded text does not establish an issuing authority.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "064330d29279cebb7d536589f93703d54410f4a30137ee6cec6529511995845c",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/BIS LABS/BIS_Recognised_LAB_Group_1.pdf",
+      "filename": "BIS_Recognised_LAB_Group_1.pdf",
+      "category": "bis labs",
+      "mime_type": "application/pdf",
+      "size_bytes": 440385,
+      "sha256": "5f38ed95235bea5567c159d7360f88bf51c8c6e971fe0aeb27beb16f1a13e0b1",
+      "page_count": 38,
+      "detected_title": "GROUP-1 LIST OF BIS RECOGNISED LABORATORIES (24-08-2026)",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [
+        "24-08-2026",
+        "14.02.2027",
+        "17.05.2027",
+        "17-11-2017",
+        "30-01-2017",
+        "15.12.2026",
+        "23-08-2024",
+        "07-08-2020",
+        "31-01-2020",
+        "05-11-2019",
+        "09-04-2018",
+        "14.01.2029"
+      ],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "quarantine pending provenance",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Bounded text does not establish an issuing authority.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "0ddb7b967993e15140cbbbe5a1de6f8e88935034a2d2a560deed17321bd35ae5",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/BIS LABS/BIS_recognised_lab_Group_2.pdf",
+      "filename": "BIS_recognised_lab_Group_2.pdf",
+      "category": "bis labs",
+      "mime_type": "application/pdf",
+      "size_bytes": 260868,
+      "sha256": "ee6d5aa401f894e2ce041bb9c9381491fcc998418a0230b4ab095a191ed4dcbf",
+      "page_count": 24,
+      "detected_title": "GROUP-2 LAB OF NATIONAL REPUTE AND EMINENCE, FACILITIES OF WHICH ARE BEING",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [
+        "07-08-2026"
+      ],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "quarantine pending provenance",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Bounded text does not establish an issuing authority.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "482fefea78e54fd2c4b78c273853754e5e8cc3ca99c945cdb3e8f92cf181c8c2",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/QCO and Overall Information/BIS_Compulsory_Certification_Schemes_II_IV_X_2026.docx",
+      "filename": "BIS_Compulsory_Certification_Schemes_II_IV_X_2026.docx",
+      "category": "qco and overall information",
+      "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "size_bytes": 48724,
+      "sha256": "3176c033d8d054a9a53d98b525b59b2e30a3e8b99d07295401ea975008cfc1eb",
+      "page_count": null,
+      "detected_title": "",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "structured/team-created secondary source",
+      "replacement": null,
+      "extraction_quality": "unsupported_extractor:python_docx_unavailable",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "secondary retrieval only (pending provenance)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Valid DOCX status does not establish primary authority; primary citations must be verified first.",
+      "unresolved_question": "Which primary sources and authorship establish this structured file?",
+      "normalized_text_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/QCO and Overall Information/BIS_QCO_Product_Manuals_Steel_Compliance_Structured_2026.docx",
+      "filename": "BIS_QCO_Product_Manuals_Steel_Compliance_Structured_2026.docx",
+      "category": "qco and overall information",
+      "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "size_bytes": 44084,
+      "sha256": "73f288da05f6d5834fe361924f9e78c9d12ff862675a06952f060eb7385f33d8",
+      "page_count": null,
+      "detected_title": "",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "structured/team-created secondary source",
+      "replacement": null,
+      "extraction_quality": "unsupported_extractor:python_docx_unavailable",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "secondary retrieval only (pending provenance)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Valid DOCX status does not establish primary authority; primary citations must be verified first.",
+      "unresolved_question": "Which primary sources and authorship establish this structured file?",
+      "normalized_text_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/Standard Fees/BIS Standrd certification Fees.pdf",
+      "filename": "BIS Standrd certification Fees.pdf",
+      "category": "standard fees",
+      "mime_type": "application/pdf",
+      "size_bytes": 1382514,
+      "sha256": "0e26ae3f7d8246f86260cab5da26d83396e122fbcdec2b407b9a1cb794339896",
+      "page_count": 6,
+      "detected_title": "4323 GI/2026 (1)",
+      "standard_order_scheme_identifiers": [
+        "IS 2028",
+        "IS 2029",
+        "IS 2997",
+        "IS 3650",
+        "IS 4003",
+        "IS 4123",
+        "IS 4508",
+        "IS 4509",
+        "IS 6149",
+        "IS 302",
+        "IS 9202",
+        "IS 18837",
+        "IS 1809",
+        "IS 4712",
+        "IS 12370",
+        "IS 10555",
+        "IS 2762",
+        "IS 19089",
+        "IS 260",
+        "IS 16012"
+      ],
+      "visible_dates": [
+        "August 2021"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "active with freshness warning (pending human approval)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "Official-looking time-sensitive material needs source URL/date confirmation and a freshness warning.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "bcffb1ee683312b26b8137d00335ad7857eef451187737ccfc8441367c96363d",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/helmet/IS-4151-Product-Manual helmet.pdf",
+      "filename": "IS-4151-Product-Manual helmet.pdf",
+      "category": "helmet",
+      "mime_type": "application/pdf",
+      "size_bytes": 564016,
+      "sha256": "0458d34dc28f9c2c55e6944da8021ac4bbe72ddf279b0e14682707087701e1a9",
+      "page_count": 8,
+      "detected_title": "PM/ IS 4151/ 1/ January 2019",
+      "standard_order_scheme_identifiers": [
+        "IS 4151/ 1",
+        "IS 4151",
+        "IS 9844",
+        "IS 9973",
+        "PM/ IS 4151/ 1"
+      ],
+      "visible_dates": [
+        "January 2019"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "active authoritative retrieval (pending human approval)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Visible issuer evidence is promising but must be confirmed against an official primary source before activation.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "de775195cbcdd07dd790d251e144a88cfad1039ddbb6982d6d3e7379d32a15cc",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/jwellery/Guidelines-for-Jewellers.pdf",
+      "filename": "Guidelines-for-Jewellers.pdf",
+      "category": "jewellery",
+      "mime_type": "application/pdf",
+      "size_bytes": 1981553,
+      "sha256": "413890d7d28e575f5a57bd5997a6d21ea0c31de5c654425def795a4340d7ca20",
+      "page_count": 23,
+      "detected_title": "BUREAU OF INDIAN STANDARDS",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [
+        "02.07.2026",
+        "January \n2024",
+        "July 2026"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "active authoritative retrieval (pending human approval)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Visible issuer evidence is promising but must be confirmed against an official primary source before activation.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "6f18f50178f192b50be45d2704c1e681723a631edee9d263944932c9fc289401",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/jwellery/Revised-Guidelines-for-JEWELLERS-Jan-24.pdf",
+      "filename": "Revised-Guidelines-for-JEWELLERS-Jan-24.pdf",
+      "category": "jewellery",
+      "mime_type": "application/pdf",
+      "size_bytes": 673864,
+      "sha256": "bb652cecf196f1015634415236e1f726439914c4f87a05df8ee9bcd7b98d50ea",
+      "page_count": 15,
+      "detected_title": "Page 1 of 15",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [
+        "January 2024"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "Guidelines-for-Jewellers.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "January 2024 jewellery guideline; incoming 2026 guideline appears later, pending content/provenance confirmation.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "e232fa8cad31615a2fe4e19df9cb126150c183b00fd6b72eb2653de87d310b7e",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/process of certification/10-steps-for-BIS-toy-certification-final2.pdf",
+      "filename": "10-steps-for-BIS-toy-certification-final2.pdf",
+      "category": "process of certification",
+      "mime_type": "application/pdf",
+      "size_bytes": 132737,
+      "sha256": "7c0ff063f8b868e7cfa7af9b334159e177c5eb72f74009ad9fc640035af03b2a",
+      "page_count": 5,
+      "detected_title": "BUREAU OF INDIAN STANDARDS",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644"
+      ],
+      "visible_dates": [],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "active authoritative retrieval (pending human approval)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Visible issuer evidence is promising but must be confirmed against an official primary source before activation.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "bd44350ca5af11f1a98c84b89b84c685e0646ea79a331653695f37cd3de4e4f4",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/process of certification/Hallmarking Guidelines.pdf",
+      "filename": "Hallmarking Guidelines.pdf",
+      "category": "process of certification",
+      "mime_type": "application/pdf",
+      "size_bytes": 611777,
+      "sha256": "657fffdb78e372a0f4e398b41816d7ce17bb8f0beaf58b9aaf655f44f0d144eb",
+      "page_count": 38,
+      "detected_title": "HM/A&HC/Guidelines /3",
+      "standard_order_scheme_identifiers": [
+        "IS 15820",
+        "IS 1417",
+        "IS 2112"
+      ],
+      "visible_dates": [
+        "October 2024"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "active authoritative retrieval (pending human approval)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Visible issuer evidence is promising but must be confirmed against an official primary source before activation.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "1fdae27f49f500c87a89272950666b8f0662697a9a26de5df770a3e881656e88",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/1 PM-9873-Oct-2023.pdf",
+      "filename": "1 PM-9873-Oct-2023.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 1609205,
+      "sha256": "a623ebbb4932292f5886b156e57425c83e9939d51428e35a5ee581d08259a721",
+      "page_count": 54,
+      "detected_title": "PM/ 9873/11",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "IS 9873 Part 1",
+        "IS 9873 Part 2"
+      ],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "data/raw/product_manual_2026.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "October 2023/February 2023 PM-9873 version; current registry contains product_manual_2026.pdf.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "800ddfb632cd495c457b37bcf35383c10530124eaf972aaef577736b5e4e2736",
+      "duplicate_version_relationship": "probable text/version variant (0.8432) of categories/toys/PM-9873-Feb-2023.pdf; normalized-text duplicate of categories/toys/ProductManualUpadate-9873-Oct-2023.pdf; normalized-text duplicate of categories/toys/historical.pdf"
+    },
+    {
+      "original_relative_path": "categories/toys/10-steps-for-BIS-toy-certification.pdf",
+      "filename": "10-steps-for-BIS-toy-certification.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 953237,
+      "sha256": "854cbbf31023127cf0aba34d7dd1ae05518d9f0c7accade23796de89a939a8f7",
+      "page_count": 9,
+      "detected_title": "İखलौनों के  िलए बीआईएस लाइसŐस हेतु",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644"
+      ],
+      "visible_dates": [],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "exact duplicate",
+      "classification": "exact duplicate",
+      "replacement": "data/raw/10-steps-for-BIS-toy-certification.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "exclude",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Identical content is already represented; retain only its existing canonical source.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "7bdf5b81ea55d908390a0d53fef1bb0dac787df562c99380aaa3aa16216409f5",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+      "filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 783108,
+      "sha256": "74747115815219db3f76e0a4efbed9316a531e9f73e2cf4a5af413657509c3ab",
+      "page_count": 6,
+      "detected_title": "4724  GI/2026 (1)",
+      "standard_order_scheme_identifiers": [
+        "Transition Facilitation (Quality Control) Order",
+        "Quality Control Order",
+        "Quality Control) Order"
+      ],
+      "visible_dates": [
+        "25.02.2020",
+        "01.01.2021",
+        "27.10.2020",
+        "01.01.2022",
+        "05.12.2019",
+        "01.10.2023",
+        "01.08.2024",
+        "11.03.2024",
+        "01.03.2025",
+        "07.03.2024",
+        "01.04.2025",
+        "12.12.2023"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "exact duplicate",
+      "classification": "exact duplicate",
+      "replacement": "data/raw/Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "exclude",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Identical content is already represented; retain only its existing canonical source.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "1f3dcba21c1f2067d974ca104d1fd71bb8eba87a83909bdea0c3993b48ac6d2a",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/PM-9873-Feb-2023.pdf",
+      "filename": "PM-9873-Feb-2023.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 614720,
+      "sha256": "e5f6e6a390b65f098a46167b251c0b16fb2a59d17290f49c84fdf9542e123ea4",
+      "page_count": 53,
+      "detected_title": "PM/ 9873/10",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "IS 9873 Part 1",
+        "IS 9873 Part 2"
+      ],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "data/raw/product_manual_2026.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "October 2023/February 2023 PM-9873 version; current registry contains product_manual_2026.pdf.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "46e5bf52a17bdc519967d5c961998e4a9906107edfceeb5d227da193472b74ff",
+      "duplicate_version_relationship": "probable text/version variant (0.8434) of categories/toys/1 PM-9873-Oct-2023.pdf; probable text/version variant (0.8434) of categories/toys/ProductManualUpadate-9873-Oct-2023.pdf; probable text/version variant (0.8434) of categories/toys/historical.pdf"
+    },
+    {
+      "original_relative_path": "categories/toys/ProductManualUpadate-9873-Oct-2023.pdf",
+      "filename": "ProductManualUpadate-9873-Oct-2023.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 1609205,
+      "sha256": "a623ebbb4932292f5886b156e57425c83e9939d51428e35a5ee581d08259a721",
+      "page_count": 54,
+      "detected_title": "PM/ 9873/11",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "IS 9873 Part 1",
+        "IS 9873 Part 2"
+      ],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "data/raw/product_manual_2026.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "October 2023/February 2023 PM-9873 version; current registry contains product_manual_2026.pdf.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "800ddfb632cd495c457b37bcf35383c10530124eaf972aaef577736b5e4e2736",
+      "duplicate_version_relationship": "normalized-text duplicate of categories/toys/1 PM-9873-Oct-2023.pdf; probable text/version variant (0.8432) of categories/toys/PM-9873-Feb-2023.pdf; normalized-text duplicate of categories/toys/historical.pdf"
+    },
+    {
+      "original_relative_path": "categories/toys/Safety_of_toys.pdf",
+      "filename": "Safety_of_toys.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 9514,
+      "sha256": "d15f0ad50b5812052c711b071a3ad4085660b22243b714e9827fa4b761d0e07e",
+      "page_count": 1,
+      "detected_title": "BUREAU OF INDIAN STANDARDS",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "Quality Control) Order"
+      ],
+      "visible_dates": [
+        "01/09/2020"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "active authoritative retrieval (pending human approval)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Visible issuer evidence is promising but must be confirmed against an official primary source before activation.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "d82b8af20144fe77b79ade44dd71e623cae25cc9f7d5e89651c3aeb1ba623414",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/Toy_QC_order.pdf",
+      "filename": "Toy_QC_order.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 753487,
+      "sha256": "96eefa64ed07b2b5a4c70c0562fc4e8635a7e38377e0d33e62458511df0c4ccb",
+      "page_count": 3,
+      "detected_title": "1121 GI/2020 (1)",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "Quality Control) Order",
+        "Quality Control Order"
+      ],
+      "visible_dates": [
+        "01.09.2020"
+      ],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "exact duplicate",
+      "classification": "exact duplicate",
+      "replacement": "data/raw/Toy_QC_order.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "exclude",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Identical content is already represented; retain only its existing canonical source.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "053d0c9e072d1136188a517a902522f2af6f934ae4710a54c1a90ad86de8bc21",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/Toys-Extension.pdf",
+      "filename": "Toys-Extension.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 1520041,
+      "sha256": "9741a78dc2e53c74c368e43bc7863cb19752d834ff69ce932cc89425f04c694f",
+      "page_count": 2,
+      "detected_title": "4271 GI/2020 (1)",
+      "standard_order_scheme_identifiers": [
+        "Quality Control) Order"
+      ],
+      "visible_dates": [],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "exact duplicate",
+      "classification": "exact duplicate",
+      "replacement": "data/raw/Toys-Extension.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "exclude",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Identical content is already represented; retain only its existing canonical source.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "50c6f22d1001e2e3c45c97d459190be12cb4740c2c8b1d25a09f5006c1d210e5",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/Toys-QCO-2024.pdf",
+      "filename": "Toys-QCO-2024.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 1769801,
+      "sha256": "6b87d51085ea854f332cbeb53e715b9f8d6b87f390a9d2394020be3d52781ccf",
+      "page_count": 2,
+      "detected_title": "6368 GI/2024 (1)",
+      "standard_order_scheme_identifiers": [
+        "Quality Control) Order",
+        "Quality Control) Amendment Order"
+      ],
+      "visible_dates": [],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "data/raw/Toys-QCO-2024.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "2024 QCO version is dated and requires confirmation against later notifications/orders.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "160b0888162313abc2af9004cf06bf1dca99f03d84ba44d8781b38324349045a",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/Toys-Quality-Control-Second-Amendment-Order-2020.pdf",
+      "filename": "Toys-Quality-Control-Second-Amendment-Order-2020.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 1697805,
+      "sha256": "13f0f9a0dc9a7498653137e0e2481f89c357829ed89ae74434bf37bf308d5839",
+      "page_count": 2,
+      "detected_title": "6078 GI/2020 (1)",
+      "standard_order_scheme_identifiers": [
+        "Quality Control) Order"
+      ],
+      "visible_dates": [],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "data/raw/Toys-Quality-Control-Second-Amendment-Order-2020.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "2020 amendment is historical by visible order date; current controlling order must be confirmed from official source.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "77a97b932664338b1fb1d08676d9c01a139f3a174042035942454a45cf607c47",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/Transition_2026_Transition Control.pdf",
+      "filename": "Transition_2026_Transition Control.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 198204,
+      "sha256": "b5395e20132e41fa90e76a71e48992eb6bed49b52e4d4972364a82958330b6da",
+      "page_count": 11,
+      "detected_title": "1",
+      "standard_order_scheme_identifiers": [],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "quarantine pending provenance",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Bounded text does not establish an issuing authority.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "23d20a35c0bc167def161e097a27ef661631e430cb5c1c1ae110505fa705365b",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/historical.pdf",
+      "filename": "historical.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 1609205,
+      "sha256": "a623ebbb4932292f5886b156e57425c83e9939d51428e35a5ee581d08259a721",
+      "page_count": 54,
+      "detected_title": "PM/ 9873/11",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "IS 9873 Part 1",
+        "IS 9873 Part 2"
+      ],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "historical/superseded",
+      "classification": "historical/superseded",
+      "replacement": "data/raw/product_manual_2026.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "historical retrieval only (disabled by default)",
+      "freshness_warning": "Confirm currentness/source before relying on this time-sensitive document.",
+      "reason": "October 2023/February 2023 PM-9873 version; current registry contains product_manual_2026.pdf.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "800ddfb632cd495c457b37bcf35383c10530124eaf972aaef577736b5e4e2736",
+      "duplicate_version_relationship": "normalized-text duplicate of categories/toys/1 PM-9873-Oct-2023.pdf; probable text/version variant (0.8432) of categories/toys/PM-9873-Feb-2023.pdf; normalized-text duplicate of categories/toys/ProductManualUpadate-9873-Oct-2023.pdf"
+    },
+    {
+      "original_relative_path": "categories/toys/toys product manual declaration format.pdf",
+      "filename": "toys product manual declaration format.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 890063,
+      "sha256": "7ef8b3461716cf12f608ec38109b019bd243a0597927b5d78e77853bf465f110",
+      "page_count": 49,
+      "detected_title": "PM/ 9873/4",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "IS 9873 Part 1",
+        "IS 9873 Part 2"
+      ],
+      "visible_dates": [],
+      "authority": "BIS named in extracted document text (requires primary-source verification)",
+      "currentness": "unresolved",
+      "classification": "new candidate",
+      "replacement": null,
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "high",
+      "proposed_active_retrieval_eligibility": "active authoritative retrieval (pending human approval)",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Visible issuer evidence is promising but must be confirmed against an official primary source before activation.",
+      "unresolved_question": "Which official URL or primary registry entry establishes authority and currentness?",
+      "normalized_text_hash": "c425b93a6227dddd91bd14d77339b5404b0c4ff183e38311f97989bc4a72e3c6",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    },
+    {
+      "original_relative_path": "categories/toys/toys-faqs.pdf",
+      "filename": "toys-faqs.pdf",
+      "category": "toys",
+      "mime_type": "application/pdf",
+      "size_bytes": 199286,
+      "sha256": "d32e2ffa87a713c276820dfcae3a1a10fb6a431e8e07f2a6b1b6aadbc97c9c1e",
+      "page_count": 3,
+      "detected_title": "BIS CERTIFICATION OF SAFETY OF TOYS",
+      "standard_order_scheme_identifiers": [
+        "IS 9873",
+        "IS 15644",
+        "Quality Control) Order"
+      ],
+      "visible_dates": [],
+      "authority": "No issuing authority established by bounded extracted text",
+      "currentness": "exact duplicate",
+      "classification": "exact duplicate",
+      "replacement": "data/raw/toys-faqs.pdf",
+      "extraction_quality": "bounded text extracted",
+      "table_ocr_risk": "unknown/needs visual review",
+      "proposed_active_retrieval_eligibility": "exclude",
+      "freshness_warning": "None proposed until approval.",
+      "reason": "Identical content is already represented; retain only its existing canonical source.",
+      "unresolved_question": "None",
+      "normalized_text_hash": "f5a29f909e91e4a76d38e88707dc330f209c11d3a0ea6103060648f91c194496",
+      "duplicate_version_relationship": "No high-similarity incoming text relationship detected."
+    }
+  ]
+}

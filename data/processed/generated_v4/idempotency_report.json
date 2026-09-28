@@ -1,0 +1,11 @@
+{
+  "complete_artifact_sha256": "f899313eaaaca23b7cba788ef503aaeb9fce61012df4e0fb5291e93f7c53fb7e",
+  "candidate_collection": "bis_corpus_v4_candidate_f899313eaaac",
+  "candidate_count": 1160,
+  "complete_artifact_hash_identical": true,
+  "complete_run_1_exit_code": 0,
+  "complete_run_2_exit_code": 0,
+  "index_membership_identical": true,
+  "v3_chunks_sha256": "39b347ab687eac8f3e5de0e3fbd5215ebdd6bb63f497a72afdeac3bddb147f59",
+  "v3_hash_unchanged": true
+}

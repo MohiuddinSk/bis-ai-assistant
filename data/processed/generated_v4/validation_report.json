@@ -1,0 +1,10 @@
+{
+  "valid": true,
+  "checks": [
+    "approved_only",
+    "nonblank_chunks",
+    "page_metadata",
+    "scope_and_freshness_metadata",
+    "table_serialization_rejected"
+  ]
+}

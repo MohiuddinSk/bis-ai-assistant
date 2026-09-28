@@ -1,0 +1,536 @@
+{
+  "total": 6,
+  "passed": 6,
+  "failed": [],
+  "results": [
+    {
+      "query": "battery-operated toy standard",
+      "expected_sources": [
+        "product_manual_2026"
+      ],
+      "required_identifier": "IS 15644",
+      "v3_top5": [
+        {
+          "id": "d938f351699427234028d87685b1b7e3eb9622735df7c33c2d48d47ee703efbd",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 2; row 3 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: 2 | Column 2: Electric Toys | Column 3: Electric toys are further sub-divided into the following sub-groups according to input source: \uf0b7 Battery operated \uf0b7 Transformer toys \uf0b7 Dual-supply toys Accordingly, the following shall apply: \u2014 To cover all the models of battery operated electric toys, one model of battery operated electric toy from among all models of battery operated electric toys having the same power supply layout, same chassis, same power requirement and same battery type &size, processor/ controller (if any), same charger for externally rechargeable batteries (Alternate models of charger may be evaluated as part of the main product and mentioned in the test report),and in the same series (as per Sl No 1) to be drawn and tested for considering GOL or CSOL. \u2014 To cover all the models of Transformer toys, one model of transformer toy from among all models of Transformer toys having the Same mains layout or"
+        },
+        {
+          "id": "457fb83d67821f07eaaddc74f63ca20b22eefa7ed467c738e98b8dce90526e98",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: from among all models of battery operated electric\n                                                             toys having the same power supply layout, same\n                                                             chassis, same power requirement and same battery\n                                                             type  &size,  processor/  controller  (if  any),  same\n                                                             charger   for   externally   rechargeable   batteries\n                                                             (Alternate models of charger may be evaluated as\n                                                             part of the main product and mentioned in the test\n                                                             report),and in the same series (as per Sl No 1) to"
+        },
+        {
+          "id": "c09a2730b11bd7ee48d6fd79cd36ce2b38a7b7edccfdb54f1e0be11c8761f7db",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: to be drawn and tested for considering GOL or CSOL.\n                 2             Electric Toys            Electric toys are further sub-divided into the following\n                                                        sub-groups according to input source:\n                                                                          \uf0b7    Battery operated\n                                                                          \uf0b7    Transformer toys\n                                                                          \uf0b7    Dual-supply toys\n                                                        Accordingly, the following shall apply:\n                                                        \u2014    To cover all the models of       battery  operated electric\n                                                             toys, one model of        battery    operated electric toy"
+        },
+        {
+          "id": "deb8982ed378406e5844138245f0109d5d0d48e5b9e28cfdc3c405784a4ee320",
+          "source_id": "product_manual_2026",
+          "page": 3,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                      May 2026\n            Applicable              Secondary IS 9873 Part 2, 3 , 4, 9 ,10 and 11\n            standard\n            *Details in the table are given for illustration. Also see sampling guidelines at Annex-A\n            **Input source for electric toys - battery operated, transformer          operated or dual supply\n             #Details of models contained in each series shall be declared by manufacturer to BIS\n            separately and BIS shall endorse the series wise details of models separately in the licence\n            document as Annexure (See Annex            -A for details)\n                                              BUREAU OF INDIAN STANDARDS\n                              MANAK BHAVAN,9, BAHADUR SHAH ZAFAR MARG, NEW"
+        },
+        {
+          "id": "af8570f5d9e75e7d1e83007c40d45a8f108af3f1365848a263a943411a6a92f6",
+          "source_id": "product_manual_2026",
+          "page": 3,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 2 (left-to-right cells; check PDF headers and ditto references)\nColumn 1:  | Column 2: *Details in the table are given for illustration. Also see sampling guidelines at Annex-A **Input source for electric toys - battery operated, transformer operated or dual supply #Details of models contained in each series shall be declared by manufacturer to BIS separately and BIS shall endorse the series wise details of models separately in the licence document as Annexure (See Annex-A for details) | Column 3: "
+        }
+      ],
+      "v4_top5": [
+        {
+          "id": "d938f351699427234028d87685b1b7e3eb9622735df7c33c2d48d47ee703efbd",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 2; row 3 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: 2 | Column 2: Electric Toys | Column 3: Electric toys are further sub-divided into the following sub-groups according to input source: \uf0b7 Battery operated \uf0b7 Transformer toys \uf0b7 Dual-supply toys Accordingly, the following shall apply: \u2014 To cover all the models of battery operated electric toys, one model of battery operated electric toy from among all models of battery operated electric toys having the same power supply layout, same chassis, same power requirement and same battery type &size, processor/ controller (if any), same charger for externally rechargeable batteries (Alternate models of charger may be evaluated as part of the main product and mentioned in the test report),and in the same series (as per Sl No 1) to be drawn and tested for considering GOL or CSOL. \u2014 To cover all the models of Transformer toys, one model of transformer toy from among all models of Transformer toys having the Same mains layout or"
+        },
+        {
+          "id": "457fb83d67821f07eaaddc74f63ca20b22eefa7ed467c738e98b8dce90526e98",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: from among all models of battery operated electric\n                                                             toys having the same power supply layout, same\n                                                             chassis, same power requirement and same battery\n                                                             type  &size,  processor/  controller  (if  any),  same\n                                                             charger   for   externally   rechargeable   batteries\n                                                             (Alternate models of charger may be evaluated as\n                                                             part of the main product and mentioned in the test\n                                                             report),and in the same series (as per Sl No 1) to"
+        },
+        {
+          "id": "c09a2730b11bd7ee48d6fd79cd36ce2b38a7b7edccfdb54f1e0be11c8761f7db",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: to be drawn and tested for considering GOL or CSOL.\n                 2             Electric Toys            Electric toys are further sub-divided into the following\n                                                        sub-groups according to input source:\n                                                                          \uf0b7    Battery operated\n                                                                          \uf0b7    Transformer toys\n                                                                          \uf0b7    Dual-supply toys\n                                                        Accordingly, the following shall apply:\n                                                        \u2014    To cover all the models of       battery  operated electric\n                                                             toys, one model of        battery    operated electric toy"
+        },
+        {
+          "id": "deb8982ed378406e5844138245f0109d5d0d48e5b9e28cfdc3c405784a4ee320",
+          "source_id": "product_manual_2026",
+          "page": 3,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                      May 2026\n            Applicable              Secondary IS 9873 Part 2, 3 , 4, 9 ,10 and 11\n            standard\n            *Details in the table are given for illustration. Also see sampling guidelines at Annex-A\n            **Input source for electric toys - battery operated, transformer          operated or dual supply\n             #Details of models contained in each series shall be declared by manufacturer to BIS\n            separately and BIS shall endorse the series wise details of models separately in the licence\n            document as Annexure (See Annex            -A for details)\n                                              BUREAU OF INDIAN STANDARDS\n                              MANAK BHAVAN,9, BAHADUR SHAH ZAFAR MARG, NEW"
+        },
+        {
+          "id": "af8570f5d9e75e7d1e83007c40d45a8f108af3f1365848a263a943411a6a92f6",
+          "source_id": "product_manual_2026",
+          "page": 3,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 2 (left-to-right cells; check PDF headers and ditto references)\nColumn 1:  | Column 2: *Details in the table are given for illustration. Also see sampling guidelines at Annex-A **Input source for electric toys - battery operated, transformer operated or dual supply #Details of models contained in each series shall be declared by manufacturer to BIS separately and BIS shall endorse the series wise details of models separately in the licence document as Annexure (See Annex-A for details) | Column 3: "
+        }
+      ],
+      "first_relevant_rank": 1,
+      "forbidden": [],
+      "metadata_ok": true,
+      "v3_identifier_present": false,
+      "v4_identifier_present": false,
+      "identifier_preserved": true,
+      "pass": true
+    },
+    {
+      "query": "IS 9873 toy",
+      "expected_sources": [
+        "Toy_QC_order",
+        "product_manual_2026"
+      ],
+      "required_identifier": "IS 9873",
+      "v3_top5": [
+        {
+          "id": "cc990c917f460646313f7ce052d26729d4907af6a36368d5e3b3c58d2511250b",
+          "source_id": "product_manual_2026",
+          "page": 2,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: \u201cLicence is granted to use Standard Mark as per IS 9873 (Part 1): 2025/IS 15644:2006 with\n              the following       scope: *\n              Name of     the product                  Saf ety            of           Toys            Part            1            Saf ety            Aspects Related            to            Mechanical\n                                                       and Physical Properties          /Saf ety of Electric Toys\n              Type                                     Non Electric Toys/       Electric Toys\n              Descrip   tion of toy                    Rattle, Ring     etc., (as applicable)\n              Category No. and Name                    Category A      - Toys for sensorimot        or or activities \u2014 First age\n              Sub- category No. and Name               Subcategory 1 - Rattles and rings"
+        },
+        {
+          "id": "d1a242a161c38b4029504e65323f98faff2af9e7414498b27e5429fb2d0bdacf",
+          "source_id": "Toy_QC_order",
+          "page": 3,
+          "source_filename": "Toy_QC_order.pdf",
+          "text": "passage: IS 9873 (Part 2) : 2017 Safety of Toys Part 2 Flammability.\n                         IS 9873 (Part 3) : 2017 Safety Requirements for Toys Part 3 Migration of Certain\n                                                                         Elements.\n                         IS 9873 (Part 4) : 2017 Safety of Toys Part 4 Swings, Slides and Similar Activity\n                                                                         Toys for Indoor and Outdoor Family Domestic Use.\n                         IS 9873 (Part 7) : 2017 Safety of Toys Part 7 Requirements and Test Methods for\n                                                                         Finger Paints.\n                         IS 9873 (Part 9) : 2017 Safety of Toys Part 9 Certain Phthalates Esters in Toys and\n                         IS 15644: 2006  Safety of Electric Toys."
+        },
+        {
+          "id": "deb8982ed378406e5844138245f0109d5d0d48e5b9e28cfdc3c405784a4ee320",
+          "source_id": "product_manual_2026",
+          "page": 3,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                      May 2026\n            Applicable              Secondary IS 9873 Part 2, 3 , 4, 9 ,10 and 11\n            standard\n            *Details in the table are given for illustration. Also see sampling guidelines at Annex-A\n            **Input source for electric toys - battery operated, transformer          operated or dual supply\n             #Details of models contained in each series shall be declared by manufacturer to BIS\n            separately and BIS shall endorse the series wise details of models separately in the licence\n            document as Annexure (See Annex            -A for details)\n                                              BUREAU OF INDIAN STANDARDS\n                              MANAK BHAVAN,9, BAHADUR SHAH ZAFAR MARG, NEW"
+        },
+        {
+          "id": "33c4c16b974caa95bc1279d508d9263d6251fb4d596b34e78f16c573961002da",
+          "source_id": "product_manual_2026",
+          "page": 26,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                                                    May 2026\n                                                                     5.11.1,\n                                                                     5.11.2,\n                      4.11                  Cords                    5.11.3,              -do-               one         Each Control      Unit               -do-\n                                                                     5.11.4,\n                                                                     5.11.5,\n                                                                     5.11.6\n                      4.12         Folding mechanisms\n                                      Toy pushchairs,                4.12.1,             IS9873"
+        },
+        {
+          "id": "dd2c8dec807723af73cdcb37908f802f33e34558bc63ccd80edabeb5f6b40944",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: be ensured that the age grading so declared is reasonable and in accordance with the age\n         grading guidelines given in IS 9873 (Part 8) to ensure that a toy is appropriate and safe at the\n         various stages of physical and mental development of the child using the toy.\n         In case a manufacturer is found to be declaring a higher age grading than that specified\n         in Appendix-I simply in order to avoid testing of certain requirements, such requests\n         shall not be entertained.\n         For example, starting age for teethers and teething rings is given as 4 months+ in Appendix                          -I.\n         Further, the test for shape, size and strength (C. 5.3 of IS 9873 (Part 1):               2025) of Squeeze toys,\n         rattles, and certain other toys and components of toys (Cl. 4.5.1.2 of IS 9873 (Part 1):                     2025) is"
+        }
+      ],
+      "v4_top5": [
+        {
+          "id": "cc990c917f460646313f7ce052d26729d4907af6a36368d5e3b3c58d2511250b",
+          "source_id": "product_manual_2026",
+          "page": 2,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: \u201cLicence is granted to use Standard Mark as per IS 9873 (Part 1): 2025/IS 15644:2006 with\n              the following       scope: *\n              Name of     the product                  Saf ety            of           Toys            Part            1            Saf ety            Aspects Related            to            Mechanical\n                                                       and Physical Properties          /Saf ety of Electric Toys\n              Type                                     Non Electric Toys/       Electric Toys\n              Descrip   tion of toy                    Rattle, Ring     etc., (as applicable)\n              Category No. and Name                    Category A      - Toys for sensorimot        or or activities \u2014 First age\n              Sub- category No. and Name               Subcategory 1 - Rattles and rings"
+        },
+        {
+          "id": "d1a242a161c38b4029504e65323f98faff2af9e7414498b27e5429fb2d0bdacf",
+          "source_id": "Toy_QC_order",
+          "page": 3,
+          "source_filename": "Toy_QC_order.pdf",
+          "text": "passage: IS 9873 (Part 2) : 2017 Safety of Toys Part 2 Flammability.\n                         IS 9873 (Part 3) : 2017 Safety Requirements for Toys Part 3 Migration of Certain\n                                                                         Elements.\n                         IS 9873 (Part 4) : 2017 Safety of Toys Part 4 Swings, Slides and Similar Activity\n                                                                         Toys for Indoor and Outdoor Family Domestic Use.\n                         IS 9873 (Part 7) : 2017 Safety of Toys Part 7 Requirements and Test Methods for\n                                                                         Finger Paints.\n                         IS 9873 (Part 9) : 2017 Safety of Toys Part 9 Certain Phthalates Esters in Toys and\n                         IS 15644: 2006  Safety of Electric Toys."
+        },
+        {
+          "id": "deb8982ed378406e5844138245f0109d5d0d48e5b9e28cfdc3c405784a4ee320",
+          "source_id": "product_manual_2026",
+          "page": 3,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                      May 2026\n            Applicable              Secondary IS 9873 Part 2, 3 , 4, 9 ,10 and 11\n            standard\n            *Details in the table are given for illustration. Also see sampling guidelines at Annex-A\n            **Input source for electric toys - battery operated, transformer          operated or dual supply\n             #Details of models contained in each series shall be declared by manufacturer to BIS\n            separately and BIS shall endorse the series wise details of models separately in the licence\n            document as Annexure (See Annex            -A for details)\n                                              BUREAU OF INDIAN STANDARDS\n                              MANAK BHAVAN,9, BAHADUR SHAH ZAFAR MARG, NEW"
+        },
+        {
+          "id": "33c4c16b974caa95bc1279d508d9263d6251fb4d596b34e78f16c573961002da",
+          "source_id": "product_manual_2026",
+          "page": 26,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                                                    May 2026\n                                                                     5.11.1,\n                                                                     5.11.2,\n                      4.11                  Cords                    5.11.3,              -do-               one         Each Control      Unit               -do-\n                                                                     5.11.4,\n                                                                     5.11.5,\n                                                                     5.11.6\n                      4.12         Folding mechanisms\n                                      Toy pushchairs,                4.12.1,             IS9873"
+        },
+        {
+          "id": "dd2c8dec807723af73cdcb37908f802f33e34558bc63ccd80edabeb5f6b40944",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: be ensured that the age grading so declared is reasonable and in accordance with the age\n         grading guidelines given in IS 9873 (Part 8) to ensure that a toy is appropriate and safe at the\n         various stages of physical and mental development of the child using the toy.\n         In case a manufacturer is found to be declaring a higher age grading than that specified\n         in Appendix-I simply in order to avoid testing of certain requirements, such requests\n         shall not be entertained.\n         For example, starting age for teethers and teething rings is given as 4 months+ in Appendix                          -I.\n         Further, the test for shape, size and strength (C. 5.3 of IS 9873 (Part 1):               2025) of Squeeze toys,\n         rattles, and certain other toys and components of toys (Cl. 4.5.1.2 of IS 9873 (Part 1):                     2025) is"
+        }
+      ],
+      "first_relevant_rank": 1,
+      "forbidden": [],
+      "metadata_ok": true,
+      "v3_identifier_present": true,
+      "v4_identifier_present": true,
+      "identifier_preserved": true,
+      "pass": true
+    },
+    {
+      "query": "toy certification steps",
+      "expected_sources": [
+        "product_manual_2026"
+      ],
+      "required_identifier": null,
+      "v3_top5": [
+        {
+          "id": "aeea7068b5fed79d110f12ec4661a3cf7b4c7d0375aba235d55ae5f81f3f482f",
+          "source_id": "product_manual_2026",
+          "page": 2,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Sample Quantity                        certification officer shall consult with the lab and ensure that\n                                                     sufficient quantity required for           complete testing is sent to lab.\n                                                     (Samples to be fully packaged and labeled)\n         d)   \u092a\u0930\u0940\u0915\u094d\u0937\u0923 \u0905\u0928\u0941\u0930 \u0927 \u092e\u0947\u0902 \u0918 \u0924\u094d\u0930\u0930\u094d\u093f              Name of the product\n              \u0924\u094d\u0930\u0915\u090f \u091c\u093e\u0928\u0947 \u093f\u093e\u0932\u0947 \u092a\u0948\u0930\u093e\u092e\u0940\u091f\u0930                 Type\n              Parameters to be                         Description of toy\n              Declared in Test                         Category No. and Name\n              Request                                  Sub- category No. and Name\n                                                       Input source for electric toy\n                                                       Starting Age"
+        },
+        {
+          "id": "dd2c8dec807723af73cdcb37908f802f33e34558bc63ccd80edabeb5f6b40944",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: be ensured that the age grading so declared is reasonable and in accordance with the age\n         grading guidelines given in IS 9873 (Part 8) to ensure that a toy is appropriate and safe at the\n         various stages of physical and mental development of the child using the toy.\n         In case a manufacturer is found to be declaring a higher age grading than that specified\n         in Appendix-I simply in order to avoid testing of certain requirements, such requests\n         shall not be entertained.\n         For example, starting age for teethers and teething rings is given as 4 months+ in Appendix                          -I.\n         Further, the test for shape, size and strength (C. 5.3 of IS 9873 (Part 1):               2025) of Squeeze toys,\n         rattles, and certain other toys and components of toys (Cl. 4.5.1.2 of IS 9873 (Part 1):                     2025) is"
+        },
+        {
+          "id": "bd956ff77ec18b08855c17a144eae47e184215ddf573688c9a3da59284cf2f80",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                         May 2026\n                                                               ANNEX-A\n                                                     GROUPING GUIDELINES\n    1.   For the purpose of certification, toys have been classified into 2 types. For each type, one primary\n         standard shall apply against which licence            would be granted and the other standards against which\n         testing may also be required to be done shall be taken as secondary standards. However, testing will\n         be considered by the lab based on both the primary and secondary standards applicable. The\n         classification is as follows:\n                 Sl.    Type                                  Primary Standard           Secondary Standards"
+        },
+        {
+          "id": "f63ae989b0558afa5faa3e454dd9109642e84604c6b64780043065a828900890",
+          "source_id": "product_manual_2026",
+          "page": 38,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Cl.                Requirement                 Test Methods                    No. of           Frequency                Remarks\n                                                          Clause Reference                 Sample\n           3              Maximum acceptable\n                          levels of phthalates\n           i)             Vinyl in toys or                             IS9873             One sample Once in 12 months Also to be tested whenever\n                          childcare  articles                          (Part6)              per series                          supplier of material changes\n           ii)            Vinyl in any part   of the                   IS9873                  -do-       -do-                  -do-\n                          toy or childcare article                     (Part6)\n                          that can be placed in"
+        },
+        {
+          "id": "8828c93b7238c6931fbfce03c936bca5e5edae7f1a22cfbb4751558569586cdf",
+          "source_id": "Toy_QC_order",
+          "page": 3,
+          "source_filename": "Toy_QC_order.pdf",
+          "text": "passage: [      II            3(ii)]                                                                                                                                            3\n        (b) This order shall apply to Toys as they are initially received by the children and, in addition,\n                 this shall apply after a toy is subjected to reasonably foreseeable conditions of normal use and\n                 abuse unless specifically noted otherwise.\n 3.     Conformity to standard and compulsory use of Standard Mark                                                            .    The goods or articles\nspecified in the column (1) of the Table below shall conform to the corresponding Indian Standard (s)\nmentioned in the column (2) of the Table and shall bear the Standard Mark under a licence from the\nBureau as per Scheme-I of Schedule-II of BIS (Conformity Assessment) Regulations, 2018:"
+        }
+      ],
+      "v4_top5": [
+        {
+          "id": "aeea7068b5fed79d110f12ec4661a3cf7b4c7d0375aba235d55ae5f81f3f482f",
+          "source_id": "product_manual_2026",
+          "page": 2,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Sample Quantity                        certification officer shall consult with the lab and ensure that\n                                                     sufficient quantity required for           complete testing is sent to lab.\n                                                     (Samples to be fully packaged and labeled)\n         d)   \u092a\u0930\u0940\u0915\u094d\u0937\u0923 \u0905\u0928\u0941\u0930 \u0927 \u092e\u0947\u0902 \u0918 \u0924\u094d\u0930\u0930\u094d\u093f              Name of the product\n              \u0924\u094d\u0930\u0915\u090f \u091c\u093e\u0928\u0947 \u093f\u093e\u0932\u0947 \u092a\u0948\u0930\u093e\u092e\u0940\u091f\u0930                 Type\n              Parameters to be                         Description of toy\n              Declared in Test                         Category No. and Name\n              Request                                  Sub- category No. and Name\n                                                       Input source for electric toy\n                                                       Starting Age"
+        },
+        {
+          "id": "dd2c8dec807723af73cdcb37908f802f33e34558bc63ccd80edabeb5f6b40944",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: be ensured that the age grading so declared is reasonable and in accordance with the age\n         grading guidelines given in IS 9873 (Part 8) to ensure that a toy is appropriate and safe at the\n         various stages of physical and mental development of the child using the toy.\n         In case a manufacturer is found to be declaring a higher age grading than that specified\n         in Appendix-I simply in order to avoid testing of certain requirements, such requests\n         shall not be entertained.\n         For example, starting age for teethers and teething rings is given as 4 months+ in Appendix                          -I.\n         Further, the test for shape, size and strength (C. 5.3 of IS 9873 (Part 1):               2025) of Squeeze toys,\n         rattles, and certain other toys and components of toys (Cl. 4.5.1.2 of IS 9873 (Part 1):                     2025) is"
+        },
+        {
+          "id": "bd956ff77ec18b08855c17a144eae47e184215ddf573688c9a3da59284cf2f80",
+          "source_id": "product_manual_2026",
+          "page": 4,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                         May 2026\n                                                               ANNEX-A\n                                                     GROUPING GUIDELINES\n    1.   For the purpose of certification, toys have been classified into 2 types. For each type, one primary\n         standard shall apply against which licence            would be granted and the other standards against which\n         testing may also be required to be done shall be taken as secondary standards. However, testing will\n         be considered by the lab based on both the primary and secondary standards applicable. The\n         classification is as follows:\n                 Sl.    Type                                  Primary Standard           Secondary Standards"
+        },
+        {
+          "id": "f63ae989b0558afa5faa3e454dd9109642e84604c6b64780043065a828900890",
+          "source_id": "product_manual_2026",
+          "page": 38,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Cl.                Requirement                 Test Methods                    No. of           Frequency                Remarks\n                                                          Clause Reference                 Sample\n           3              Maximum acceptable\n                          levels of phthalates\n           i)             Vinyl in toys or                             IS9873             One sample Once in 12 months Also to be tested whenever\n                          childcare  articles                          (Part6)              per series                          supplier of material changes\n           ii)            Vinyl in any part   of the                   IS9873                  -do-       -do-                  -do-\n                          toy or childcare article                     (Part6)\n                          that can be placed in"
+        },
+        {
+          "id": "8828c93b7238c6931fbfce03c936bca5e5edae7f1a22cfbb4751558569586cdf",
+          "source_id": "Toy_QC_order",
+          "page": 3,
+          "source_filename": "Toy_QC_order.pdf",
+          "text": "passage: [      II            3(ii)]                                                                                                                                            3\n        (b) This order shall apply to Toys as they are initially received by the children and, in addition,\n                 this shall apply after a toy is subjected to reasonably foreseeable conditions of normal use and\n                 abuse unless specifically noted otherwise.\n 3.     Conformity to standard and compulsory use of Standard Mark                                                            .    The goods or articles\nspecified in the column (1) of the Table below shall conform to the corresponding Indian Standard (s)\nmentioned in the column (2) of the Table and shall bear the Standard Mark under a licence from the\nBureau as per Scheme-I of Schedule-II of BIS (Conformity Assessment) Regulations, 2018:"
+        }
+      ],
+      "first_relevant_rank": 1,
+      "forbidden": [],
+      "metadata_ok": true,
+      "v3_identifier_present": true,
+      "v4_identifier_present": true,
+      "identifier_preserved": true,
+      "pass": true
+    },
+    {
+      "query": "documents for new toy series",
+      "expected_sources": [
+        "product_manual_2026"
+      ],
+      "required_identifier": null,
+      "v3_top5": [
+        {
+          "id": "28bcb241ce919d4bac8fc8259668256afe124e07396d2f07f4862739f7ab7721",
+          "source_id": "product_manual_2026",
+          "page": 58,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Indian Standards under Scheme I of Schedule II of BIS (Conformity Assessment) Regulations, 2018,                             I hereby declare the following:\n      1. I am applying for addition in scope of licence for the following new varieties (new series) of toys\n       Type         Descripti      Category          Sub-          Input source           Starting      Series         Applicable        Applicable\n                    on of toy      No. and           category      for electric           Age           No.#           primary           Secondary\n                                   Name              No. and       toy**                                               standard          standard\n                                                     Name"
+        },
+        {
+          "id": "f2ed041010ad11dc1811050e804d1eabaeeafe60b0e2126421dc4a1cc5d87bd5",
+          "source_id": "product_manual_2026",
+          "page": 62,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                                May 2026\n                                                                             APPENDIX \u2013IV\n      FORMAT FOR ADDING NEW MODELS TO SERIES ALREADY COVERED IN THE SCOPE OF LICENCE BY LICENSEE\n     Date\n     Branch Office Bureau of Indian Standards\n      Sir/Madam\n      Subject: Declaration addition of new models in the series already covered in scope of Licence for Safety Of Toys\n     With reference to my existing licence for safety of toys (Licence No CM/L-\u2026..), I request BIS to add the following new models in the series\n     which are already covered in the scope of my licence\n       1   SERIES NO:                      (STARTING AGE:)"
+        },
+        {
+          "id": "29b13c087feb89fdb1366b3a3b4e41d38c346df4ec69ca9ff13af436cf2d9169",
+          "source_id": "product_manual_2026",
+          "page": 54,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 1 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: Type | Column 2: Descripti on of toy | Column 3: Category No. and Name | Column 4: Sub- category No. and Name | Column 5: Input source for electric toy** | Column 6: Starting Age | Column 7: Series No.# | Column 8: Applicable primary standard | Column 9: Applicable Secondary standard"
+        },
+        {
+          "id": "9135b996e50ef8acf042334c590ba25fa42e546346c25e9dba975592300090cd",
+          "source_id": "product_manual_2026",
+          "page": 58,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 1 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: Type | Column 2: Descripti on of toy | Column 3: Category No. and Name | Column 4: Sub- category No. and Name | Column 5: Input source for electric toy** | Column 6: Starting Age | Column 7: Series No.# | Column 8: Applicable primary standard | Column 9: Applicable Secondary standard"
+        },
+        {
+          "id": "0e77914922457f80a650c2dadbe27b743af99640a7b289896500eb33518b6e65",
+          "source_id": "product_manual_2026",
+          "page": 58,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                                           May 2026\n                                                                                    APPENDIX III\n                                                          FORMAT FOR DECLARATION BY MANUFACTURER\n                  (TO BE SUBMITTED WITH APPLICATION FOR CHANGE IN SCOPE OF LICENCE I.E. ADDITION OF NEW SERIES)\n      Date:\n            Branch Office\n      Bureau of Indian Standards\n      Subject: Declaration For Application For Change in Scope of Licence for Safety Of Toys\n      Dear Sir,\n      With reference to my application for Change in Scope of Licence for Safety of Toys i.e. addition of new series                          in the scope of licence as per"
+        }
+      ],
+      "v4_top5": [
+        {
+          "id": "28bcb241ce919d4bac8fc8259668256afe124e07396d2f07f4862739f7ab7721",
+          "source_id": "product_manual_2026",
+          "page": 58,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Indian Standards under Scheme I of Schedule II of BIS (Conformity Assessment) Regulations, 2018,                             I hereby declare the following:\n      1. I am applying for addition in scope of licence for the following new varieties (new series) of toys\n       Type         Descripti      Category          Sub-          Input source           Starting      Series         Applicable        Applicable\n                    on of toy      No. and           category      for electric           Age           No.#           primary           Secondary\n                                   Name              No. and       toy**                                               standard          standard\n                                                     Name"
+        },
+        {
+          "id": "f2ed041010ad11dc1811050e804d1eabaeeafe60b0e2126421dc4a1cc5d87bd5",
+          "source_id": "product_manual_2026",
+          "page": 62,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                                May 2026\n                                                                             APPENDIX \u2013IV\n      FORMAT FOR ADDING NEW MODELS TO SERIES ALREADY COVERED IN THE SCOPE OF LICENCE BY LICENSEE\n     Date\n     Branch Office Bureau of Indian Standards\n      Sir/Madam\n      Subject: Declaration addition of new models in the series already covered in scope of Licence for Safety Of Toys\n     With reference to my existing licence for safety of toys (Licence No CM/L-\u2026..), I request BIS to add the following new models in the series\n     which are already covered in the scope of my licence\n       1   SERIES NO:                      (STARTING AGE:)"
+        },
+        {
+          "id": "29b13c087feb89fdb1366b3a3b4e41d38c346df4ec69ca9ff13af436cf2d9169",
+          "source_id": "product_manual_2026",
+          "page": 54,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 1 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: Type | Column 2: Descripti on of toy | Column 3: Category No. and Name | Column 4: Sub- category No. and Name | Column 5: Input source for electric toy** | Column 6: Starting Age | Column 7: Series No.# | Column 8: Applicable primary standard | Column 9: Applicable Secondary standard"
+        },
+        {
+          "id": "9135b996e50ef8acf042334c590ba25fa42e546346c25e9dba975592300090cd",
+          "source_id": "product_manual_2026",
+          "page": 58,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 1 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: Type | Column 2: Descripti on of toy | Column 3: Category No. and Name | Column 4: Sub- category No. and Name | Column 5: Input source for electric toy** | Column 6: Starting Age | Column 7: Series No.# | Column 8: Applicable primary standard | Column 9: Applicable Secondary standard"
+        },
+        {
+          "id": "0e77914922457f80a650c2dadbe27b743af99640a7b289896500eb33518b6e65",
+          "source_id": "product_manual_2026",
+          "page": 58,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                                           May 2026\n                                                                                    APPENDIX III\n                                                          FORMAT FOR DECLARATION BY MANUFACTURER\n                  (TO BE SUBMITTED WITH APPLICATION FOR CHANGE IN SCOPE OF LICENCE I.E. ADDITION OF NEW SERIES)\n      Date:\n            Branch Office\n      Bureau of Indian Standards\n      Subject: Declaration For Application For Change in Scope of Licence for Safety Of Toys\n      Dear Sir,\n      With reference to my application for Change in Scope of Licence for Safety of Toys i.e. addition of new series                          in the scope of licence as per"
+        }
+      ],
+      "first_relevant_rank": 1,
+      "forbidden": [],
+      "metadata_ok": true,
+      "v3_identifier_present": true,
+      "v4_identifier_present": true,
+      "identifier_preserved": true,
+      "pass": true
+    },
+    {
+      "query": "2026 transition order",
+      "expected_sources": [
+        "Notification_of_Transition_Facilitation_Quality_Control_Order_2026"
+      ],
+      "required_identifier": null,
+      "v3_top5": [
+        {
+          "id": "9775c09504568c03cb7e4995a60ab0ae06119fe18b64497dfb631c6cccbee8de",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 4,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: \u0938\u0941\u092e\u0940\u0924 \u0915\u0941\u092e\u093e\u0930 \u093f\u093e\u0930\u0902\u0917\u0932        , \u0938\u0902\u092f\u0941\u093f \u0938\u091c\u091a\u0935\n                                       MINISTRY OF COMMERCE AND INDUSTRY\n                                (Department for Promotion of Industry and Internal Trade)\n                                                                  ORDER\n                                                    New Delhi, the 25th June, 2026\n          S.O. 3417(E).\u2014 In exercise of the powers conferred by section 16 read with sub                     -section (3) of section 25 of\nthe Bureau of Indian Standards Act, 2016 (11 of 2016), the Central Government is of the opinion that it is necessary so\nto do in the public interest and after consulting the Bureau, hereby makes the following Order, namely:                     \u2013\n1. Short title and commencement.            - (1) This Order may be called the Transition Facilitation (Quality Control) Order,\n2026."
+        },
+        {
+          "id": "3dbf1371c5b11bfd17d04c19a52400a989214f902a0d70ae7b126ac7c40c9d83",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 6,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: Table 1; row 3 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: 9. | Column 2: Furniture (Quality Control) Order, 2025. | Column 3: 14.02.2025 | Column 4: 13.02.2026"
+        },
+        {
+          "id": "1b0add5e6cd6f0f60ab12f48a50b1fdfcb13b077593040f0e2f833eeab5b49ee",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 6,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: Table 1; row 4 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: 10. | Column 2: Safety of Household, Commercial and Similar Electrical Appliances (Quality Control) Order, 2026. | Column 3: 20.09.2024 | Column 4: 01.10.2026"
+        },
+        {
+          "id": "fb360d5f83b65224f64557549a86a62bae99ef5701a47e7ee421c2c8394fc280",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 6,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: 6                                  THE GAZETTE OF INDIA : EXTRAORDINARY                                               [PART II\u2014SEC. 3(ii)]\n     7.      Electrical appliance for domestic clothes washing (Quality                       07.03.2024           01.04.2025\n             Control) Order, 2024.\n     8.      Hinges (Quality Control) Order, 2025.                                            12.12.2023           01.07.2025\n     9.      Furniture (Quality Control) Order, 2025.                                         14.02.2025           13.02.2026\n     10.     Safety of Household, Commercial and Similar Electrical                           20.09.2024           01.10.2026\n             Appliances (Quality Control) Order, 2026.\n                                                                                                            [F. No. P-29026/1/2026-LEI]"
+        },
+        {
+          "id": "3156dc6c68620147b0091b187755ea4991cda2b4f8e20527330b3d07a9d0d11f",
+          "source_id": "product_manual_2026",
+          "page": 61,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                       May 2026\n        S.No.               MODEL NUMBER                 TOY DESCRIPTION               TOY IMAGE/PHOTO\n                                                       SIGNATURE\n                                                       NAME DESIGNATION\n                                                       DATE"
+        }
+      ],
+      "v4_top5": [
+        {
+          "id": "9775c09504568c03cb7e4995a60ab0ae06119fe18b64497dfb631c6cccbee8de",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 4,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: \u0938\u0941\u092e\u0940\u0924 \u0915\u0941\u092e\u093e\u0930 \u093f\u093e\u0930\u0902\u0917\u0932        , \u0938\u0902\u092f\u0941\u093f \u0938\u091c\u091a\u0935\n                                       MINISTRY OF COMMERCE AND INDUSTRY\n                                (Department for Promotion of Industry and Internal Trade)\n                                                                  ORDER\n                                                    New Delhi, the 25th June, 2026\n          S.O. 3417(E).\u2014 In exercise of the powers conferred by section 16 read with sub                     -section (3) of section 25 of\nthe Bureau of Indian Standards Act, 2016 (11 of 2016), the Central Government is of the opinion that it is necessary so\nto do in the public interest and after consulting the Bureau, hereby makes the following Order, namely:                     \u2013\n1. Short title and commencement.            - (1) This Order may be called the Transition Facilitation (Quality Control) Order,\n2026."
+        },
+        {
+          "id": "3dbf1371c5b11bfd17d04c19a52400a989214f902a0d70ae7b126ac7c40c9d83",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 6,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: Table 1; row 3 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: 9. | Column 2: Furniture (Quality Control) Order, 2025. | Column 3: 14.02.2025 | Column 4: 13.02.2026"
+        },
+        {
+          "id": "1b0add5e6cd6f0f60ab12f48a50b1fdfcb13b077593040f0e2f833eeab5b49ee",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 6,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: Table 1; row 4 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: 10. | Column 2: Safety of Household, Commercial and Similar Electrical Appliances (Quality Control) Order, 2026. | Column 3: 20.09.2024 | Column 4: 01.10.2026"
+        },
+        {
+          "id": "fb360d5f83b65224f64557549a86a62bae99ef5701a47e7ee421c2c8394fc280",
+          "source_id": "Notification_of_Transition_Facilitation_Quality_Control_Order_2026",
+          "page": 6,
+          "source_filename": "Notification-of-Transition-Facilitation-Quality-Control-Order-2026.pdf",
+          "text": "passage: 6                                  THE GAZETTE OF INDIA : EXTRAORDINARY                                               [PART II\u2014SEC. 3(ii)]\n     7.      Electrical appliance for domestic clothes washing (Quality                       07.03.2024           01.04.2025\n             Control) Order, 2024.\n     8.      Hinges (Quality Control) Order, 2025.                                            12.12.2023           01.07.2025\n     9.      Furniture (Quality Control) Order, 2025.                                         14.02.2025           13.02.2026\n     10.     Safety of Household, Commercial and Similar Electrical                           20.09.2024           01.10.2026\n             Appliances (Quality Control) Order, 2026.\n                                                                                                            [F. No. P-29026/1/2026-LEI]"
+        },
+        {
+          "id": "3156dc6c68620147b0091b187755ea4991cda2b4f8e20527330b3d07a9d0d11f",
+          "source_id": "product_manual_2026",
+          "page": 61,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                                                       May 2026\n        S.No.               MODEL NUMBER                 TOY DESCRIPTION               TOY IMAGE/PHOTO\n                                                       SIGNATURE\n                                                       NAME DESIGNATION\n                                                       DATE"
+        }
+      ],
+      "first_relevant_rank": 1,
+      "forbidden": [],
+      "metadata_ok": true,
+      "v3_identifier_present": true,
+      "v4_identifier_present": true,
+      "identifier_preserved": true,
+      "pass": true
+    },
+    {
+      "query": "higher age toy grading",
+      "expected_sources": [
+        "product_manual_2026"
+      ],
+      "required_identifier": null,
+      "v3_top5": [
+        {
+          "id": "dd2c8dec807723af73cdcb37908f802f33e34558bc63ccd80edabeb5f6b40944",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: be ensured that the age grading so declared is reasonable and in accordance with the age\n         grading guidelines given in IS 9873 (Part 8) to ensure that a toy is appropriate and safe at the\n         various stages of physical and mental development of the child using the toy.\n         In case a manufacturer is found to be declaring a higher age grading than that specified\n         in Appendix-I simply in order to avoid testing of certain requirements, such requests\n         shall not be entertained.\n         For example, starting age for teethers and teething rings is given as 4 months+ in Appendix                          -I.\n         Further, the test for shape, size and strength (C. 5.3 of IS 9873 (Part 1):               2025) of Squeeze toys,\n         rattles, and certain other toys and components of toys (Cl. 4.5.1.2 of IS 9873 (Part 1):                     2025) is"
+        },
+        {
+          "id": "29fd821c7bad9f3dcb591a264bda92029d03e2a79aa51d75573c5f4aea2bb49d",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: applicable only for teethers and teething toys intended for children under 18 months.\n         In case any manufacturer declares a higher starting age for teethers or teething toys, say, 18\n         months+ (to avoid the tests prescribed in the standard which are not applicable if the toy is age\n         graded 18 months +.), such requests shall not be agreed as the age grading would not be\n         reasonable.\n         However, scope of licence should clearly mention the starting age applicable.\n    10. Since Electrical Toys are essentially Non-Electrical Toys with additional electrical functionality,\n         the test report for Electrical Toys (IS 15644), submitted by the firm, may also be considere                    d for\n         Non-Electrical Toys (IS 9873 (Part 1)), provided that the test report covers all the requirements"
+        },
+        {
+          "id": "7b27a1b56a7aae6e112ff000c0f04589c6aff2d9fd42c76b0934bf234d7691b2",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                             May 2026\n    8.   However, if any variety of toy pertains to a category/sub-category which is                    not covered in the\n         7 Categories and 146 sub-categories as per Annex I, the manufacturer shall declare the same.\n         In case of such varieties, the above sampling guidelines shall not apply and each such\n         variety shall be required to be got tested from                  third party lab for covering them in the\n         scope of licence.\n    9.   With  respect  to  the  \"Starting  Age\"  mentioned  in  the  grouping  (Appendix-I),  in  case  a\n         manufacturer intends to declare a starting age higher than that specified in Appendix-I, it shall"
+        },
+        {
+          "id": "83f49fc55b97b6f44a6e2521d47f8e7f557285fc03ce2d5b6254784bd75c3a86",
+          "source_id": "product_manual_2026",
+          "page": 46,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Sub-              Starting                           Description and examples of appropriate toys\n                           category          age\n                              56.           4 years +         Easy puzzles \u2013 20 to 150 interlocking parts\n                              57.           2 years +         Simple puzzles and plain-fitting parts \u2013 puzzles with up to 20 large parts\n                                                              that have smooth edges and fit together without interlocking, may have\n                                                              pegs for grasping shapes for fitting parts together on trays\n                              58.           7 years +         Puzzles \u2013 150 to 500 interlocking parts\n                              59.           18 months +       Toy activity panels with fixed parts and turning gears activated by"
+        },
+        {
+          "id": "29b13c087feb89fdb1366b3a3b4e41d38c346df4ec69ca9ff13af436cf2d9169",
+          "source_id": "product_manual_2026",
+          "page": 54,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 1 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: Type | Column 2: Descripti on of toy | Column 3: Category No. and Name | Column 4: Sub- category No. and Name | Column 5: Input source for electric toy** | Column 6: Starting Age | Column 7: Series No.# | Column 8: Applicable primary standard | Column 9: Applicable Secondary standard"
+        }
+      ],
+      "v4_top5": [
+        {
+          "id": "dd2c8dec807723af73cdcb37908f802f33e34558bc63ccd80edabeb5f6b40944",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: be ensured that the age grading so declared is reasonable and in accordance with the age\n         grading guidelines given in IS 9873 (Part 8) to ensure that a toy is appropriate and safe at the\n         various stages of physical and mental development of the child using the toy.\n         In case a manufacturer is found to be declaring a higher age grading than that specified\n         in Appendix-I simply in order to avoid testing of certain requirements, such requests\n         shall not be entertained.\n         For example, starting age for teethers and teething rings is given as 4 months+ in Appendix                          -I.\n         Further, the test for shape, size and strength (C. 5.3 of IS 9873 (Part 1):               2025) of Squeeze toys,\n         rattles, and certain other toys and components of toys (Cl. 4.5.1.2 of IS 9873 (Part 1):                     2025) is"
+        },
+        {
+          "id": "29fd821c7bad9f3dcb591a264bda92029d03e2a79aa51d75573c5f4aea2bb49d",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: applicable only for teethers and teething toys intended for children under 18 months.\n         In case any manufacturer declares a higher starting age for teethers or teething toys, say, 18\n         months+ (to avoid the tests prescribed in the standard which are not applicable if the toy is age\n         graded 18 months +.), such requests shall not be agreed as the age grading would not be\n         reasonable.\n         However, scope of licence should clearly mention the starting age applicable.\n    10. Since Electrical Toys are essentially Non-Electrical Toys with additional electrical functionality,\n         the test report for Electrical Toys (IS 15644), submitted by the firm, may also be considere                    d for\n         Non-Electrical Toys (IS 9873 (Part 1)), provided that the test report covers all the requirements"
+        },
+        {
+          "id": "7b27a1b56a7aae6e112ff000c0f04589c6aff2d9fd42c76b0934bf234d7691b2",
+          "source_id": "product_manual_2026",
+          "page": 6,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: PM/ 9873/14\n                                                                                                                             May 2026\n    8.   However, if any variety of toy pertains to a category/sub-category which is                    not covered in the\n         7 Categories and 146 sub-categories as per Annex I, the manufacturer shall declare the same.\n         In case of such varieties, the above sampling guidelines shall not apply and each such\n         variety shall be required to be got tested from                  third party lab for covering them in the\n         scope of licence.\n    9.   With  respect  to  the  \"Starting  Age\"  mentioned  in  the  grouping  (Appendix-I),  in  case  a\n         manufacturer intends to declare a starting age higher than that specified in Appendix-I, it shall"
+        },
+        {
+          "id": "83f49fc55b97b6f44a6e2521d47f8e7f557285fc03ce2d5b6254784bd75c3a86",
+          "source_id": "product_manual_2026",
+          "page": 46,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Sub-              Starting                           Description and examples of appropriate toys\n                           category          age\n                              56.           4 years +         Easy puzzles \u2013 20 to 150 interlocking parts\n                              57.           2 years +         Simple puzzles and plain-fitting parts \u2013 puzzles with up to 20 large parts\n                                                              that have smooth edges and fit together without interlocking, may have\n                                                              pegs for grasping shapes for fitting parts together on trays\n                              58.           7 years +         Puzzles \u2013 150 to 500 interlocking parts\n                              59.           18 months +       Toy activity panels with fixed parts and turning gears activated by"
+        },
+        {
+          "id": "29b13c087feb89fdb1366b3a3b4e41d38c346df4ec69ca9ff13af436cf2d9169",
+          "source_id": "product_manual_2026",
+          "page": 54,
+          "source_filename": "product_manual_2026.pdf",
+          "text": "passage: Table 1; row 1 (left-to-right cells; check PDF headers and ditto references)\nColumn 1: Type | Column 2: Descripti on of toy | Column 3: Category No. and Name | Column 4: Sub- category No. and Name | Column 5: Input source for electric toy** | Column 6: Starting Age | Column 7: Series No.# | Column 8: Applicable primary standard | Column 9: Applicable Secondary standard"
+        }
+      ],
+      "first_relevant_rank": 1,
+      "forbidden": [],
+      "metadata_ok": true,
+      "v3_identifier_present": true,
+      "v4_identifier_present": true,
+      "identifier_preserved": true,
+      "pass": true
+    }
+  ]
+}

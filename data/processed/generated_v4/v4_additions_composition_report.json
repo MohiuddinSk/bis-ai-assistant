@@ -1,0 +1,39 @@
+{
+  "chunk_count": 243,
+  "page_count": 107,
+  "per_category_chunks": {
+    "fees": 20,
+    "fmcs": 30,
+    "helmet": 20,
+    "jewellery": 49,
+    "laboratories": 124
+  },
+  "per_source_chunks": {
+    "bis_jewellers_guidelines_2026": 49,
+    "bis_pm_is_4151_dec_2024": 20,
+    "bis_recognised_labs_group_1_2026_08_24": 77,
+    "bis_recognised_labs_group_2_2026_08_07": 47,
+    "bis_scheme_i_fees_snapshot_2026": 20,
+    "fmcs_application_checklist": 26,
+    "fmcs_application_form_v": 4
+  },
+  "per_source_pages": {
+    "bis_jewellers_guidelines_2026": 23,
+    "bis_pm_is_4151_dec_2024": 10,
+    "bis_recognised_labs_group_1_2026_08_24": 38,
+    "bis_recognised_labs_group_2_2026_08_07": 24,
+    "bis_scheme_i_fees_snapshot_2026": 6,
+    "fmcs_application_checklist": 4,
+    "fmcs_application_form_v": 2
+  },
+  "source_count": 7,
+  "source_ids": [
+    "bis_jewellers_guidelines_2026",
+    "bis_pm_is_4151_dec_2024",
+    "bis_recognised_labs_group_1_2026_08_24",
+    "bis_recognised_labs_group_2_2026_08_07",
+    "bis_scheme_i_fees_snapshot_2026",
+    "fmcs_application_checklist",
+    "fmcs_application_form_v"
+  ]
+}

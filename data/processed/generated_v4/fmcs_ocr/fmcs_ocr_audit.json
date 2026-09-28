@@ -1,0 +1,113 @@
+{
+  "audit_type": "fmcs_offline_ocr",
+  "network_calls": 0,
+  "provider_calls": 0,
+  "sources": [
+    {
+      "accepted_line_count": 43,
+      "chunk_count": 4,
+      "confidence_summary": [
+        {
+          "maximum_confidence": 97.01,
+          "mean_confidence": 89.61,
+          "minimum_confidence": 0.0,
+          "word_count": 156
+        },
+        {
+          "maximum_confidence": 97.01,
+          "mean_confidence": 87.82,
+          "minimum_confidence": 0.0,
+          "word_count": 171
+        }
+      ],
+      "detected_title": "BUREAU OF INDIAN STANDARDS",
+      "ocr_characters_per_page": [
+        944,
+        1133
+      ],
+      "pages": 2,
+      "pages_needing_manual_review": [],
+      "rejected_line_count": 8,
+      "representative_accepted_lines": [
+        "Form - V",
+        "a (Refer clause (g) of sub-paragraph (1) of paragraph 3 of Scheme I)",
+        "BUREAU OF INDIAN STANDARDS"
+      ],
+      "representative_rejected_lines": [
+        {
+          "reason": "low_confidence",
+          "text": "ee ee ee"
+        },
+        {
+          "reason": "symbol_dominated_noise",
+          "text": "1 1"
+        },
+        {
+          "reason": "symbol_dominated_noise",
+          "text": "2 2"
+        }
+      ],
+      "source_id": "fmcs_application_form_v"
+    },
+    {
+      "accepted_line_count": 157,
+      "chunk_count": 26,
+      "confidence_summary": [
+        {
+          "maximum_confidence": 97.01,
+          "mean_confidence": 93.41,
+          "minimum_confidence": 0.0,
+          "word_count": 389
+        },
+        {
+          "maximum_confidence": 97.02,
+          "mean_confidence": 94.22,
+          "minimum_confidence": 0.0,
+          "word_count": 448
+        },
+        {
+          "maximum_confidence": 97.01,
+          "mean_confidence": 94.99,
+          "minimum_confidence": 36.78,
+          "word_count": 425
+        },
+        {
+          "maximum_confidence": 96.99,
+          "mean_confidence": 94.78,
+          "minimum_confidence": 66.65,
+          "word_count": 92
+        }
+      ],
+      "detected_title": "CHECK-LIST FOR APPLICATION TO BE SUBMITTED BY APPLICANT TO BIS",
+      "ocr_characters_per_page": [
+        2478,
+        2935,
+        2697,
+        568
+      ],
+      "pages": 4,
+      "pages_needing_manual_review": [],
+      "rejected_line_count": 56,
+      "representative_accepted_lines": [
+        "CHECK-LIST FOR APPLICATION TO BE SUBMITTED BY APPLICANT TO BIS",
+        "WHILE APPLYING FOR BIS LICENCE UNDER PRODUCT CERTIFICATION SCHEME OF BIS",
+        "The following check-list is required to be submitted with all the applications for grant of BIS licence under"
+      ],
+      "representative_rejected_lines": [
+        {
+          "reason": "empty",
+          "text": ""
+        },
+        {
+          "reason": "symbol_dominated_noise",
+          "text": "No."
+        },
+        {
+          "reason": "standalone_serial_number",
+          "text": "1"
+        }
+      ],
+      "source_id": "fmcs_application_checklist"
+    }
+  ]
+}

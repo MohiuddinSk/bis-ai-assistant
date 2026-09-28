@@ -7,15 +7,17 @@ from backend.settings import RetrievalSettings, get_retrieval_settings
 
 class RetrievalFactoryTests(unittest.TestCase):
     def test_missing_provider_defaults_to_local(self):
-        with patch.dict("os.environ", {}, clear=True), patch("backend.retrieval_factory.LocalChromaRetriever", return_value="local") as constructor:
+        configured = object()
+        with patch.dict("os.environ", {}, clear=True), patch("backend.retrieval_factory.Retriever", return_value=configured) as raw, patch("backend.retrieval_factory.LocalChromaRetriever", return_value="local") as constructor:
             self.assertEqual(get_retrieval_settings().provider, "chroma_local")
             self.assertEqual(create_retrieval_provider(), "local")
-        constructor.assert_called_once_with()
+        raw.assert_called_once_with(data_path="data/processed/generated_v3", persist_path="data/chroma", collection_name="bis_toys_v3_e73aab14a72f7908_39b347ab687e")
+        constructor.assert_called_once_with(configured)
 
     def test_explicit_local_provider_is_case_normalized(self):
         with patch("backend.retrieval_factory.LocalChromaRetriever", return_value="local") as constructor:
             self.assertEqual(create_retrieval_provider(RetrievalSettings("CHROMA_LOCAL")), "local")
-        constructor.assert_called_once_with()
+        self.assertEqual(constructor.call_count, 1)
 
     def test_disabled_provider_returns_none_without_constructing_local_adapter(self):
         with patch("backend.retrieval_factory.LocalChromaRetriever") as constructor:
