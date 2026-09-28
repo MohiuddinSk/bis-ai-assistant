@@ -82,27 +82,45 @@ class RetrievalSettings:
     data_path: str = "data/processed/generated_v3"
     persist_path: str = "data/chroma"
     collection_name: str = "bis_toys_v3_e73aab14a72f7908_39b347ab687e"
+    corpus_version: str = "v3"
+
+
+_CORPUS_RUNTIME_SELECTIONS: dict[str, tuple[str, str, str]] = {
+    "v3": (
+        "data/processed/generated_v3",
+        "data/chroma",
+        "bis_toys_v3_e73aab14a72f7908_39b347ab687e",
+    ),
+    "v4_01346f7d11f1": (
+        "data/processed/generated_v4",
+        "data/chroma_v4_01346f7d11f1",
+        "bis_corpus_v4_candidate_01346f7d11f1",
+    ),
+}
+
+
+def _selected_runtime_path(name: str, expected: str) -> str:
+    """Reject path overrides that conflict with the selected immutable corpus."""
+    configured = os.getenv(name)
+    if configured is None:
+        return expected
+    value = configured.strip()
+    if value != expected:
+        raise ValueError(f"{name} conflicts with RETRIEVAL_CORPUS_VERSION")
+    return expected
 
 
 def get_retrieval_settings() -> RetrievalSettings:
     version = os.getenv("RETRIEVAL_CORPUS_VERSION", "v3").strip().lower()
-    if version not in {"v3", "v4_01346f7d11f1"}:
+    if version not in _CORPUS_RUNTIME_SELECTIONS:
         raise ValueError("Unknown retrieval corpus version")
-    defaults = {
-        "v3": (
-            "data/processed/generated_v3", "data/chroma",
-            "bis_toys_v3_e73aab14a72f7908_39b347ab687e",
-        ),
-        "v4_01346f7d11f1": (
-            "data/processed/generated_v4", "data/chroma_v4_01346f7d11f1",
-            "bis_corpus_v4_candidate_01346f7d11f1",
-        ),
-    }[version]
+    data_path, persist_path, collection_name = _CORPUS_RUNTIME_SELECTIONS[version]
     return RetrievalSettings(
         provider=os.getenv("RETRIEVAL_PROVIDER", DEFAULT_RETRIEVAL_PROVIDER).strip().lower(),
-        data_path=os.getenv("RETRIEVAL_DATA_PATH", defaults[0]).strip(),
-        persist_path=os.getenv("RETRIEVAL_CHROMA_PATH", defaults[1]).strip(),
-        collection_name=os.getenv("RETRIEVAL_COLLECTION_NAME", defaults[2]).strip(),
+        data_path=_selected_runtime_path("RETRIEVAL_DATA_PATH", data_path),
+        persist_path=_selected_runtime_path("RETRIEVAL_CHROMA_PATH", persist_path),
+        collection_name=_selected_runtime_path("RETRIEVAL_COLLECTION_NAME", collection_name),
+        corpus_version=version,
     )
 
 

@@ -46,6 +46,11 @@ class ContainerConfigurationTests(unittest.TestCase):
         for entry in (".git", "frontend", "ingestion", "tests", "evaluation", ".env", "credentials", "data/processed/generated_v2"):
             self.assertIn(entry, self.ignore)
         self.assertIn("RETRIEVAL_PROVIDER: ${RETRIEVAL_PROVIDER:-chroma_local}", self.compose)
+        self.assertIn("RETRIEVAL_CORPUS_VERSION: ${RETRIEVAL_CORPUS_VERSION:-v3}", self.compose)
+        for shadowing_default in (
+            "RETRIEVAL_DATA_PATH:", "RETRIEVAL_CHROMA_PATH:", "RETRIEVAL_COLLECTION_NAME:",
+        ):
+            self.assertNotIn(shadowing_default, self.compose)
         self.assertIn("GROQ_API_KEY: ${GROQ_API_KEY:-}", self.compose)
         self.assertIn("LLM_SYNTHESIS_ENABLED: ${LLM_SYNTHESIS_ENABLED:-false}", self.compose)
         self.assertIn("ALLOWED_ORIGINS:", self.compose)
