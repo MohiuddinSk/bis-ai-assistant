@@ -15,12 +15,12 @@ const response = {
 };
 
 it('renders a greeting as guidance without a grounded or insufficient badge', () => {
-  render(<ChatMessage role="assistant" text="Hello, I am BIS Saarthi." response={{
-    answer: 'Hello, I am BIS Saarthi.', grounded: false, insufficient_evidence: false, evidence_count: 0,
+  render(<ChatMessage role="assistant" text="Hello, I am BIS Bandhu." response={{
+    answer: 'Hello, I am BIS Bandhu.', grounded: false, insufficient_evidence: false, evidence_count: 0,
     citations: [], model: 'local', generation_mode: 'conversation', disclaimer: 'Verify.',
-    answer_sections: [{ type: 'direct_answer', title: 'BIS Saarthi', content: 'Hello, I am BIS Saarthi. This prototype covers toy-related BIS material.', items: [], citation_ids: [] }],
+    answer_sections: [{ type: 'direct_answer', title: 'BIS Bandhu', content: 'Hello, I am BIS Bandhu. This prototype covers toy-related BIS material.', items: [], citation_ids: [] }],
   }} />);
-  expect(screen.getAllByText('BIS Saarthi').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('BIS Bandhu').length).toBeGreaterThan(0);
   expect(screen.queryByText('Grounded answer')).toBeNull();
   expect(screen.queryByText('Evidence insufficient')).toBeNull();
   expect(document.querySelector('.sources')).toBeNull();
@@ -28,7 +28,7 @@ it('renders a greeting as guidance without a grounded or insufficient badge', ()
 
 it('uses the backend response kind for conversation, clarification, limitation, and grounded guidance', () => {
   const cases = [
-    ['conversation', 'BIS Saarthi'],
+    ['conversation', 'BIS Bandhu'],
     ['clarification', 'Need more details'],
     ['limitation', 'Evidence insufficient'],
     ['grounded_guidance', 'Grounded answer'],

@@ -14,7 +14,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, { faile
   render() {
     return this.state.failed ? (
       <main className="startup-error" role="alert">
-        <h1>BIS AI Assistant</h1>
+        <h1>BIS Bandhu</h1>
         <p>The interface could not finish loading. Refresh the page or inspect the local development console.</p>
       </main>
     ) : this.props.children;
