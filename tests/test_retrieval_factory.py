@@ -26,6 +26,22 @@ class RetrievalFactoryTests(unittest.TestCase):
         )
         constructor.assert_called_once_with(configured)
 
+    def test_version_selected_v4_provider_constructs_only_the_v4_retriever(self):
+        configured = object()
+        environment = {"RETRIEVAL_CORPUS_VERSION": "v4_01346f7d11f1"}
+        with patch.dict("os.environ", environment, clear=True), patch(
+            "backend.retrieval_factory.Retriever", return_value=configured
+        ) as raw, patch(
+            "backend.retrieval_factory.LocalChromaRetriever", return_value="local"
+        ) as constructor:
+            self.assertEqual(create_retrieval_provider(), "local")
+        raw.assert_called_once_with(
+            data_path="data/processed/generated_v4",
+            persist_path="data/chroma_v4_01346f7d11f1",
+            collection_name="bis_corpus_v4_candidate_01346f7d11f1",
+        )
+        constructor.assert_called_once_with(configured)
+
     def test_disabled_provider_returns_none_without_constructing_local_adapter(self):
         with patch("backend.retrieval_factory.LocalChromaRetriever") as constructor:
             self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider="disabled")))
@@ -40,6 +56,17 @@ class RetrievalFactoryTests(unittest.TestCase):
     def test_unknown_provider_does_not_fall_back(self):
         with patch("backend.retrieval_factory.LocalChromaRetriever") as constructor:
             self.assertIsNone(create_retrieval_provider(RetrievalSettings(provider="unknown")))
+        constructor.assert_not_called()
+
+    def test_unknown_corpus_version_fails_closed_without_constructing_local_adapter(self):
+        environment = {
+            "RETRIEVAL_CORPUS_VERSION": "unknown-version",
+            "RETRIEVAL_PROVIDER": "chroma_local",
+        }
+        with patch.dict("os.environ", environment, clear=True), patch(
+            "backend.retrieval_factory.LocalChromaRetriever"
+        ) as constructor:
+            self.assertIsNone(create_retrieval_provider())
         constructor.assert_not_called()
 
     def test_unsafe_provider_value_is_not_logged(self):
