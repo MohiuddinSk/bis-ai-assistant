@@ -24,14 +24,64 @@ it('opens a stable standards URL directly and keeps catalogue errors honest when
   expect(screen.getByRole('heading', { name: 'BIS Bandhu services' })).toBeInTheDocument();
 });
 
-it('opens the Standards dropdown without creating a chat request', async () => {
+it('opens Standards directly without creating a chat request', async () => {
   render(<App />); await screen.findByRole('status');
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'Standards' }));
-  expect(screen.getByRole('menuitem', { name: 'Search standards' })).toBeInTheDocument();
-  await user.click(screen.getByRole('menuitem', { name: 'Search standards' }));
   expect(window.location.hash).toBe('#/standards');
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+});
+
+it('opens grouped navigation by keyboard, closes on Escape, and reaches certification and hallmarking', async () => {
+  render(<App />); await screen.findByRole('status');
+  const user = userEvent.setup();
+  const industry = screen.getByRole('button', { name: 'Open industry menu' });
+  industry.focus();
+  await user.keyboard('{Enter}');
+  expect(industry).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('menuitem', { name: 'Certification guidance' })).toBeInTheDocument();
+  await user.keyboard('{Escape}');
+  expect(industry).toHaveAttribute('aria-expanded', 'false');
+  await user.click(industry);
+  await user.click(screen.getByRole('menuitem', { name: 'Certification guidance' }));
+  expect(window.location.hash).toBe('#/industry/certification-guide');
+  expect(screen.getByText('Track the official process')).toBeInTheDocument();
+  const consumers = screen.getByRole('button', { name: 'Open consumers menu' });
+  await user.click(consumers);
+  await user.click(screen.getByRole('menuitem', { name: 'Hallmarking' }));
+  expect(window.location.hash).toBe('#/consumers/hallmarking');
+  expect(screen.getByText(/does not verify a HUID/i)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open official BIS hallmarking information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/hallmarking-overview/?lang=en');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+});
+
+it('features verified helmet metadata only in the unfiltered view and keeps searched API order', async () => {
+  const helmet={identifier:'IS 4151:2015',title:'Protective Helmet for Two Wheeler Riders',category:'Helmet',edition_year:'2015',status:'Verified from product manual',official_url:'https://www.bis.gov.in/helmet.pdf',retrieved_at:'2024-12',provenance:'BIS product manual',evidence_filename:'helmet.pdf',evidence_page:1};
+  const second={...helmet,identifier:'IS 9999:2020',title:'Other verified test record'};
+  vi.stubGlobal('fetch',vi.fn((url:string)=>Promise.resolve(response(url.includes('health')?{status:'ready'}:url.includes('/api/catalogue/')?{query:'',record_count:2,last_updated:'2024-12',results:[second,helmet]}:answer))));
+  window.location.hash='#/standards'; render(<App />);
+  expect(await screen.findByText(helmet.title)).toBeInTheDocument();
+  const cards=Array.from(document.querySelectorAll('.reference-card'));
+  expect(cards[0]).toHaveTextContent(helmet.identifier);
+  expect(cards[0]).toHaveClass('featured-standard');
+  const user=userEvent.setup();
+  await user.type(screen.getByLabelText('IS number, product, or keyword'),'other');
+  await user.click(screen.getByRole('button',{name:'Search'}));
+  await waitFor(()=>expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url])=>String(url).includes('/api/catalogue/'))).toHaveLength(2));
+  expect(document.querySelector('.reference-card')).toHaveTextContent(second.identifier);
+  expect(document.querySelector('.featured-standard')).toBeNull();
+});
+
+it('loads a non-featured verified detail from its direct URL without inventing technical guidance', async () => {
+  const electric={identifier:'IS 15644:2006',title:'Safety of Electric Toys',category:'Toys',edition_year:'2006',status:'Identifier and title listed by BIS; this metadata is not an applicability decision',official_url:'https://www.bis.gov.in/product-certification/products-under-compulsory-certification/scheme-1/?lang=en',retrieved_at:'2026-09-29',provenance:'BIS Scheme-I page',evidence_filename:null,evidence_page:null};
+  vi.stubGlobal('fetch',vi.fn((url:string)=>Promise.resolve(response(url.includes('health')?{status:'ready'}:url.includes('/api/catalogue/')?electric:answer))));
+  window.location.hash='#/standards/detail?is=IS%2015644%3A2006';
+  render(<App />);
+  expect(await screen.findByText('Safety of Electric Toys')).toBeInTheDocument();
+  expect(screen.getByText(/does not replace the official standard or make an applicability decision/)).toBeInTheDocument();
+  expect(screen.getByRole('link',{name:'Open official source ↗'})).toHaveAttribute('href',electric.official_url);
+  expect(window.location.hash).toBe('#/standards/detail?is=IS%2015644%3A2006');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url])=>String(url).includes('/api/chat'))).toHaveLength(0);
 });
 
 it('renders only provenance-bearing catalogue records returned by the API', async () => {
@@ -50,6 +100,7 @@ it('keeps consumer guidance as an official handoff rather than simulated verific
   render(<App />); await screen.findByRole('status');
   expect(screen.getAllByText(/does not verify a licence, product, HUID/i)).not.toHaveLength(0);
   expect(screen.getByRole('link', { name: 'Open official BIS consumer information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/consumer-overview/');
+  expect(screen.getByRole('link', { name: 'Open official BIS complaints information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/consumer-overview/online-complaint-registration/?lang=en');
 });
 
 it('localizes detailed reference-page controls in every supported language without leaving its deep route', async () => {
@@ -74,9 +125,13 @@ it('opens on the BIS Bandhu homepage with working journeys', async () => {
   expect(screen.getByRole('heading', { name: 'Compliance Wizard' })).toBeInTheDocument();
 });
 
-it('sends the example request only from its explicit action', async () => {
+it('prefills the supported example for review and sends it only after Ask Bandhu', async () => {
   render(<App />); await screen.findByRole('status');
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Try an example' }));
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Battery-operated toy standard' }));
+  expect(screen.getByLabelText('Ask about a product, standard or BIS process')).toHaveValue('Which standard applies to a battery-operated toy?');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+  await user.click(within(document.querySelector('.hero-search') as HTMLElement).getByRole('button', { name: 'Ask Bandhu' }));
   expect(await screen.findByText(answer.answer)).toBeInTheDocument();
   const chatCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => String(url).includes('/api/chat'));
   expect(JSON.parse(String((chatCall?.[1] as RequestInit).body)).question).toBe('Which standard applies to a battery-operated toy?');
@@ -161,12 +216,16 @@ it('submits the customer product wording as a Manufacturer and renders API evide
   expect(payload.question).not.toContain('battery-operated');
 });
 
-it('keeps the battery-operated toy request behind the explicit example action', async () => {
+it('keeps both recorded questions editable and behind an explicit submit', async () => {
   render(<App />);
   await screen.findByRole('status');
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Try an example' }));
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'New toy series documents' }));
+  expect(screen.getByLabelText('Ask about a product, standard or BIS process')).toHaveValue('What documents are required for a new toy series?');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+  await user.click(within(document.querySelector('.hero-search') as HTMLElement).getByRole('button', { name: 'Ask Bandhu' }));
   const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => String(url).includes('/api/chat'));
-  expect(JSON.parse(String((call?.[1] as RequestInit).body)).question).toBe('Which standard applies to a battery-operated toy?');
+  expect(JSON.parse(String((call?.[1] as RequestInit).body))).toMatchObject({question:'What documents are required for a new toy series?',audience:'manufacturer'});
 });
 
 it('uses all five language labels while preserving the canonical English suggestion payload', async () => {
@@ -477,7 +536,7 @@ it('localizes consumer service and theme controls in every supported shell langu
     await screen.findByRole('status');
     const user = userEvent.setup();
     await user.selectOptions(document.getElementById('language') as HTMLSelectElement, language);
-    await user.click(within(screen.getByRole('navigation')).getByRole('button', { name: language === 'en' ? 'Consumers' : /उपभोक्ता|ग्राहक|நுகர்வோர்|ভোক্তা/ }));
+    await user.click(within(screen.getByRole('navigation')).getByRole('button', { name: language === 'en' ? 'Consumers' : /^(उपभोक्ता|ग्राहक|நுகர்வோர்|ভোক্তা)$/ }));
 
     expect(screen.getByRole('link', { name: linkLabel })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: themeLabel })).toBeInTheDocument();

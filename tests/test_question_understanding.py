@@ -6,6 +6,14 @@ from backend.question_understanding import normalize_question, understand_questi
 
 
 class QuestionUnderstandingTests(unittest.TestCase):
+    def test_unrelated_product_standard_question_never_asks_toy_power_type(self):
+        understood = understand_question("Which standard applies to a pressure cooker?")
+        self.assertTrue(understood.clarification_required)
+        self.assertIn("toy-focused", understood.clarification_question)
+        self.assertIn("official BIS standards search", understood.clarification_question)
+        self.assertNotIn("battery-operated, mains-powered", understood.clarification_question)
+        self.assertEqual(understood.standard_references, ())
+
     def test_bare_standard_identifiers_use_structural_explanation_routing(self):
         for question in ("IS 15644", "What is IS 15644?", "IS9873", "What is IS 9873?", "IS 9873 Part 2"):
             with self.subTest(question=question):

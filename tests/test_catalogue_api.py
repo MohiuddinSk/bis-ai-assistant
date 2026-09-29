@@ -14,7 +14,7 @@ class CatalogueApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["record_count"], 1)
+        self.assertEqual(body["record_count"], 3)
         self.assertTrue(body["coverage_note"].startswith("Only locally verified"))
         self.assertEqual(body["results"], [{
             "identifier": "IS 4151:2015",
@@ -29,6 +29,21 @@ class CatalogueApiTests(unittest.TestCase):
             "evidence_page": 1,
         }])
 
+    def test_new_toy_metadata_has_official_provenance_without_claiming_applicability(self):
+        with TestClient(create_app()) as client:
+            electric = client.get("/api/catalogue/standards", params={"q": "is-15644:2006"})
+            mechanical = client.get("/api/catalogue/standards", params={"q": "IS 9873 Part 1:2019"})
+
+        self.assertEqual(electric.status_code, 200)
+        self.assertEqual(mechanical.status_code, 200)
+        self.assertEqual([row["identifier"] for row in electric.json()["results"]], ["IS 15644:2006"])
+        self.assertEqual([row["identifier"] for row in mechanical.json()["results"]], ["IS 9873 Part 1:2019"])
+        for record in (electric.json()["results"][0], mechanical.json()["results"][0]):
+            self.assertTrue(record["official_url"].startswith("https://www.bis.gov.in/"))
+            self.assertIn("BIS", record["provenance"])
+            self.assertIn("not an applicability decision", record["status"])
+            self.assertIsNone(record["evidence_filename"])
+
     def test_keyword_and_unknown_result_do_not_invent_a_standard(self):
         with TestClient(create_app()) as client:
             helmet = client.get("/api/catalogue/standards", params={"q": "helmet"})
@@ -39,7 +54,7 @@ class CatalogueApiTests(unittest.TestCase):
 
     def test_pagination_and_invalid_page_are_explicit(self):
         with TestClient(create_app()) as client:
-            second_page = client.get("/api/catalogue/standards", params={"page": 2, "page_size": 1})
+            second_page = client.get("/api/catalogue/standards", params={"page": 4, "page_size": 1})
             invalid_page = client.get("/api/catalogue/standards", params={"page": 0})
 
         self.assertEqual(second_page.status_code, 200)

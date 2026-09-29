@@ -20,10 +20,10 @@ const routeForView: Record<View, string> = {
   home: '/', assistant: '/assistant', wizard: '/industry/compliance-wizard', services: '/services',
   standards: '/standards', 'standard-detail': '/standards/detail',
   finder: '/industry/finder', 'certification-guide': '/industry/certification-guide',
-  consumers: '/consumers', help: '/help', 'how-it-works': '/help/how-it-works',
+  consumers: '/consumers', hallmarking: '/consumers/hallmarking', help: '/help', 'how-it-works': '/help/how-it-works',
 };
 const viewForRoute = (): View => {
-  const route = window.location.hash.replace(/^#/, '') || '/';
+  const route = (window.location.hash.replace(/^#/, '') || '/').split('?')[0];
   return (Object.entries(routeForView).find(([, path]) => path === route)?.[0] as View | undefined) ?? 'home';
 };
 type AssistantRequest={question:string;
@@ -44,13 +44,21 @@ const consumerServiceLabel: Record<Language, string> = {
   ta: 'அதிகாரப்பூர்வ BIS நுகர்வோர் தகவல் ↗',
   bn: 'সরকারি BIS ভোক্তা তথ্য ↗',
 };
-const referenceNavigation: Record<Language, Record<'standards'|'services'|'help'|'search'|'finder'|'guide'|'consumerHub', string>> = {
-  en:{standards:'Standards',services:'BIS Services',help:'Help',search:'Search standards',finder:'Product → Standard Finder',guide:'Certification guidance',consumerHub:'Consumer guidance'},
-  hi:{standards:'मानक',services:'BIS सेवाएँ',help:'सहायता',search:'मानक खोजें',finder:'उत्पाद → मानक खोजक',guide:'प्रमाणन मार्गदर्शन',consumerHub:'उपभोक्ता मार्गदर्शन'},
-  mr:{standards:'मानके',services:'BIS सेवा',help:'मदत',search:'मानके शोधा',finder:'उत्पादन → मानक शोधक',guide:'प्रमाणन मार्गदर्शन',consumerHub:'ग्राहक मार्गदर्शन'},
-  ta:{standards:'தரநிலைகள்',services:'BIS சேவைகள்',help:'உதவி',search:'தரநிலைகளைத் தேடுக',finder:'தயாரிப்பு → தரநிலை கண்டறிதல்',guide:'சான்றிதழ் வழிகாட்டல்',consumerHub:'நுகர்வோர் வழிகாட்டல்'},
-  bn:{standards:'মান',services:'BIS পরিষেবা',help:'সহায়তা',search:'মান খুঁজুন',finder:'পণ্য → মান অনুসন্ধান',guide:'সার্টিফিকেশন নির্দেশনা',consumerHub:'ভোক্তা নির্দেশনা'},
+const referenceNavigation: Record<Language, Record<'standards'|'services'|'help'|'finder'|'guide'|'consumerHub'|'hallmarking'|'industryMenu'|'consumerMenu', string>> = {
+  en:{standards:'Standards',services:'BIS Services',help:'Help',finder:'Product → Standard Finder',guide:'Certification guidance',consumerHub:'Consumer guidance',hallmarking:'Hallmarking',industryMenu:'Open industry menu',consumerMenu:'Open consumers menu'},
+  hi:{standards:'मानक',services:'BIS सेवाएँ',help:'सहायता',finder:'उत्पाद → मानक खोजक',guide:'प्रमाणन मार्गदर्शन',consumerHub:'उपभोक्ता मार्गदर्शन',hallmarking:'हॉलमार्किंग',industryMenu:'उद्योग मेनू खोलें',consumerMenu:'उपभोक्ता मेनू खोलें'},
+  mr:{standards:'मानके',services:'BIS सेवा',help:'मदत',finder:'उत्पादन → मानक शोधक',guide:'प्रमाणन मार्गदर्शन',consumerHub:'ग्राहक मार्गदर्शन',hallmarking:'हॉलमार्किंग',industryMenu:'उद्योग मेनू उघडा',consumerMenu:'ग्राहक मेनू उघडा'},
+  ta:{standards:'தரநிலைகள்',services:'BIS சேவைகள்',help:'உதவி',finder:'தயாரிப்பு → தரநிலை கண்டறிதல்',guide:'சான்றிதழ் வழிகாட்டல்',consumerHub:'நுகர்வோர் வழிகாட்டல்',hallmarking:'ஹால்மார்க்கிங்',industryMenu:'தொழில் பட்டியைத் திறக்கவும்',consumerMenu:'நுகர்வோர் பட்டியைத் திறக்கவும்'},
+  bn:{standards:'মান',services:'BIS পরিষেবা',help:'সহায়তা',finder:'পণ্য → মান অনুসন্ধান',guide:'সার্টিফিকেশন নির্দেশনা',consumerHub:'ভোক্তা নির্দেশনা',hallmarking:'হলমার্কিং',industryMenu:'শিল্প মেনু খুলুন',consumerMenu:'ভোক্তা মেনু খুলুন'},
 };
+const demoExamples: Record<Language, { heading:string; first:string; second:string; selected:string }> = {
+  en:{heading:'Try an example · edit before asking',first:'Battery-operated toy standard',second:'New toy series documents',selected:'Manufacturer example — review or edit the question, then Ask Bandhu.'},
+  hi:{heading:'उदाहरण आज़माएँ · पूछने से पहले संपादित करें',first:'बैटरी वाले खिलौने का मानक',second:'नई खिलौना श्रृंखला के दस्तावेज़',selected:'निर्माता उदाहरण — प्रश्न जाँचें या संपादित करें, फिर BIS Bandhu से पूछें।'},
+  mr:{heading:'उदाहरण वापरा · विचारण्यापूर्वी बदला',first:'बॅटरीवर चालणाऱ्या खेळण्याचे मानक',second:'नवीन खेळणी मालिकेची कागदपत्रे',selected:'उत्पादक उदाहरण — प्रश्न तपासा किंवा बदला, मग BIS Bandhu ला विचारा.'},
+  ta:{heading:'எடுத்துக்காட்டை முயல்க · கேட்குமுன் திருத்தலாம்',first:'மின்கல பொம்மை தரநிலை',second:'புதிய பொம்மைத் தொடருக்கான ஆவணங்கள்',selected:'உற்பத்தியாளர் எடுத்துக்காட்டு — கேள்வியைச் சரிபார்த்து அல்லது திருத்தி, BIS Bandhu-விடம் கேளுங்கள்.'},
+  bn:{heading:'উদাহরণ দেখুন · জিজ্ঞাসার আগে সম্পাদনা করুন',first:'ব্যাটারিচালিত খেলনার মান',second:'নতুন খেলনা সিরিজের নথি',selected:'প্রস্তুতকারকের উদাহরণ — প্রশ্ন দেখে বা সম্পাদনা করে BIS Bandhu-কে জিজ্ঞাসা করুন।'},
+};
+const sampleQuestions = ['Which standard applies to a battery-operated toy?', 'What documents are required for a new toy series?'] as const;
 const prototypeCoverage: Record<Language, string> = {
   en: 'Coverage is limited to the documents currently indexed for this prototype. BIS Bandhu does not claim to cover every Indian Standard or BIS service.',
   hi: 'कवरेज इस प्रोटोटाइप में वर्तमान में सूचीबद्ध दस्तावेज़ों तक सीमित है। BIS Bandhu हर भारतीय मानक या BIS सेवा को कवर करने का दावा नहीं करता।',
@@ -66,8 +74,10 @@ findStandard: () => void;
 startAudienceJourney: (audience: Audience) => void }) {
   const { t, language } = useLanguage();
 const [q, setQ] = useState('');
+const [sampleSelected, setSampleSelected] = useState(false);
+const searchInput = useRef<HTMLInputElement>(null);
 const submit = (e: FormEvent) => { e.preventDefault();
-if (q.trim()) ask(q.trim());
+if (q.trim()) ask(q.trim(), sampleSelected ? 'manufacturer' : 'general');
 };
 return <>
     <section className="bandhu-hero">
@@ -85,19 +95,22 @@ return <>
 </button>
 <button className="secondary" onClick={findStandard}>{t('shellFindStandard')}
 </button>
-<button className="example-action" onClick={() => ask('Which standard applies to a battery-operated toy?', 'manufacturer')}>{t('shellTryExample')}
-</button>
 </div>
 <form className="hero-search" onSubmit={submit}>
 <label htmlFor="bandhu-search">{t('shellSearchLabel')}
 </label>
 <div>
-<input id="bandhu-search" value={q} onChange={e => setQ(e.target.value)} placeholder={t('shellSearchPlaceholder')} />
-<SpeechInput value={q} onTranscript={setQ} />
+<input ref={searchInput} id="bandhu-search" value={q} onChange={e => {setQ(e.target.value);setSampleSelected(false)}} placeholder={t('shellSearchPlaceholder')} maxLength={1000} />
+<SpeechInput value={q} onTranscript={transcript=>{setQ(transcript);setSampleSelected(false)}} />
 <button>{t('shellAskBandhu')}
 </button>
 </div>
 </form>
+<div className="demo-examples" aria-label={demoExamples[language].heading}>
+<span>{demoExamples[language].heading}</span>
+{sampleQuestions.map((question,index)=><button key={question} type="button" onClick={()=>{setQ(question);setSampleSelected(true);searchInput.current?.focus()}}>{index===0?demoExamples[language].first:demoExamples[language].second}</button>)}
+{sampleSelected&&<small>{demoExamples[language].selected}</small>}
+</div>
 </div>
 <div className="hero-proof">
 <div className="seal">BIS<br />
@@ -183,7 +196,7 @@ function AppContent(){const{t,language}=useLanguage();
 const navCopy=referenceNavigation[language];
 const[view,setView]=useState<View>(viewForRoute);
 const[menu,setMenu]=useState(false);
-const[openGroup,setOpenGroup]=useState<'standards'|'industry'|'consumers'|null>(null);
+const[openGroup,setOpenGroup]=useState<'industry'|'consumers'|null>(null);
 const[messages,setMessages]=useState<Message[]>([]);
 const[busy,setBusy]=useState(false);
 const[error,setError]=useState('');
@@ -198,6 +211,14 @@ const[status,setStatus]=useState<'ready'|'degraded'|'unavailable'>('unavailable'
 const[updating,setUpdating]=useState(false);
 const[theme,setTheme]=useState<'light'|'dark'>('light');
 const end=useRef<HTMLDivElement>(null),questionInput=useRef<HTMLTextAreaElement>(null),chatAbort=useRef<AbortController|null>(null),localeAbort=useRef<AbortController|null>(null),localeVersion=useRef(0),id=useRef(0),variants=useRef(new Map<number,Map<Language,ChatResponse>>()),pendingRequest=useRef(false);
+const navRef=useRef<HTMLElement>(null);
+useEffect(()=>{
+  const closeOutside=(event:PointerEvent)=>{if(!navRef.current?.contains(event.target as Node))setOpenGroup(null)};
+  const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpenGroup(null)};
+  document.addEventListener('pointerdown',closeOutside);
+  document.addEventListener('keydown',closeOnEscape);
+  return()=>{document.removeEventListener('pointerdown',closeOutside);document.removeEventListener('keydown',closeOnEscape)};
+},[]);
 useEffect(()=>{const c=new AbortController();
 void getHealth(c.signal).then(x=>!c.signal.aborted&&setStatus(x.status==='ready'?'ready':'degraded')).catch(()=>!c.signal.aborted&&setStatus('unavailable'));
 return()=>c.abort()},[]);
@@ -297,16 +318,15 @@ return <div className="app-shell">
 <img className="brand-logo" src={theme==='dark'?'/bis-logo-dark.png':'/bis-logo-transparent.png'} alt="" />
 <span className="brand-copy"><strong>BIS Bandhu</strong><small>{t('shellTagline')}</small></span>
 </button>
-<nav className={menu?'open reference-nav-open':''} aria-label={t('shellNavigation')}>
+<nav ref={navRef} className={menu?'open reference-nav-open':''} aria-label={t('shellNavigation')}>
 <button aria-current={view==='home'?'page':undefined} onClick={()=>go('home')}>{t('shellNavHome')}
 </button>
 <button aria-current={view==='assistant'&&audience==='general'?'page':undefined} onClick={()=>startAudience('general')}>{t('shellNavAssistant')}
 </button>
-<div className="nav-group"><button aria-expanded={openGroup==='standards'} aria-current={['standards','standard-detail'].includes(view)?'page':undefined} onClick={()=>setOpenGroup(openGroup==='standards'?null:'standards')}>{navCopy.standards}</button>{openGroup==='standards'&&<div className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('standards')}>{navCopy.search}</button></div>}</div>
-<div className="nav-group"><button aria-expanded={openGroup==='industry'} aria-current={view==='assistant'&&audience==='manufacturer'?'page':undefined} onClick={()=>{startAudience('manufacturer');setOpenGroup(openGroup==='industry'?null:'industry')}}>{t('shellNavIndustry')}</button>{openGroup==='industry'&&<div className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('finder')}>{navCopy.finder}</button><button role="menuitem" onClick={()=>go('certification-guide')}>{navCopy.guide}</button><button role="menuitem" onClick={()=>go('wizard')}>{t('shellNavWizard')}</button></div>}</div>
-<div className="nav-group"><button aria-expanded={openGroup==='consumers'} aria-current={view==='assistant'&&audience==='consumer'?'page':undefined} onClick={()=>{startAudience('consumer');setOpenGroup(openGroup==='consumers'?null:'consumers')}}>{t('shellNavConsumers')}</button>{openGroup==='consumers'&&<div className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('consumers')}>{navCopy.consumerHub}</button></div>}</div>
+<button aria-current={['standards','standard-detail'].includes(view)?'page':undefined} onClick={()=>go('standards')}>{navCopy.standards}</button>
+<div className="nav-group"><button aria-current={view==='assistant'&&audience==='manufacturer'||['finder','certification-guide'].includes(view)?'page':undefined} onClick={()=>startAudience('manufacturer')}>{t('shellNavIndustry')}</button><button className="nav-chevron" aria-label={navCopy.industryMenu} aria-expanded={openGroup==='industry'} aria-controls="industry-menu" onClick={()=>setOpenGroup(openGroup==='industry'?null:'industry')}><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>{openGroup==='industry'&&<div id="industry-menu" className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('finder')}>{navCopy.finder}</button><button role="menuitem" onClick={()=>go('certification-guide')}>{navCopy.guide}</button><button role="menuitem" onClick={()=>go('wizard')}>{t('shellNavWizard')}</button></div>}</div>
+<div className="nav-group"><button aria-current={view==='assistant'&&audience==='consumer'||['consumers','hallmarking'].includes(view)?'page':undefined} onClick={()=>startAudience('consumer')}>{t('shellNavConsumers')}</button><button className="nav-chevron" aria-label={navCopy.consumerMenu} aria-expanded={openGroup==='consumers'} aria-controls="consumers-menu" onClick={()=>setOpenGroup(openGroup==='consumers'?null:'consumers')}><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>{openGroup==='consumers'&&<div id="consumers-menu" className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('consumers')}>{navCopy.consumerHub}</button><button role="menuitem" onClick={()=>go('hallmarking')}>{navCopy.hallmarking}</button></div>}</div>
 <button aria-current={view==='services'?'page':undefined} onClick={()=>go('services')}>{navCopy.services}</button>
-<button onClick={()=>go('help')}>{navCopy.help}</button>
 <button aria-current={view==='wizard'?'page':undefined} onClick={()=>go('wizard')}>{t('shellNavWizard')}</button>
 </nav>
 <div className="header-tools">
@@ -354,6 +374,7 @@ go('assistant')}} startAudienceJourney={startAudience}/>} {view==='assistant'&&<
 <b>BIS Bandhu</b>
 <span>{t('footer')}
 </span>
+<button className="footer-help" onClick={()=>go('help')}>{navCopy.help}</button>
 </footer>
 </div>}
 export default function App(){return <LanguageProvider>
