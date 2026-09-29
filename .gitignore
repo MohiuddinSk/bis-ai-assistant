@@ -1,4 +1,5 @@
 .venv/
+.venv-core-standards/
 venv/
 venv311/
 venv311_broken_*/

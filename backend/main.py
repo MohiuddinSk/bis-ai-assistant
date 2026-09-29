@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from backend.chat_service import ChatRetrievalError, ChatService, ComplianceRoutingContext
+from backend.catalogue import catalogue_metadata, load_catalogue, normalize_is_number, record_as_dict, search_catalogue
 from backend.documents import SourceDocumentRegistry
 from backend.question_understanding import QuestionUnderstanding, understand_question
 from backend.generation import (
@@ -29,6 +30,8 @@ from backend.retrieval_factory import from_environment as retrieval_provider_fro
 from backend.schemas import (
     ChatRequest,
     ChatResponse,
+    CatalogueSearchResponse,
+    CatalogueStandard,
     ComplianceGuideResponse,
     ComplianceProfile,
     HealthResponse,
@@ -463,6 +466,31 @@ def create_app(
                 product_description=context.product_description or "toys",
             )
         return run_chat(payload, request, routing_context=routing_context, understanding=understanding)
+
+    @application.get("/api/catalogue/standards", response_model=CatalogueSearchResponse)
+    @application.get("/api/v1/catalogue/standards", response_model=CatalogueSearchResponse)
+    def catalogue_search(q: str = "", page: int = 1, page_size: int = 20) -> CatalogueSearchResponse:
+        """Search only locally verified, provenance-bearing catalogue metadata."""
+        if page < 1 or not 1 <= page_size <= 100:
+            raise HTTPException(status_code=422, detail="Invalid pagination.")
+        all_records = load_catalogue()
+        matches = search_catalogue(q)
+        start = (page - 1) * page_size
+        metadata = catalogue_metadata(all_records)
+        return CatalogueSearchResponse(
+            query=q,
+            results=[CatalogueStandard(**record_as_dict(record)) for record in matches[start:start + page_size]],
+            **metadata,
+        )
+
+    @application.get("/api/catalogue/standards/{identifier}", response_model=CatalogueStandard)
+    @application.get("/api/v1/catalogue/standards/{identifier}", response_model=CatalogueStandard)
+    def catalogue_detail(identifier: str) -> CatalogueStandard:
+        normalized = normalize_is_number(identifier)
+        for record in load_catalogue():
+            if record.identifier == normalized:
+                return CatalogueStandard(**record_as_dict(record))
+        raise HTTPException(status_code=404, detail="No locally verified catalogue record was found.")
 
     @application.post(
         "/api/compliance/guide",
