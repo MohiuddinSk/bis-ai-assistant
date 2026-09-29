@@ -1,4 +1,59 @@
 import { useState } from 'react';
+import type { RefObject } from 'react';
 import type { Audience } from '../types/chat';
 import { useLanguage } from '../i18n/LanguageContext';
-export function ChatInput({onSend,busy,audience,onAudienceChange}:{onSend:(q:string)=>void;busy:boolean;audience:Audience;onAudienceChange:(audience:Audience)=>void}){const [value,setValue]=useState('');const {t}=useLanguage(); const submit=()=>{const q=value.trim();if(q&&!busy){onSend(q);setValue('')}}; return <div className="input-wrap"><label htmlFor="audience">{t('audienceLabel')}</label><select id="audience" value={audience} disabled={busy} onChange={event=>onAudienceChange(event.target.value as Audience)}><option value="general">{t('audienceGeneral')}</option><option value="manufacturer">{t('audienceManufacturer')}</option><option value="consumer">{t('audienceConsumer')}</option></select><label htmlFor="question">{t('questionLabel')}</label><textarea id="question" value={value} maxLength={1000} disabled={busy} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}}}/><div><small>{value.length}/1000</small><button onClick={submit} disabled={busy||!value.trim()}>{busy?t('sending'):t('send')}</button></div></div>}
+export function ChatInput({
+  onSend,
+  busy,
+  audience,
+  onAudienceChange,
+  autoFocus = false,
+  inputRef,
+}: {
+  onSend: (question: string) => void;
+  busy: boolean;
+  audience: Audience;
+  onAudienceChange: (audience: Audience) => void;
+  autoFocus?: boolean;
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
+}) {
+  const [value, setValue] = useState('');
+  const { t } = useLanguage();
+
+  const submit = () => {
+    const question = value.trim();
+    if (question && !busy) {
+      onSend(question);
+      setValue('');
+    }
+  };
+
+  return <div className="input-wrap">
+    <label htmlFor="audience">{t('audienceLabel')}</label>
+    <select id="audience" value={audience} disabled={busy} onChange={event => onAudienceChange(event.target.value as Audience)}>
+      <option value="general">{t('audienceGeneral')}</option>
+      <option value="manufacturer">{t('audienceManufacturer')}</option>
+      <option value="consumer">{t('audienceConsumer')}</option>
+    </select>
+    <label htmlFor="question">{t('questionLabel')}</label>
+    <textarea
+      ref={inputRef}
+      id="question"
+      autoFocus={autoFocus}
+      value={value}
+      maxLength={1000}
+      disabled={busy}
+      onChange={event => setValue(event.target.value)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          submit();
+        }
+      }}
+    />
+    <div>
+      <small>{value.length}/1000</small>
+      <button onClick={submit} disabled={busy || !value.trim()}>{busy ? t('sending') : t('send')}</button>
+    </div>
+  </div>;
+}
