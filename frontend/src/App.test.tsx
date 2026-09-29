@@ -328,25 +328,29 @@ it('clears retained context when the suggested Wizard action leaves Assistant', 
   expect(JSON.parse(String((chatCall![1] as RequestInit).body))).not.toHaveProperty('assistant_context');
 });
 
-it('persists an accessible theme choice', async () => {
+it('shows a visible accessible theme action and switches in both directions', async () => {
   render(<App />); await screen.findByRole('status');
   const user = userEvent.setup();
-  const toggle = screen.getByRole('button', { name: 'Use dark theme' });
+  const toggle = screen.getByRole('button', { name: 'Dark mode' });
+  expect(toggle).toHaveTextContent('Dark mode');
   expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await user.click(toggle);
   expect(document.documentElement.dataset.theme).toBe('dark');
-  expect(localStorage.getItem('bis-bandhu-theme')).toBe('dark');
-  expect(screen.getByRole('button', { name: 'Use light theme' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Light mode' })).toHaveAttribute('aria-pressed', 'true');
+  await user.click(screen.getByRole('button', { name: 'Light mode' }));
+  expect(document.documentElement.dataset.theme).toBe('light');
+  expect(screen.getByRole('button', { name: 'Dark mode' })).toHaveAttribute('aria-pressed', 'false');
 });
 
-it('uses the system dark preference until the visitor selects a theme', async () => {
+it('always initializes light despite stored and system dark preferences', async () => {
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+  localStorage.setItem('bis-bandhu-theme', 'dark');
   render(<App />);
   await screen.findByRole('status');
 
-  expect(document.documentElement.dataset.theme).toBe('dark');
-  expect(screen.getByRole('button', { name: 'Use light theme' })).toHaveAttribute('aria-pressed', 'true');
-  expect(localStorage.getItem('bis-bandhu-theme')).toBeNull();
+  expect(document.documentElement.dataset.theme).toBe('light');
+  expect(screen.getByRole('button', { name: 'Dark mode' })).toHaveAttribute('aria-pressed', 'false');
+  expect(localStorage.getItem('bis-bandhu-theme')).toBe('dark');
 });
 
 it('focuses the existing draft on audience navigation, exposes one active item, and makes no automatic request', async () => {
@@ -395,17 +399,17 @@ it('clears clarification context when changing audience without clearing visible
 
 it('localizes consumer service and theme controls in every supported shell language', async () => {
   const labels = {
-    en: ['Official BIS consumer information ↗', 'Use dark theme'],
-    hi: ['आधिकारिक BIS उपभोक्ता जानकारी ↗', 'गहरी थीम उपयोग करें'],
-    mr: ['अधिकृत BIS ग्राहक माहिती ↗', 'गडद थीम वापरा'],
-    ta: ['அதிகாரப்பூர்வ BIS நுகர்வோர் தகவல் ↗', 'இருண்ட நிறத் தோற்றத்தைப் பயன்படுத்தவும்'],
-    bn: ['সরকারি BIS ভোক্তা তথ্য ↗', 'গাঢ় থিম ব্যবহার করুন'],
+    en: ['Official BIS consumer information ↗', 'Dark mode'],
+    hi: ['आधिकारिक BIS उपभोक्ता जानकारी ↗', 'गहरी थीम'],
+    mr: ['अधिकृत BIS ग्राहक माहिती ↗', 'गडद मोड'],
+    ta: ['அதிகாரப்பூர்வ BIS நுகர்வோர் தகவல் ↗', 'இருண்ட தோற்றம்'],
+    bn: ['সরকারি BIS ভোক্তা তথ্য ↗', 'গাঢ় মোড'],
   } as const;
 
   for (const [language, [linkLabel, themeLabel]] of Object.entries(labels)) {
     cleanup();
     localStorage.clear();
-    localStorage.setItem('bis-bandhu-theme', 'light');
+    localStorage.setItem('bis-bandhu-theme', 'dark');
     render(<App />);
     await screen.findByRole('status');
     const user = userEvent.setup();
