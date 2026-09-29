@@ -365,6 +365,40 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   outline:0;
   background:transparent
 }
+.speech-input{
+  display:flex;
+  align-items:center;
+  gap:7px
+}
+.speech-input-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:40px;
+  border:1px solid var(--line)!important;
+  border-radius:7px!important;
+  background:var(--color-surface-inset)!important;
+  color:var(--link)!important;
+  padding:8px 10px!important;
+  font-size:.8rem;
+  font-weight:800
+}
+.speech-input-button:not(:disabled):hover{
+  background:var(--color-surface)!important;
+  border-color:var(--link)!important
+}
+.speech-status{
+  margin:0;
+  color:var(--muted);
+  font-size:.75rem;
+  line-height:1.3
+}
+.composer-actions{
+  display:flex;
+  align-items:center;
+  gap:10px
+}
 .intent-section,.assistant-view,.wizard-view{
   max-width:1120px;
   margin:auto;
@@ -840,6 +874,21 @@ footer b{
     flex-direction:column
   }
   .hero-search button{
+    width:100%
+  }
+  .hero-search .speech-input{
+    align-items:flex-start;
+    flex-direction:column
+  }
+  .composer-actions{
+    align-items:stretch;
+    flex-direction:column
+  }
+  .composer-actions .speech-input{
+    align-items:stretch;
+    flex-direction:column
+  }
+  .composer-actions .speech-input-button{
     width:100%
   }
   .message{

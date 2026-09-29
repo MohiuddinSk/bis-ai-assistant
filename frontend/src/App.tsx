@@ -3,6 +3,7 @@ import { askQuestion, getHealth } from './services/api';
 import type { AssistantContext, Audience, ChatResponse } from './types/chat';
 import { ChatHeader } from './components/ChatHeader';
 import { ChatInput } from './components/ChatInput';
+import { SpeechInput } from './components/SpeechInput';
 import { ChatMessage } from './components/ChatMessage';
 import { SuggestedQuestions } from './components/SuggestedQuestions';
 import { LoadingMessage } from './components/LoadingMessage';
@@ -73,6 +74,7 @@ return <>
 </label>
 <div>
 <input id="bandhu-search" value={q} onChange={e => setQ(e.target.value)} placeholder={t('shellSearchPlaceholder')} />
+<SpeechInput value={q} onTranscript={setQ} />
 <button>{t('shellAskBandhu')}
 </button>
 </div>

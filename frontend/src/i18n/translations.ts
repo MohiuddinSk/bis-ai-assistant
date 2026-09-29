@@ -37,6 +37,7 @@ const en = {
     printReportAria: 'Compliance Passport', printReportTitle: 'Compliance Passport', printReportSubtitle: 'Evidence-grounded informational guidance', generated: 'Generated', printProductProfile: 'Product profile', printDetail: 'Detail', printProvidedInformation: 'Provided information', printWhy: 'Why this applies', printChecklist: 'Compliance checklist', printImportant: 'Important conditions and limitations', printDocument: 'Document', printReferencedPages: 'Referenced pages', printProfileNote: 'These details were provided by the user to personalize the guidance. They are not verified BIS evidence.', printFooter: 'Verify applicable requirements with BIS or a qualified professional.',
     passportTitle: 'Compliance Passport', passportAvailable: 'Evidence-backed guidance available', passportNeedsInformation: 'Needs more information', passportNeedsVerification: 'Needs verification', passportReportId: 'Report ID', passportGenerated: 'Generated', passportLanguage: 'Selected language', passportNotice: 'Informational guidance — not a BIS certificate.', passportProductProfile: 'Product profile', passportUserProvided: 'User-provided information — not verified BIS evidence.', passportApplicable: 'Applicable standards', passportFindings: 'Evidence-backed completed findings', passportMissingProfile: 'Missing profile information', passportVerificationNeeded: 'Verification needed', passportNextActions: 'Next three actions', passportSources: 'Cited evidence', passportEvidenceVerification: 'The finalized response needs verification before it can support a compliance decision.', passportNoMissing: 'No missing profile fields are identified by this guidance.', passportNoVerification: 'No additional verification requirement is identified by this guidance.', passportNoActions: 'No evidence-backed next action is available.', saveAsPdf: 'Save as PDF / Print', saveAsPdfAria: 'Save compliance passport as PDF or print',
     themeDarkMode: 'Dark mode', themeLightMode: 'Light mode',
+    speechSpeakNow: 'Speak now', speechListening: 'Listening…', speechStop: 'Stop listening', speechUnsupported: 'Voice input is not supported in this browser. You can continue typing.', speechPermissionDenied: 'Microphone permission was denied. You can continue typing.', speechNoSpeech: 'No speech was detected. Try again or continue typing.', speechLanguageUnavailable: 'Voice input is unavailable for the selected language. You can continue typing.', speechError: 'Voice input could not start. You can continue typing.',
   } as const;
 
 export const translations = {
@@ -62,6 +63,7 @@ export const translations = {
     passportTitle: 'अनुपालन पासपोर्ट', passportAvailable: 'साक्ष्य-समर्थित मार्गदर्शन उपलब्ध है', passportNeedsInformation: 'और जानकारी चाहिए', passportNeedsVerification: 'सत्यापन चाहिए', passportReportId: 'रिपोर्ट आईडी', passportGenerated: 'निर्मित', passportLanguage: 'चुनी गई भाषा', passportNotice: 'सूचनात्मक मार्गदर्शन — BIS प्रमाणपत्र नहीं।', passportProductProfile: 'उत्पाद प्रोफ़ाइल', passportUserProvided: 'उपयोगकर्ता द्वारा दी गई जानकारी — सत्यापित BIS साक्ष्य नहीं।', passportApplicable: 'लागू मानक', passportFindings: 'साक्ष्य-समर्थित पूर्ण निष्कर्ष', passportMissingProfile: 'अधूरी प्रोफ़ाइल जानकारी', passportVerificationNeeded: 'सत्यापन आवश्यक', passportNextActions: 'अगली तीन कार्रवाइयाँ', passportSources: 'उद्धृत साक्ष्य', passportEvidenceVerification: 'अंतिम उत्तर को अनुपालन निर्णय के लिए उपयोग करने से पहले सत्यापन चाहिए।', passportNoMissing: 'इस मार्गदर्शन में कोई अधूरा प्रोफ़ाइल फ़ील्ड नहीं पहचाना गया है।', passportNoVerification: 'इस मार्गदर्शन में कोई अतिरिक्त सत्यापन आवश्यकता नहीं पहचानी गई है।', passportNoActions: 'कोई साक्ष्य-समर्थित अगली कार्रवाई उपलब्ध नहीं है।', saveAsPdf: 'PDF के रूप में सहेजें / प्रिंट', saveAsPdfAria: 'अनुपालन पासपोर्ट को PDF के रूप में सहेजें या प्रिंट करें',
     ...hindiShellOverrides(),
     themeDarkMode: 'गहरी थीम', themeLightMode: 'हल्की थीम',
+    speechSpeakNow: 'अब बोलें', speechListening: 'सुन रहे हैं…', speechStop: 'सुनना बंद करें', speechUnsupported: 'इस ब्राउज़र में आवाज़ से इनपुट उपलब्ध नहीं है। आप टाइप करना जारी रख सकते हैं।', speechPermissionDenied: 'माइक्रोफ़ोन की अनुमति नहीं मिली। आप टाइप करना जारी रख सकते हैं।', speechNoSpeech: 'कोई आवाज़ नहीं मिली। फिर कोशिश करें या टाइप करें।', speechLanguageUnavailable: 'चुनी हुई भाषा के लिए आवाज़ से इनपुट उपलब्ध नहीं है। आप टाइप करना जारी रख सकते हैं।', speechError: 'आवाज़ से इनपुट शुरू नहीं हो सका। आप टाइप करना जारी रख सकते हैं।',
   },
   mr: {
     ...sectionLabelTranslations.mr,
@@ -84,6 +86,7 @@ export const translations = {
     passportTitle: 'अनुपालन पासपोर्ट', passportAvailable: 'पुरावा-आधारित मार्गदर्शन उपलब्ध आहे', passportNeedsInformation: 'अधिक माहिती हवी आहे', passportNeedsVerification: 'पडताळणी आवश्यक आहे', passportReportId: 'अहवाल आयडी', passportGenerated: 'तयार केले', passportLanguage: 'निवडलेली भाषा', passportNotice: 'माहितीपर मार्गदर्शन — BIS प्रमाणपत्र नाही.', passportProductProfile: 'उत्पादन प्रोफाइल', passportUserProvided: 'वापरकर्त्याने दिलेली माहिती — सत्यापित BIS पुरावा नाही.', passportApplicable: 'लागू मानके', passportFindings: 'पुरावा-आधारित पूर्ण निष्कर्ष', passportMissingProfile: 'गहाळ प्रोफाइल माहिती', passportVerificationNeeded: 'पडताळणी आवश्यक', passportNextActions: 'पुढील तीन कृती', passportSources: 'उद्धृत पुरावा', passportEvidenceVerification: 'अंतिम उत्तरावर अनुपालन निर्णयासाठी अवलंबून राहण्यापूर्वी पडताळणी आवश्यक आहे.', passportNoMissing: 'या मार्गदर्शनात कोणतेही अपूर्ण प्रोफाइल क्षेत्र ओळखलेले नाही.', passportNoVerification: 'या मार्गदर्शनात कोणतीही अतिरिक्त पडताळणी आवश्यकता ओळखलेली नाही.', passportNoActions: 'कोणतीही पुरावा-आधारित पुढील कृती उपलब्ध नाही.', saveAsPdf: 'PDF म्हणून जतन करा / प्रिंट', saveAsPdfAria: 'अनुपालन पासपोर्ट PDF म्हणून जतन करा किंवा प्रिंट करा',
     ...brandOverrides(),
     themeDarkMode: 'गडद मोड', themeLightMode: 'हलका मोड',
+    speechSpeakNow: 'आता बोला', speechListening: 'ऐकत आहोत…', speechStop: 'ऐकणे थांबवा', speechUnsupported: 'या ब्राउझरमध्ये आवाज इनपुट उपलब्ध नाही. तुम्ही टाइप करत राहू शकता.', speechPermissionDenied: 'मायक्रोफोनची परवानगी नाकारली गेली. तुम्ही टाइप करत राहू शकता.', speechNoSpeech: 'आवाज सापडला नाही. पुन्हा प्रयत्न करा किंवा टाइप करा.', speechLanguageUnavailable: 'निवडलेल्या भाषेसाठी आवाज इनपुट उपलब्ध नाही. तुम्ही टाइप करत राहू शकता.', speechError: 'आवाज इनपुट सुरू होऊ शकले नाही. तुम्ही टाइप करत राहू शकता.',
   },
   ta: {
     ...en,
@@ -99,6 +102,7 @@ export const translations = {
     shellNavigation: 'முதன்மை வழிசெலுத்தல்', shellToggleNavigation: 'வழிசெலுத்தலை மாற்றவும்',
     ...brandOverrides(),
     themeDarkMode: 'இருண்ட தோற்றம்', themeLightMode: 'ஒளி தோற்றம்',
+    speechSpeakNow: 'இப்போது பேசுங்கள்', speechListening: 'கேட்டுக்கொண்டிருக்கிறது…', speechStop: 'கேட்பதை நிறுத்து', speechUnsupported: 'இந்த உலாவியில் குரல் உள்ளீடு ஆதரிக்கப்படவில்லை. தட்டச்சு செய்யலாம்.', speechPermissionDenied: 'மைக்ரோஃபோன் அனுமதி மறுக்கப்பட்டது. தட்டச்சு செய்யலாம்.', speechNoSpeech: 'குரல் கண்டறியப்படவில்லை. மீண்டும் முயற்சிக்கவும் அல்லது தட்டச்சு செய்யவும்.', speechLanguageUnavailable: 'தேர்ந்தெடுத்த மொழிக்கு குரல் உள்ளீடு கிடைக்கவில்லை. தட்டச்சு செய்யலாம்.', speechError: 'குரல் உள்ளீட்டைத் தொடங்க முடியவில்லை. தட்டச்சு செய்யலாம்.',
   },
   bn: {
     ...en,
@@ -114,6 +118,7 @@ export const translations = {
     shellNavigation: 'প্রধান নেভিগেশন', shellToggleNavigation: 'নেভিগেশন বদলান',
     ...brandOverrides(),
     themeDarkMode: 'গাঢ় মোড', themeLightMode: 'হালকা মোড',
+    speechSpeakNow: 'এখন বলুন', speechListening: 'শোনা হচ্ছে…', speechStop: 'শোনা বন্ধ করুন', speechUnsupported: 'এই ব্রাউজারে ভয়েস ইনপুট সমর্থিত নয়। আপনি টাইপ করতে পারেন।', speechPermissionDenied: 'মাইক্রোফোনের অনুমতি দেওয়া হয়নি। আপনি টাইপ করতে পারেন।', speechNoSpeech: 'কোনও কথা শনাক্ত হয়নি। আবার চেষ্টা করুন বা টাইপ করুন।', speechLanguageUnavailable: 'নির্বাচিত ভাষার জন্য ভয়েস ইনপুট উপলভ্য নয়। আপনি টাইপ করতে পারেন।', speechError: 'ভয়েস ইনপুট শুরু করা যায়নি। আপনি টাইপ করতে পারেন।',
   },
 } as const;
 

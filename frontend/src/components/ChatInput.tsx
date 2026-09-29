@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { RefObject } from 'react';
 import type { Audience } from '../types/chat';
 import { useLanguage } from '../i18n/LanguageContext';
+import { SpeechInput } from './SpeechInput';
 export function ChatInput({
   onSend,
   busy,
@@ -53,7 +54,10 @@ export function ChatInput({
     />
     <div>
       <small>{value.length}/1000</small>
-      <button onClick={submit} disabled={busy || !value.trim()}>{busy ? t('sending') : t('send')}</button>
+      <div className="composer-actions">
+        <SpeechInput value={value} onTranscript={setValue} disabled={busy} />
+        <button onClick={submit} disabled={busy || !value.trim()}>{busy ? t('sending') : t('send')}</button>
+      </div>
     </div>
   </div>;
 }

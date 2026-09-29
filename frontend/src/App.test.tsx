@@ -7,7 +7,7 @@ const answer = { answer: 'IS 15644 is the primary standard.', grounded: true, in
 const response = (body: unknown) => ({ ok: true, json: async () => body });
 
 beforeEach(() => { localStorage.clear(); vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(response(url.includes('health') ? { status: 'ready' } : answer)))); });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); delete (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition; delete (window as Window & { SpeechRecognition?: unknown }).SpeechRecognition; });
 
 async function openAssistant() {
   await screen.findByRole('status');
@@ -419,4 +419,87 @@ it('localizes consumer service and theme controls in every supported shell langu
     expect(screen.getByRole('link', { name: linkLabel })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: themeLabel })).toBeInTheDocument();
   }
+});
+
+class MockSpeechRecognition {
+  static instances: MockSpeechRecognition[] = [];
+  lang = '';
+  continuous = false;
+  interimResults = false;
+  onstart: (() => void) | null = null;
+  onend: (() => void) | null = null;
+  onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null = null;
+  onerror: ((event: { error: string }) => void) | null = null;
+  start = vi.fn(() => this.onstart?.());
+  stop = vi.fn(() => this.onend?.());
+
+  constructor() { MockSpeechRecognition.instances.push(this); }
+}
+
+function mockSpeechRecognition() {
+  MockSpeechRecognition.instances = [];
+  Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: MockSpeechRecognition });
+}
+
+it('inserts a final Home transcript after the typed draft without submitting it', async () => {
+  mockSpeechRecognition();
+  render(<App />); await screen.findByRole('status');
+  const user = userEvent.setup();
+  const input = screen.getByLabelText('Ask about a product, standard or BIS process');
+  await user.type(input, 'My product is');
+  await user.click(screen.getByRole('button', { name: 'Speak now' }));
+
+  const recognition = MockSpeechRecognition.instances[0];
+  expect(recognition.lang).toBe('en-IN');
+  expect(screen.getByRole('button', { name: 'Stop listening' })).toHaveAttribute('aria-pressed', 'true');
+  await user.click(screen.getByRole('button', { name: 'Stop listening' }));
+  expect(recognition.stop).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole('button', { name: 'Speak now' }));
+  const resumed = MockSpeechRecognition.instances[1];
+  await act(async () => {
+    resumed.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: ' a battery-operated toy' } }] });
+    resumed.onend?.();
+  });
+
+  expect(input).toHaveValue('My product is a battery-operated toy');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+});
+
+it('uses every selected language locale and stops a session when language changes', async () => {
+  mockSpeechRecognition();
+  render(<App />); await screen.findByRole('status');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Speak now' }));
+  const first = MockSpeechRecognition.instances[0];
+  await user.selectOptions(screen.getByLabelText('Language'), 'hi');
+  expect(first.stop).toHaveBeenCalled();
+
+  const locales = {
+    hi: ['अब बोलें', 'सुनना बंद करें', 'hi-IN'],
+    mr: ['आता बोला', 'ऐकणे थांबवा', 'mr-IN'],
+    ta: ['இப்போது பேசுங்கள்', 'கேட்பதை நிறுத்து', 'ta-IN'],
+    bn: ['এখন বলুন', 'শোনা বন্ধ করুন', 'bn-IN'],
+    en: ['Speak now', 'Stop listening', 'en-IN'],
+  } as const;
+  for (const [language, [startLabel, stopLabel, locale]] of Object.entries(locales)) {
+    await user.selectOptions(document.getElementById('language') as HTMLSelectElement, language);
+    await user.click(screen.getByRole('button', { name: startLabel }));
+    expect(MockSpeechRecognition.instances.at(-1)?.lang).toBe(locale);
+    await user.click(screen.getByRole('button', { name: stopLabel }));
+  }
+});
+
+it('keeps typing available when voice input is unsupported or reports an error', async () => {
+  render(<App />); await screen.findByRole('status');
+  const user = userEvent.setup();
+  const input = screen.getByLabelText('Ask about a product, standard or BIS process');
+  await user.click(screen.getByRole('button', { name: 'Speak now' }));
+  expect(screen.getByText('Voice input is not supported in this browser. You can continue typing.')).toBeInTheDocument();
+  await user.type(input, 'I can still type');
+  expect(input).toHaveValue('I can still type');
+
+  mockSpeechRecognition();
+  await user.click(screen.getByRole('button', { name: 'Speak now' }));
+  await act(async () => { MockSpeechRecognition.instances[0].onerror?.({ error: 'not-allowed' }); });
+  expect(screen.getByText('Microphone permission was denied. You can continue typing.')).toBeInTheDocument();
 });
