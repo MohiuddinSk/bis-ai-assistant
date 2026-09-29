@@ -112,6 +112,27 @@ class HealthResponse(BaseModel):
     detail: str | None = None
 
 
+class CatalogueStandard(BaseModel):
+    identifier: str
+    title: str
+    category: str | None = None
+    edition_year: str | None = None
+    status: str | None = None
+    official_url: str
+    retrieved_at: str
+    provenance: str
+    evidence_filename: str | None = None
+    evidence_page: int | None = None
+
+
+class CatalogueSearchResponse(BaseModel):
+    query: str
+    results: list[CatalogueStandard]
+    record_count: int
+    last_updated: str | None = None
+    coverage_note: str
+
+
 class GeneratedCitation(BaseModel):
     """A model-selected trusted ID paired with its verbatim supporting quote."""
 

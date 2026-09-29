@@ -12,7 +12,7 @@ class CorpusV4ContractTests(unittest.TestCase):
   fmcs=[x for x in rows if x['category']=='fmcs']; self.assertEqual(len(fmcs),2); self.assertTrue(all(x['scope']=='FMCS only' for x in fmcs))
   snaps=[x for x in rows if x['requires_live_verification']]; self.assertEqual({x['category'] for x in snaps},{'laboratories','fees'}); self.assertTrue(all(x['live_verification_url'] for x in snaps))
  def test_chunks_have_page_scope_and_no_serialized_table_noise(self):
-  chunks=[json.loads(x) for x in (DATA/'chunks.jsonl').read_text().splitlines()]
+  chunks=[json.loads(x) for x in (DATA/'chunks.jsonl').read_text(encoding='utf-8').splitlines()]
   self.assertTrue(chunks); self.assertTrue(all(x['metadata']['page_start']>0 and x['metadata']['scheme_scope'] for x in chunks))
   self.assertFalse(any(x['document'].lower().count('column ')>=4 or x['document'].count('-do-')>=3 for x in chunks))
 if __name__=='__main__':unittest.main()
