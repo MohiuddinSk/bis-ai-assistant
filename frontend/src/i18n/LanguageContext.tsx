@@ -4,7 +4,9 @@ import type { Language, TranslationKey } from './translations';
 
 const storageKey = 'bis-assistant-language';
 type LanguageContextValue = { language: Language; setLanguage: (language: Language) => void; t: (key: TranslationKey) => string };
-const defaultLanguageContext: LanguageContextValue = { language: 'en', setLanguage: () => undefined, t: (key) => translations.en[key] };
+const brandKey = (key: TranslationKey) => key === 'appTitle' || key === 'conversationGuide';
+const translate = (language: Language, key: TranslationKey) => brandKey(key) ? 'BIS Bandhu' : translations[language][key];
+const defaultLanguageContext: LanguageContextValue = { language: 'en', setLanguage: () => undefined, t: (key) => translate('en', key) };
 const LanguageContext = createContext<LanguageContextValue>(defaultLanguageContext);
 
 function savedLanguage(): Language {
@@ -22,7 +24,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = language;
     try { window.localStorage.setItem(storageKey, language); } catch { /* Storage is optional. */ }
   }, [language]);
-  const value = useMemo(() => ({ language, setLanguage, t: (key: TranslationKey) => translations[language][key] }), [language]);
+  const value = useMemo(() => ({ language, setLanguage, t: (key: TranslationKey) => translate(language, key) }), [language]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 

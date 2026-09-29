@@ -49,8 +49,21 @@ export function passportStatus(profile: ComplianceProfile, guidance: ChatRespons
   return 'available';
 }
 
-function sourceRows(citations: Citation[]) {
-  return citations.map((citation) => ({ id: citation.citation_id, filename: citation.source_filename, pages: citation.page_start === citation.page_end ? String(citation.page_start ?? '') : `${citation.page_start ?? ''}–${citation.page_end ?? ''}`, quote: citation.supporting_quote }));
+type SourceGroup = { filename: string | null; pages: string; citations: Citation[] };
+
+/** Groups repeated references without collapsing their IDs or source metadata. */
+export function passportSourceGroups(citations: Citation[]): SourceGroup[] {
+  const groups = new Map<string, SourceGroup>();
+  for (const citation of citations) {
+    const pages = citation.page_start === citation.page_end
+      ? String(citation.page_start ?? '')
+      : `${citation.page_start ?? ''}–${citation.page_end ?? ''}`;
+    const key = `${citation.source_filename ?? ''}\u0000${pages}`;
+    const group = groups.get(key) ?? { filename: citation.source_filename, pages, citations: [] };
+    group.citations.push(citation);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }
 
 function SectionList({ sections }: { sections: AnswerSection[] }) {
@@ -79,7 +92,7 @@ export function CompliancePassportContent({ profile, guidance, generatedAt }: { 
     <section className="passport-section"><h2>{t('passportMissingProfile')}</h2>{missingProfile.length > 0 ? <ul>{missingProfile.map((field) => <li key={field}>{field}</li>)}</ul> : <p>{t('passportNoMissing')}</p>}</section>
     <section className="passport-section"><h2>{t('passportVerificationNeeded')}</h2>{limitations.length > 0 ? <SectionList sections={limitations} /> : status === 'needs_verification' ? <p>{t('passportEvidenceVerification')}</p> : <p>{t('passportNoVerification')}</p>}</section>
     <section className="passport-section"><h2>{t('passportNextActions')}</h2>{actions.length > 0 ? <ol>{actions.map((action, index) => <li key={index}>{action}</li>)}</ol> : <p>{t('passportNoActions')}</p>}</section>
-    <section className="passport-section"><h2>{t('passportSources')}</h2>{sourceRows(sources).map((source) => <article className="passport-source" key={source.id}><p><strong>{source.id}</strong> — <span className="passport-filename">{source.filename}</span> — {t('pages')} {source.pages}</p>{source.quote && <p>{source.quote}</p>}</article>)}</section>
+    <section className="passport-section"><h2>{t('passportSources')}</h2>{passportSourceGroups(sources).map((source) => <article className="passport-source" key={`${source.filename}-${source.pages}`}><p><span className="passport-filename">{source.filename}</span> — {t('pages')} {source.pages}</p>{source.citations.map((citation) => <div className="passport-source-reference" key={citation.citation_id}><strong>{citation.citation_id}</strong>{citation.supporting_quote ? <p>{citation.supporting_quote}</p> : citation.excerpt && <p className="passport-source-excerpt"><span>{t('extractedSourceText')}</span>{citation.excerpt}</p>}</div>)}</article>)}</section>
   </>;
 }
 

@@ -20,7 +20,7 @@ it('renders a greeting as guidance without a grounded or insufficient badge', ()
     citations: [], model: 'local', generation_mode: 'conversation', disclaimer: 'Verify.',
     answer_sections: [{ type: 'direct_answer', title: 'BIS Saarthi', content: 'Hello, I am BIS Saarthi. This prototype covers toy-related BIS material.', items: [], citation_ids: [] }],
   }} />);
-  expect(screen.getAllByText('BIS Saarthi').length).toBeGreaterThan(0);
+  expect(screen.getByText('BIS Bandhu')).toBeInTheDocument();
   expect(screen.queryByText('Grounded answer')).toBeNull();
   expect(screen.queryByText('Evidence insufficient')).toBeNull();
   expect(document.querySelector('.sources')).toBeNull();
@@ -28,7 +28,7 @@ it('renders a greeting as guidance without a grounded or insufficient badge', ()
 
 it('uses the backend response kind for conversation, clarification, limitation, and grounded guidance', () => {
   const cases = [
-    ['conversation', 'BIS Saarthi'],
+    ['conversation', 'BIS Bandhu'],
     ['clarification', 'Need more details'],
     ['limitation', 'Evidence insufficient'],
     ['grounded_guidance', 'Grounded answer'],

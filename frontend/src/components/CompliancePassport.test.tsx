@@ -32,7 +32,8 @@ it('renders cited findings, verification limits, and at most three actions witho
   const passport = within(screen.getByRole('region', { name: 'Compliance Passport' }));
   expect(passport.getByText(compliancePassportId(profile, guidance))).toBeInTheDocument();
   expect(passport.getByText('User-provided information — not verified BIS evidence.')).toBeInTheDocument();
-  expect(passport.queryByText('IS 15644 applies where applicable.')).not.toBeInTheDocument();
+  expect(passport.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(passport.getByText('Extracted source text')).toBeInTheDocument();
   expect(passport.getByText('manual.pdf')).toBeInTheDocument();
   expect(passport.queryByText('unlinked.pdf')).not.toBeInTheDocument();
   expect(passport.queryByText('Battery toy context from the user.')).not.toBeInTheDocument();
@@ -71,13 +72,15 @@ it('localizes passport UI labels without changing sources or standard identifier
   renderPassport('hi');
   expect(screen.getByRole('region', { name: 'अनुपालन पासपोर्ट' })).toBeInTheDocument();
   expect(screen.getByText('उद्धृत साक्ष्य')).toBeInTheDocument();
-  expect(screen.queryByText('IS 15644 applies where applicable.')).not.toBeInTheDocument();
+  expect(screen.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(screen.getByText('निकाला गया स्रोत पाठ')).toBeInTheDocument();
   expect(screen.getByText('manual.pdf')).toBeInTheDocument();
   cleanup();
   renderPassport('mr');
   expect(screen.getByRole('region', { name: 'अनुपालन पासपोर्ट' })).toBeInTheDocument();
   expect(screen.getByText('उद्धृत पुरावा')).toBeInTheDocument();
-  expect(screen.queryByText('IS 15644 applies where applicable.')).not.toBeInTheDocument();
+  expect(screen.getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(screen.getByText('काढलेला स्रोत मजकूर')).toBeInTheDocument();
   expect(screen.getByText('manual.pdf')).toBeInTheDocument();
 });
 
@@ -176,11 +179,11 @@ it('prints a validated supporting quote instead of a noisy excerpt while preserv
   const paragraphs = source.querySelectorAll('p');
   expect(paragraphs).toHaveLength(2);
   expect(paragraphs[0].parentElement).toBe(source);
-  expect(paragraphs[1].parentElement).toBe(source);
+  expect(paragraphs[1].parentElement).toHaveClass('passport-source-reference');
   expect(paragraphs[1]).toHaveTextContent(quote);
 });
 
-it('prints metadata only when no supporting quote is available and preserves source order', () => {
+it('prints labeled exact excerpts when no supporting quote is available and preserves source order', () => {
   const first = { ...guidance.citations[0], excerpt: 'Raw evidence one.' };
   const second = { ...guidance.citations[1], citation_id: 'S3', source_filename: 'second.pdf', page_start: 7, page_end: 7, chunk_id: 'chunk-3', excerpt: 'Raw evidence two.' };
   const response = { ...guidance, citations: [first, second], answer_sections: guidance.answer_sections!.map((section) => ({ ...section, citation_ids: section.citation_ids.includes('S1') ? ['S1', 'S3'] : section.citation_ids })) };
@@ -193,11 +196,12 @@ it('prints metadata only when no supporting quote is available and preserves sou
   expect(blocks[1]).toHaveTextContent('S3');
   expect(blocks[1]).toHaveTextContent('second.pdf');
   expect(blocks[1]).toHaveTextContent('Pages 7');
-  expect(blocks[0]).not.toHaveTextContent('Raw evidence one.');
-  expect(blocks[1]).not.toHaveTextContent('Raw evidence two.');
+  expect(blocks[0]).toHaveTextContent('Extracted source text');
+  expect(blocks[0]).toHaveTextContent('Raw evidence one.');
+  expect(blocks[1]).toHaveTextContent('Raw evidence two.');
   for (const block of blocks) {
-    expect(block.querySelectorAll('p')).toHaveLength(1);
-    expect(block.querySelector('p')?.parentElement).toBe(block);
+    expect(block.querySelectorAll('p')).toHaveLength(2);
+    expect(block.querySelector('.passport-source-reference')).not.toBeNull();
   }
 });
 
@@ -213,4 +217,16 @@ it('keeps all printable citation metadata and evidence in the protected citation
   expect(source).toHaveTextContent('Pages 4');
   expect(source).toHaveTextContent(quote);
   expect(source.parentElement?.querySelectorAll('.passport-source')).toHaveLength(1);
+});
+
+it('groups repeated document and page references without losing citation IDs', () => {
+  const second = { ...guidance.citations[0], citation_id: 'S4', chunk_id: 'chunk-4', excerpt: 'A distinct excerpt for the same page.' };
+  const response = { ...guidance, citations: [guidance.citations[0], second], answer_sections: guidance.answer_sections!.map((section) => ({ ...section, citation_ids: section.citation_ids.includes('S1') ? ['S1', 'S4'] : section.citation_ids })) };
+  renderPassport('en', response);
+  const sources = screen.getByRole('heading', { name: 'Cited evidence' }).parentElement!;
+  expect(within(sources).getAllByText('manual.pdf')).toHaveLength(1);
+  expect(within(sources).getByText('S1')).toBeInTheDocument();
+  expect(within(sources).getByText('S4')).toBeInTheDocument();
+  expect(within(sources).getByText('IS 15644 applies where applicable.')).toBeInTheDocument();
+  expect(within(sources).getByText('A distinct excerpt for the same page.')).toBeInTheDocument();
 });
