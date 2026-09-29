@@ -173,8 +173,7 @@ const[audience,setAudience]=useState<Audience>('general');
 const[findingStandard,setFindingStandard]=useState(false);
 const[status,setStatus]=useState<'ready'|'degraded'|'unavailable'>('unavailable');
 const[updating,setUpdating]=useState(false);
-const savedTheme=useRef<'light'|'dark'|null>(null);
-const[theme,setTheme]=useState<'light'|'dark'>(()=>{try{const saved=localStorage.getItem('bis-bandhu-theme');if(saved==='light'||saved==='dark'){savedTheme.current=saved;return saved}}catch{}return window.matchMedia?.('(prefers-color-scheme: dark)').matches?'dark':'light'});
+const[theme,setTheme]=useState<'light'|'dark'>('light');
 const end=useRef<HTMLDivElement>(null),questionInput=useRef<HTMLTextAreaElement>(null),chatAbort=useRef<AbortController|null>(null),localeAbort=useRef<AbortController|null>(null),localeVersion=useRef(0),id=useRef(0),variants=useRef(new Map<number,Map<Language,ChatResponse>>()),pendingRequest=useRef(false);
 useEffect(()=>{const c=new AbortController();
 void getHealth(c.signal).then(x=>!c.signal.aborted&&setStatus(x.status==='ready'?'ready':'degraded')).catch(()=>!c.signal.aborted&&setStatus('unavailable'));
@@ -183,7 +182,7 @@ useEffect(()=>{end.current?.scrollIntoView({behavior:'smooth'})},[messages,busy]
 useEffect(()=>{document.getElementById('main-content')?.scrollIntoView({behavior:'smooth',block:'start'})},[view]);
 useEffect(()=>()=>{chatAbort.current?.abort();
 localeAbort.current?.abort()},[]);
-useEffect(()=>{document.documentElement.dataset.theme=theme;if(savedTheme.current===theme){try{localStorage.setItem('bis-bandhu-theme',theme)}catch{}}},[theme]);
+useEffect(()=>{document.documentElement.dataset.theme=theme},[theme]);
 useEffect(()=>{
 if(view==='assistant'&&findingStandard){
 questionInput.current?.focus();
@@ -259,18 +258,16 @@ setAudience(selectedAudience);
 setFindingStandard(true);
 go('assistant');
 };
-const chooseTheme=(nextTheme:'light'|'dark')=>{savedTheme.current=nextTheme;setTheme(nextTheme)};
+const chooseTheme=(nextTheme:'light'|'dark')=>setTheme(nextTheme);
 const local=(items:SuggestedAction[]|undefined)=>items?.map(a=>actionKeys[a.label]?{...a,label:t(actionKeys[a.label])}:a);
-const themeAction={en:theme==='dark'?'Use light theme':'Use dark theme',hi:theme==='dark'?'हल्की थीम उपयोग करें':'गहरी थीम उपयोग करें',mr:theme==='dark'?'हलकी थीम वापरा':'गडद थीम वापरा',ta:theme==='dark'?'ஒளி நிறத் தோற்றத்தைப் பயன்படுத்தவும்':'இருண்ட நிறத் தோற்றத்தைப் பயன்படுத்தவும்',bn:theme==='dark'?'হালকা থিম ব্যবহার করুন':'গাঢ় থিম ব্যবহার করুন'}[language];
+const themeAction=t(theme==='dark'?'themeLightMode':'themeDarkMode');
 return <div className="app-shell">
 <a className="skip-link" href="#main-content">{t('shellSkip')}
 </a>
 <header className="site-header">
 <button className="brand" onClick={()=>go('home')}>
-<span>BIS</span>
-<strong>Bandhu</strong>
-<small>{t('shellTagline')}
-</small>
+<img className="brand-logo" src="/bis-logo.jpeg" alt="" />
+<span className="brand-copy"><strong>BIS Bandhu</strong><small>{t('shellTagline')}</small></span>
 </button>
 <nav className={menu?'open':''} aria-label={t('shellNavigation')}>
 <button aria-current={view==='home'?'page':undefined} onClick={()=>go('home')}>{t('shellNavHome')}
@@ -286,7 +283,7 @@ return <div className="app-shell">
 </nav>
 <div className="header-tools">
 <ChatHeader status={status}/>
-<button className="theme-toggle" type="button" aria-label={themeAction} aria-pressed={theme==='dark'} onClick={()=>chooseTheme(theme==='dark'?'light':'dark')}>{theme==='dark'?'☀':'◐'}</button>
+<button className="theme-toggle" type="button" aria-pressed={theme==='dark'} onClick={()=>chooseTheme(theme==='dark'?'light':'dark')}><span aria-hidden="true">{theme==='dark'?'☀':'◐'}</span><span>{themeAction}</span></button>
 <button className="menu-toggle" aria-label={t('shellToggleNavigation')} aria-expanded={menu} onClick={()=>setMenu(!menu)}>☰</button>
 </div>
 </header>
