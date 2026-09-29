@@ -6,13 +6,58 @@ import App from './App';
 const answer = { answer: 'IS 15644 is the primary standard.', grounded: true, insufficient_evidence: false, evidence_count: 1, citations: [{ citation_id: 'S1', source_filename: 'manual.pdf', page_start: 4, page_end: 4, chunk_id: 'internal', excerpt: 'IS 15644 applies.' }], model: 'test', generation_mode: 'llm' as const, disclaimer: 'Verify.' };
 const response = (body: unknown) => ({ ok: true, json: async () => body });
 
-beforeEach(() => { localStorage.clear(); vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(response(url.includes('health') ? { status: 'ready' } : answer)))); });
+beforeEach(() => { window.history.replaceState(null, '', '/'); localStorage.clear(); vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(response(url.includes('health') ? { status: 'ready' } : answer)))); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); delete (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition; delete (window as Window & { SpeechRecognition?: unknown }).SpeechRecognition; });
 
 async function openAssistant() {
   await screen.findByRole('status');
   await userEvent.setup().click(screen.getByRole('button', { name: 'Assistant' }));
 }
+
+it('opens a stable standards URL directly and updates the route when navigating', async () => {
+  window.location.hash = '#/standards';
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: 'Search standards' })).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Services' }));
+  expect(window.location.hash).toBe('#/services');
+  expect(screen.getByRole('heading', { name: 'Choose a useful next step' })).toBeInTheDocument();
+});
+
+it('opens the Standards dropdown and routes to comparison without a chat request', async () => {
+  render(<App />); await screen.findByRole('status');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Standards' }));
+  expect(screen.getByRole('menuitem', { name: 'Compare standards' })).toBeInTheDocument();
+  await user.click(screen.getByRole('menuitem', { name: 'Compare standards' }));
+  expect(window.location.hash).toBe('#/standards/compare');
+  expect(screen.getByText('Choose two illustrative records before comparing them.')).toBeInTheDocument();
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+});
+
+it('keeps demo verification explicitly non-verifying and localizes its notice on a deep route', async () => {
+  window.location.hash = '#/consumers/verify-product';
+  render(<App />); await screen.findByRole('status');
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Verify product'), 'DEMO-100');
+  await user.click(screen.getByRole('button', { name: 'View details' }));
+  expect(screen.getAllByRole('status').at(-1)).toHaveTextContent(/has not verified/i);
+  await user.selectOptions(screen.getByLabelText('Language'), 'hi');
+  expect(screen.getAllByText('डेमो डेटा — केवल उदाहरण')).not.toHaveLength(0);
+  expect(screen.getByDisplayValue('DEMO-100')).toBeInTheDocument();
+});
+
+it('localizes detailed reference-page controls in every supported language without leaving its deep route', async () => {
+  const filters = { en: 'Filter demo catalogue', hi: 'डेमो कैटलॉग छानें', mr: 'डेमो कॅटलॉग फिल्टर करा', ta: 'டெமோ பட்டியலை வடிகட்டவும்', bn: 'ডেমো ক্যাটালগ ফিল্টার করুন' } as const;
+  for (const [language, label] of Object.entries(filters)) {
+    cleanup();
+    window.history.replaceState(null, '', '/');
+    window.location.hash = '#/standards';
+    render(<App />); await screen.findByRole('status');
+    await userEvent.setup().selectOptions(document.getElementById('language') as HTMLSelectElement, language);
+    expect(screen.getByLabelText(label)).toBeInTheDocument();
+    expect(window.location.hash).toBe('#/standards');
+  }
+});
 
 it('opens on the BIS Bandhu homepage with working journeys', async () => {
   render(<App />); await screen.findByRole('status');
@@ -451,6 +496,116 @@ it('localizes consumer service and theme controls in every supported shell langu
 
     expect(screen.getByRole('link', { name: linkLabel })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: themeLabel })).toBeInTheDocument();
+  }
+});
+
+it('filters demo standards, compares two selections, removes them, and opens a detail route', async () => {
+  window.location.hash = '#/standards';
+  render(<App />);
+  await screen.findByRole('status');
+  const user = userEvent.setup();
+
+  const filter = screen.getByLabelText('Filter demo catalogue');
+  await user.type(filter, 'cooking');
+  expect(screen.getByText('Illustrative cooking appliance standard')).toBeInTheDocument();
+  expect(screen.queryByText('Illustrative lighting product standard')).toBeNull();
+  await user.clear(filter);
+
+  await user.click(screen.getByLabelText('Add to comparison: Illustrative cooking appliance standard'));
+  await user.click(screen.getByLabelText('Add to comparison: Illustrative lighting product standard'));
+  await user.click(screen.getByRole('button', { name: 'Compare standards (2/2)' }));
+  expect(await screen.findByRole('heading', { name: 'Compare standards' })).toBeInTheDocument();
+  expect(screen.getByText('Field')).toBeInTheDocument();
+
+  await user.click(screen.getByLabelText('Illustrative cooking appliance standard'));
+  expect(screen.getByText('Choose two illustrative records before comparing them.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Clear comparison' }));
+  expect(screen.getByLabelText('Illustrative lighting product standard')).not.toBeChecked();
+
+  await user.click(screen.getByRole('button', { name: 'Standards' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Search standards' }));
+  await user.click(screen.getAllByRole('button', { name: 'View details' })[0]);
+  expect(window.location.hash).toBe('#/standards/demo-detail');
+  expect(screen.getByRole('heading', { name: 'Illustrative cooking appliance standard' })).toBeInTheDocument();
+});
+
+it('keeps a laboratory filter when returning from its illustrative detail', async () => {
+  window.location.hash = '#/industry/labs';
+  render(<App />);
+  await screen.findByRole('status');
+  const user = userEvent.setup();
+
+  const filter = screen.getByLabelText('Filter demo laboratories');
+  await user.type(filter, 'illustrative');
+  await user.click(screen.getByRole('button', { name: 'View details' }));
+  expect(window.location.hash).toBe('#/industry/labs/demo-detail');
+  expect(screen.getByRole('heading', { name: 'Testing Laboratories' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Testing Laboratories' }));
+  expect(window.location.hash).toBe('#/industry/labs');
+  expect(screen.getByLabelText('Filter demo laboratories')).toHaveValue('illustrative');
+});
+
+it('persists checklist progress across a remount and resets it through local session deletion', async () => {
+  window.location.hash = '#/industry/checklist';
+  render(<App />);
+  await screen.findByRole('status');
+  const user = userEvent.setup();
+  await user.click(screen.getByLabelText('Product description'));
+  expect(screen.getByLabelText('Product description')).toBeChecked();
+
+  cleanup();
+  render(<App />);
+  await screen.findByRole('status');
+  expect(screen.getByLabelText('Product description')).toBeChecked();
+
+  await user.click(screen.getByRole('button', { name: 'Services' }));
+  await user.click(screen.getByRole('button', { name: 'Delete local session data' }));
+  cleanup();
+  window.location.hash = '#/industry/checklist';
+  render(<App />);
+  await screen.findByRole('status');
+  expect(screen.getByLabelText('Product description')).not.toBeChecked();
+});
+
+it('saves a Finder question through the live Assistant request and deletes it from My Session', async () => {
+  window.location.hash = '#/industry/finder';
+  render(<App />);
+  await screen.findByRole('status');
+  const user = userEvent.setup();
+
+  await user.type(screen.getByLabelText('Product, keyword, or IS number'), 'battery powered product');
+  await user.click(screen.getByRole('button', { name: 'Ask Bandhu' }));
+  expect(await screen.findByText(answer.answer)).toBeInTheDocument();
+  expect(window.location.hash).toBe('#/assistant');
+  const request = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => String(url).includes('/api/chat'));
+  expect(JSON.parse(String((request?.[1] as RequestInit).body))).toMatchObject({ question: 'battery powered product', audience: 'manufacturer' });
+
+  await user.click(screen.getByRole('button', { name: 'My Session' }));
+  expect(screen.getByText('battery powered product')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Delete local session data' }));
+  expect(screen.getByText('No local searches or checklist progress yet.')).toBeInTheDocument();
+});
+
+it('keeps product, licence, and HUID lookup results explicitly illustrative', async () => {
+  const lookups = [
+    ['#/consumers/verify-product', 'Verify product'],
+    ['#/consumers/verify-licence', 'Verify licence'],
+    ['#/consumers/verify-huid', 'Verify HUID'],
+  ] as const;
+
+  for (const [route, label] of lookups) {
+    cleanup();
+    window.location.hash = route;
+    render(<App />);
+    await screen.findByRole('status');
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(label), 'DEMO-100');
+    await user.click(screen.getByRole('button', { name: 'View details' }));
+    const result = screen.getAllByRole('status').at(-1);
+    expect(result).toHaveTextContent('Demo data — illustrative only');
+    expect(result).toHaveTextContent('has not verified');
+    expect(result?.textContent).not.toMatch(/BIS has verified|is an active licence|is a valid HUID/i);
   }
 });
 
