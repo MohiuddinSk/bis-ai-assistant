@@ -38,7 +38,7 @@ it('keeps a selected language and exposes the assistant view', async () => {
   await user.click(screen.getByRole('button', { name: 'सहायक' }));
   expect(screen.getByLabelText('भाषा')).toHaveValue('hi');
   expect(screen.getByRole('heading', { name: 'विश्वास से पूछें। साक्ष्य जाँचें।' })).toBeInTheDocument();
-  expect(screen.getByLabelText(/BIS खिलौना मानक/i)).toBeInTheDocument();
+  expect(screen.getByLabelText('उत्पाद, मानक या BIS प्रक्रिया के बारे में पूछें')).toBeInTheDocument();
 });
 
 it('preserves in-progress Wizard answers while visiting the Assistant', async () => {
@@ -68,7 +68,7 @@ it('opens Find a Standard without submitting a chat request', async () => {
 
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
   expect(screen.getByLabelText('I am a:')).toHaveValue('manufacturer');
-  expect(screen.getByLabelText('Ask a question about BIS toy standards')).toHaveFocus();
+  expect(screen.getByLabelText('Ask about a product, standard or BIS process')).toHaveFocus();
 });
 
 it('opens the Industry card as an editable Manufacturer journey without a chat request', async () => {
@@ -78,7 +78,7 @@ it('opens the Industry card as an editable Manufacturer journey without a chat r
 
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
   expect(screen.getByLabelText('I am a:')).toHaveValue('manufacturer');
-  expect(screen.getByLabelText('Ask a question about BIS toy standards')).toHaveFocus();
+  expect(screen.getByLabelText('Ask about a product, standard or BIS process')).toHaveFocus();
 });
 
 it('opens the Consumer card as an editable Consumer journey without a chat request', async () => {
@@ -88,7 +88,7 @@ it('opens the Consumer card as an editable Consumer journey without a chat reque
 
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
   expect(screen.getByLabelText('I am a:')).toHaveValue('consumer');
-  expect(screen.getByLabelText('Ask a question about BIS toy standards')).toHaveFocus();
+  expect(screen.getByLabelText('Ask about a product, standard or BIS process')).toHaveFocus();
 });
 
 it('submits the customer product wording as a Manufacturer and renders API evidence', async () => {
@@ -98,7 +98,7 @@ it('submits the customer product wording as a Manufacturer and renders API evide
   await screen.findByRole('status');
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'Find a Standard' }));
-  await user.type(screen.getByLabelText('Ask a question about BIS toy standards'), 'What standard applies to my wooden puzzle?{Enter}');
+  await user.type(screen.getByLabelText('Ask about a product, standard or BIS process'), 'What standard applies to my wooden puzzle?{Enter}');
 
   expect(await screen.findByText('Mocked product guidance from the backend.')).toBeInTheDocument();
   expect(screen.getByText('mocked-guidance.pdf')).toBeInTheDocument();
@@ -167,7 +167,7 @@ it('refreshes answers by language, caches variants, and ignores stale localizati
     return new Promise(resolve => { resolveMarathi = resolve; });
   });
   vi.stubGlobal('fetch', fetchMock); render(<App />); await openAssistant(); const user = userEvent.setup();
-  await user.type(screen.getByLabelText(/ask a question/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
   await user.selectOptions(screen.getByLabelText('Language'), 'hi');
   await user.selectOptions(screen.getByLabelText('भाषा'), 'mr');
   await act(async () => resolveMarathi(response({ ...answer, answer: 'मराठी उत्तर.' })));
@@ -186,7 +186,7 @@ it('retains the last verified answer when a language refresh fails', async () =>
     return JSON.parse(String(init?.body)).response_language === 'hi' ? Promise.reject(new Error('private backend body')) : Promise.resolve(response({ ...answer, answer: 'English answer.' }));
   });
   vi.stubGlobal('fetch', fetchMock); render(<App />); await openAssistant(); const user = userEvent.setup();
-  await user.type(screen.getByLabelText(/ask a question/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'Original question?{Enter}'); await screen.findByText('English answer.');
   await user.selectOptions(screen.getByLabelText('Language'), 'hi');
   await waitFor(() => expect(screen.getByText('English answer.')).toBeInTheDocument());
   expect(document.body).not.toHaveTextContent('private backend body');
@@ -260,7 +260,7 @@ it('submits typed questions with Enter and includes clarification context for a 
   vi.stubGlobal('fetch', fetchMock);
   render(<App />); await openAssistant();
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText(/ask a question/i), 'Explain the standard{Enter}');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'Explain the standard{Enter}');
   await user.click(await screen.findByRole('button', { name: 'IS 15644' }));
   expect(await screen.findByText(answer.answer)).toBeInTheDocument();
   const chatCall = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/chat')).at(-1);
@@ -269,13 +269,46 @@ it('submits typed questions with Enter and includes clarification context for a 
   expect(payload.assistant_context).toEqual(context);
 });
 
-it('reports ready, degraded, and unavailable health states', async () => {
+it('keeps health monitoring internal instead of displaying a public backend badge', async () => {
   for (const health of [{ status: 'ready' }, { status: 'degraded' }, null] as const) {
     cleanup();
     vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('health') ? health ? Promise.resolve(response(health)) : Promise.reject(new Error('offline')) : Promise.resolve(response(answer))));
     render(<App />);
-    expect(await screen.findByRole('status')).toHaveTextContent(health?.status ?? 'unavailable');
+    expect(await screen.findByRole('status')).toHaveAttribute('data-health', health?.status ?? 'unavailable');
+    expect(screen.queryByText(/Backend ready|Backend degraded|Backend unavailable/i)).toBeNull();
   }
+});
+
+it('opens Services without inventing a standard, then sends a deliberate evidence-backed search', async () => {
+  render(<App />);
+  await screen.findByRole('status');
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole('button', { name: 'Services' }));
+  expect(screen.getByRole('heading', { name: 'Choose a useful next step' })).toBeInTheDocument();
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+  expect(screen.getByText(/No local standard record is shown unless a live answer cites evidence/i)).toBeInTheDocument();
+
+  await user.type(screen.getByRole('textbox', { name: 'Product, keyword, or IS number' }), 'a toy safety question');
+  await user.click(screen.getByRole('button', { name: 'Search with Bandhu' }));
+  expect(await screen.findByText(answer.answer)).toBeInTheDocument();
+  const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => String(url).includes('/api/chat'));
+  expect(JSON.parse(String((call?.[1] as RequestInit).body))).toMatchObject({ question: 'a toy safety question', audience: 'general' });
+});
+
+it('keeps service searches on this device and deletes them on request', async () => {
+  render(<App />);
+  await screen.findByRole('status');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Services' }));
+  await user.type(screen.getByRole('textbox', { name: 'Product, keyword, or IS number' }), 'product term');
+  await user.click(screen.getByRole('button', { name: 'Search with Bandhu' }));
+  await screen.findByText(answer.answer);
+  await user.click(screen.getByRole('button', { name: 'Services' }));
+  expect(screen.getByRole('button', { name: 'product term' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Delete local session data' }));
+  expect(screen.getByText('Nothing has been saved on this device yet.')).toBeInTheDocument();
+  expect(localStorage.getItem('bis-bandhu-service-session')).toBeNull();
 });
 
 it('start over clears messages and retained Assistant context', async () => {
@@ -297,12 +330,12 @@ it('clears retained clarification context after leaving Assistant without cleari
   vi.stubGlobal('fetch', fetchMock);
   render(<App />); await openAssistant();
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText(/ask a question/i), 'Explain the standard{Enter}');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'Explain the standard{Enter}');
   await screen.findByText('Need more details', { selector: '.answer-status' });
   await user.click(screen.getByRole('button', { name: 'Home' }));
   await user.click(screen.getByRole('button', { name: 'Assistant' }));
   expect(screen.getByText('Which standard?')).toBeInTheDocument();
-  await user.type(screen.getByLabelText(/ask a question/i), 'What should I check before buying a toy?{Enter}');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'What should I check before buying a toy?{Enter}');
   const chatCall = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/chat')).at(-1);
   expect(chatCall).toBeDefined();
   const payload = JSON.parse(String((chatCall![1] as RequestInit).body));
@@ -317,12 +350,12 @@ it('clears retained context when the suggested Wizard action leaves Assistant', 
   vi.stubGlobal('fetch', fetchMock);
   render(<App />); await openAssistant();
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText(/ask a question/i), 'Explain the standard{Enter}');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'Explain the standard{Enter}');
   await user.click(await screen.findByRole('button', { name: 'Show my complete compliance roadmap' }));
   expect(screen.getByRole('heading', { name: 'Compliance Wizard' })).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Assistant' }));
   expect(screen.getByText('Which standard?')).toBeInTheDocument();
-  await user.type(screen.getByLabelText(/ask a question/i), 'What should I check before buying a toy?{Enter}');
+  await user.type(screen.getByLabelText(/ask about a product/i), 'What should I check before buying a toy?{Enter}');
   const chatCall = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/chat')).at(-1);
   expect(chatCall).toBeDefined();
   expect(JSON.parse(String((chatCall![1] as RequestInit).body))).not.toHaveProperty('assistant_context');
@@ -357,7 +390,7 @@ it('focuses the existing draft on audience navigation, exposes one active item, 
   render(<App />);
   await openAssistant();
   const user = userEvent.setup();
-  const question = screen.getByLabelText('Ask a question about BIS toy standards');
+  const question = screen.getByLabelText('Ask about a product, standard or BIS process');
 
   await user.type(question, 'My unfinished product question');
   await user.click(screen.getByRole('button', { name: 'Industry' }));
@@ -385,11 +418,11 @@ it('clears clarification context when changing audience without clearing visible
   await openAssistant();
   const user = userEvent.setup();
 
-  await user.type(screen.getByLabelText('Ask a question about BIS toy standards'), 'Explain the standard{Enter}');
+  await user.type(screen.getByLabelText('Ask about a product, standard or BIS process'), 'Explain the standard{Enter}');
   await screen.findByText('Which standard?');
   await user.selectOptions(screen.getByLabelText('I am a:'), 'consumer');
   expect(screen.getByText('Which standard?')).toBeInTheDocument();
-  await user.type(screen.getByLabelText('Ask a question about BIS toy standards'), 'What should I check before buying a toy?{Enter}');
+  await user.type(screen.getByLabelText('Ask about a product, standard or BIS process'), 'What should I check before buying a toy?{Enter}');
 
   const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat')).at(-1);
   const payload = JSON.parse(String((call?.[1] as RequestInit).body));

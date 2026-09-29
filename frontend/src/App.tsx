@@ -9,11 +9,12 @@ import { SuggestedQuestions } from './components/SuggestedQuestions';
 import { LoadingMessage } from './components/LoadingMessage';
 import { ErrorMessage } from './components/ErrorMessage';
 import { ComplianceWizard } from './components/ComplianceWizard';
+import { ServiceHub } from './components/ServiceHub';
 import { builtInSuggestedActions, normalizeSuggestedActions, questionForSuggestedAction } from './suggestedActions';
 import type { SuggestedAction } from './suggestedActions';
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
 import type { Language, TranslationKey } from './i18n/translations';
-type View='home'|'assistant'|'wizard';
+type View='home'|'assistant'|'wizard'|'services';
 type AssistantRequest={question:string;
 audience:Audience;
 assistantContext?:AssistantContext};
@@ -32,12 +33,15 @@ const consumerServiceLabel: Record<Language, string> = {
   ta: 'அதிகாரப்பூர்வ BIS நுகர்வோர் தகவல் ↗',
   bn: 'সরকারি BIS ভোক্তা তথ্য ↗',
 };
+const servicesNavigationLabel: Record<Language, string> = {
+  en: 'Services', hi: 'सेवाएँ', mr: 'सेवा', ta: 'சேவைகள்', bn: 'পরিষেবা',
+};
 const prototypeCoverage: Record<Language, string> = {
-  en: 'Prototype coverage currently focuses on indexed toy documents and processes; it does not cover every BIS service or standard.',
-  hi: 'यह प्रोटोटाइप अभी सूचीबद्ध खिलौना दस्तावेज़ों और प्रक्रियाओं पर केंद्रित है; यह हर BIS सेवा या मानक को कवर नहीं करता।',
-  mr: 'हा प्रोटोटाइप सध्या अनुक्रमित खेळणी दस्तऐवज आणि प्रक्रियांवर केंद्रित आहे; तो प्रत्येक BIS सेवा किंवा मानक समाविष्ट करत नाही.',
-  ta: 'இந்த முன்மாதிரி தற்போது குறியிடப்பட்ட பொம்மை ஆவணங்கள் மற்றும் செயல்முறைகளில் கவனம் செலுத்துகிறது; இது ஒவ்வொரு BIS சேவை அல்லது தரநிலையையும் உள்ளடக்காது.',
-  bn: 'এই প্রোটোটাইপটি বর্তমানে সূচিবদ্ধ খেলনা-সংক্রান্ত নথি ও প্রক্রিয়ার উপর কেন্দ্রীভূত; এটি প্রতিটি BIS পরিষেবা বা মানকে অন্তর্ভুক্ত করে না।',
+  en: 'Coverage is limited to the documents currently indexed for this prototype. BIS Bandhu does not claim to cover every Indian Standard or BIS service.',
+  hi: 'कवरेज इस प्रोटोटाइप में वर्तमान में सूचीबद्ध दस्तावेज़ों तक सीमित है। BIS Bandhu हर भारतीय मानक या BIS सेवा को कवर करने का दावा नहीं करता।',
+  mr: 'कव्हरेज या प्रोटोटाइपमध्ये सध्या अनुक्रमित दस्तऐवजांपुरते मर्यादित आहे. BIS Bandhu प्रत्येक भारतीय मानक किंवा BIS सेवा समाविष्ट करण्याचा दावा करत नाही.',
+  ta: 'இந்த முன்மாதிரியில் தற்போது குறியிடப்பட்ட ஆவணங்களுக்கே கவரேஜ் வரம்பிடப்பட்டுள்ளது. ஒவ்வொரு இந்தியத் தரநிலை அல்லது BIS சேவையையும் BIS Bandhu உள்ளடக்கும் என்று கூறவில்லை.',
+  bn: 'এই প্রোটোটাইপে বর্তমানে সূচিবদ্ধ নথিতেই কভারেজ সীমিত। BIS Bandhu প্রতিটি ভারতীয় মান বা BIS পরিষেবা অন্তর্ভুক্ত করার দাবি করে না।',
 };
 const independent=(q:string)=>/^(?:what|which|how|when|why|where|can|does|do|is|are|will|should)\b/i.test(q.trim());
 const followup=(q:string)=>/\b(?:this|that|the)\s+standards?\b|\bprimary standard\b|\bsimpler language\b|\bin simple(?:r)?(?:\s+words|\s+language)?\b|\bmore simply\b|\bafter identifying\b|\btell me about the is\b/i.test(q);
@@ -268,11 +272,13 @@ return <div className="app-shell">
 </a>
 <header className="site-header">
 <button className="brand" onClick={()=>go('home')}>
-<img className="brand-logo" src="/bis-logo.jpeg" alt="" />
+<img className="brand-logo" src="/bis-logo-transparent.png" alt="" />
 <span className="brand-copy"><strong>BIS Bandhu</strong><small>{t('shellTagline')}</small></span>
 </button>
 <nav className={menu?'open':''} aria-label={t('shellNavigation')}>
 <button aria-current={view==='home'?'page':undefined} onClick={()=>go('home')}>{t('shellNavHome')}
+</button>
+<button aria-current={view==='services'?'page':undefined} onClick={()=>go('services')}>{servicesNavigationLabel[language]}
 </button>
 <button aria-current={view==='assistant'&&audience==='general'?'page':undefined} onClick={()=>startAudience('general')}>{t('shellNavAssistant')}
 </button>
@@ -309,6 +315,7 @@ go('assistant')}} startAudienceJourney={startAudience}/>} {view==='assistant'&&<
 <ChatInput onSend={send} busy={busy} audience={audience} onAudienceChange={startAudience} autoFocus={findingStandard} inputRef={questionInput}/>{messages.length>0&&<button className="secondary reset-conversation" onClick={reset} disabled={busy}>{t('startOver')}
 </button>}
 </section>}
+{view==='services'&&<ServiceHub onAsk={(q,a)=>void send(q,undefined,q,a)} onWizard={()=>go('wizard')} onAudience={startAudience}/>}
 <section className="wizard-view" hidden={view!=='wizard'}>
 <div className="view-intro">
 <p className="eyebrow">{t('shellWizardKicker')}
