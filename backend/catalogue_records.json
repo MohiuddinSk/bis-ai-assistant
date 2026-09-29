@@ -10,5 +10,25 @@
     "provenance": "BIS Product Manual PM/IS 4151/3/Dec 2024, page 1",
     "evidence_filename": "PM_IS_4151_-Dec-24.pdf",
     "evidence_page": 1
+  },
+  {
+    "identifier": "IS 15644:2006",
+    "title": "Safety of Electric Toys",
+    "category": "Toys",
+    "edition_year": "2006",
+    "status": "Identifier and title listed by BIS; this metadata is not an applicability decision",
+    "official_url": "https://www.bis.gov.in/product-certification/products-under-compulsory-certification/scheme-1/?lang=en",
+    "retrieved_at": "2026-09-29",
+    "provenance": "BIS Scheme-I page, Electric Toys row, accessed 29 Sep 2026"
+  },
+  {
+    "identifier": "IS 9873 Part 1:2019",
+    "title": "Safety of toys: Part 1 safety aspects related to mechanical and physical properties (Fourth Revision)",
+    "category": "Toys",
+    "edition_year": "2019",
+    "status": "Identifier and title listed by BIS; this metadata is not an applicability decision",
+    "official_url": "https://www.bis.gov.in/is-9873-part-1-2019/?lang=en",
+    "retrieved_at": "2026-09-29",
+    "provenance": "BIS IS 9873 (Part 1):2019 page, accessed 29 Sep 2026"
   }
 ]

@@ -582,11 +582,20 @@ def understand_question(
                 "Check an exemption", "Understand a transition order", "Show my complete compliance roadmap",
             )
     elif intent == "standards" and power in {"unknown", "electric_unspecified"}:
-        missing.append("power_type")
-        if power == "electric_unspecified":
-            ambiguity.append("electric_power_source_unspecified")
-        clarification = "Is the toy battery-operated, mains-powered, or non-electric?"
-        suggestions = ("Battery-operated", "Mains-powered", "Non-electric")
+        if "toy" not in signals and "children_play" not in signals:
+            # An unrelated product must not inherit the toy-specific power
+            # question merely because the user asked for a standard.
+            clarification = (
+                "The indexed evidence is toy-focused and cannot establish a standard "
+                "for this product. Please use the official BIS standards search for "
+                "broader coverage, or provide an IS number for a source-limited question."
+            )
+        else:
+            missing.append("power_type")
+            if power == "electric_unspecified":
+                ambiguity.append("electric_power_source_unspecified")
+            clarification = "Is the toy battery-operated, mains-powered, or non-electric?"
+            suggestions = ("Battery-operated", "Mains-powered", "Non-electric")
     elif intent == "certification":
         # A general process question can safely use the selected partial
         # procedure facts. Keep structured clarification for personal cases.
