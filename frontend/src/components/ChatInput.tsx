@@ -36,7 +36,7 @@ export function ChatInput({
       <option value="manufacturer">{t('audienceManufacturer')}</option>
       <option value="consumer">{t('audienceConsumer')}</option>
     </select>
-    <label htmlFor="question">{t('questionLabel')}</label>
+    <label htmlFor="question">{t('shellSearchLabel')}</label>
     <textarea
       ref={inputRef}
       id="question"

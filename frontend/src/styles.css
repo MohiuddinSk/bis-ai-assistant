@@ -68,6 +68,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   left:-10000px;
   z-index:99
 }
+.visually-hidden{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0
+}
 .skip-link:focus{
   left:10px;
   top:10px;
@@ -352,6 +363,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 }
 .hero-search>div{
   display:flex;
+  align-items:flex-start;
+  gap:8px;
   padding:5px;
   border:1px solid var(--line);
   border-radius:9px;
@@ -364,6 +377,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   padding:10px;
   outline:0;
   background:transparent
+}
+.hero-search .speech-input{
+  flex:0 1 150px;
+  flex-wrap:wrap;
+  align-items:flex-start
+}
+.hero-search .speech-status{
+  flex-basis:100%;
+  padding-inline:2px
 }
 .speech-input{
   display:flex;
@@ -864,6 +886,11 @@ footer b{
   .intent-section,.assistant-view,.wizard-view{
     padding:52px 18px
   }
+  .service-hub{padding:52px 18px}
+  .service-grid{grid-template-columns:1fr}
+  .service-card-wide{grid-column:auto}
+  .service-search{flex-direction:column}
+  .service-search button{width:100%}
   .intent-grid{
     grid-template-columns:1fr
   }
@@ -878,7 +905,9 @@ footer b{
   }
   .hero-search .speech-input{
     align-items:flex-start;
-    flex-direction:column
+    flex-basis:auto;
+    flex-direction:column;
+    width:100%
   }
   .composer-actions{
     align-items:stretch;
@@ -976,10 +1005,60 @@ footer b{
   width:min(100%,900px);
   margin-inline:auto
 }
+.service-hub{
+  width:min(100%,1120px);
+  margin-inline:auto;
+  padding:72px 24px
+}
+.service-hub .view-intro{
+  width:min(100%,900px)
+}
+.service-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+  margin-top:28px
+}
+.service-card{
+  display:flex;
+  min-width:0;
+  min-height:210px;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:12px;
+  padding:22px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--color-surface-raised);
+  color:var(--ink)
+}
+.service-card-wide{grid-column:span 2}
+.service-card h2,.service-card h3{margin:0;color:var(--deep)}
+.service-card h3{font-size:.9rem;color:var(--muted)}
+.service-card p{margin:0;color:var(--muted);line-height:1.55}
+.service-card form{width:100%}
+.service-card label{display:block;margin-bottom:6px;font-size:.86rem;font-weight:800;color:var(--deep)}
+.service-search{display:flex;gap:8px;min-width:0}
+.service-search input{min-width:0;flex:1;border:1px solid var(--line);border-radius:7px;background:var(--color-surface);color:var(--ink);padding:10px}
+.service-search button,.service-card>button{border:1px solid var(--blue);border-radius:7px;background:var(--filled-control);color:var(--filled-control-text);padding:10px 13px;font-weight:800}
+.service-card>button.secondary{border-color:var(--line);background:transparent!important;color:var(--link)!important}
+.service-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.evidence-limited{padding:9px 10px;border-left:3px solid var(--saffron);background:var(--color-surface-inset);font-size:.86rem}
+.check-item{display:flex!important;align-items:center;gap:8px;margin:0!important;color:var(--ink)!important;font-weight:600!important}
+.check-item input{inline-size:18px;block-size:18px;accent-color:var(--filled-control)}
+.session-list{display:grid;gap:5px;width:100%;margin:0;padding:0;list-style:none}
+.text-action{padding:0;border:0;background:transparent;color:var(--link);font:inherit;font-weight:700;text-align:left;text-decoration:underline;text-underline-offset:3px}
 .wizard-view .view-intro,
 .assistant-view .view-intro{
   width:min(100%,900px);
   margin-inline:auto
+}
+@media(max-width:760px){
+  .service-hub{padding:52px 18px}
+  .service-grid{grid-template-columns:1fr}
+  .service-card-wide{grid-column:auto}
+  .service-search{flex-direction:column}
+  .service-search button{width:100%}
 }
 
 /* The screen palette is token driven; the printed report is deliberately paper-light. */
@@ -1086,6 +1165,18 @@ footer b{
   color:var(--color-link);
   border-color:var(--color-border)
 }
+[data-theme='dark'] .service-card,
+[data-theme='dark'] .service-search input{
+  background:var(--color-surface-raised);
+  color:var(--color-text);
+  border-color:var(--color-border)
+}
+[data-theme='dark'] .service-card h2,
+[data-theme='dark'] .service-card label,
+[data-theme='dark'] .check-item{
+  color:var(--color-heading)!important
+}
+[data-theme='dark'] .evidence-limited{background:var(--color-surface-inset)}
 [data-theme='dark'] .source-page-chips a:hover{
   background:var(--color-surface-inset);
   border-color:var(--color-link)
@@ -1114,7 +1205,7 @@ footer b{
   .brand strong{font-size:1rem}
   .brand small{font-size:.56rem}
   .theme-toggle{gap:4px;padding-inline:7px;font-size:.7rem}
-  .bandhu-hero,.evidence-journey,.intent-section,.assistant-view,.wizard-view{padding-inline:14px}
+  .bandhu-hero,.evidence-journey,.intent-section,.assistant-view,.wizard-view,.service-hub{padding-inline:14px}
   .wizard-actions,.result-actions{align-items:stretch}
   .wizard-actions button,.result-actions button{width:100%}
   .wizard-review,.journey-category,.compliance-passport{padding:12px}
