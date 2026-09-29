@@ -9,12 +9,25 @@ import { SuggestedQuestions } from './components/SuggestedQuestions';
 import { LoadingMessage } from './components/LoadingMessage';
 import { ErrorMessage } from './components/ErrorMessage';
 import { ComplianceWizard } from './components/ComplianceWizard';
-import { ServiceHub } from './components/ServiceHub';
+import { ReferencePages } from './components/ReferencePages';
+import type { ReferencePage } from './components/ReferencePages';
 import { builtInSuggestedActions, normalizeSuggestedActions, questionForSuggestedAction } from './suggestedActions';
 import type { SuggestedAction } from './suggestedActions';
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
 import type { Language, TranslationKey } from './i18n/translations';
-type View='home'|'assistant'|'wizard'|'services';
+type View = 'home' | 'assistant' | 'wizard' | ReferencePage;
+const routeForView: Record<View, string> = {
+  home: '/', assistant: '/assistant', wizard: '/industry/compliance-wizard', services: '/services',
+  standards: '/standards', 'standard-detail': '/standards/demo-detail', compare: '/standards/compare',
+  finder: '/industry/finder', applicability: '/industry/applicability', 'certification-guide': '/industry/certification-guide',
+  'certification-journey': '/industry/certification-journey', checklist: '/industry/checklist', labs: '/industry/labs', 'lab-detail': '/industry/labs/demo-detail',
+  consumers: '/consumers', 'verify-product': '/consumers/verify-product', 'verify-licence': '/consumers/verify-licence', 'verify-huid': '/consumers/verify-huid',
+  complaints: '/consumers/complaints', hallmarking: '/consumers/hallmarking', help: '/help', 'how-it-works': '/help/how-it-works', session: '/session',
+};
+const viewForRoute = (): View => {
+  const route = window.location.hash.replace(/^#/, '') || '/';
+  return (Object.entries(routeForView).find(([, path]) => path === route)?.[0] as View | undefined) ?? 'home';
+};
 type AssistantRequest={question:string;
 audience:Audience;
 assistantContext?:AssistantContext};
@@ -35,6 +48,13 @@ const consumerServiceLabel: Record<Language, string> = {
 };
 const servicesNavigationLabel: Record<Language, string> = {
   en: 'Services', hi: 'सेवाएँ', mr: 'सेवा', ta: 'சேவைகள்', bn: 'পরিষেবা',
+};
+const referenceNavigation: Record<Language, Record<'standards'|'session'|'help'|'search'|'compare'|'finder'|'applicability'|'guide'|'journey'|'checklist'|'labs'|'consumerHub'|'verifyProduct'|'verifyLicence'|'verifyHuid'|'complaints'|'hallmarking', string>> = {
+  en:{standards:'Standards',session:'My Session',help:'Help',search:'Search standards',compare:'Compare standards',finder:'Product → Standard Finder',applicability:'Applicability Checker',guide:'Certification Guide',journey:'Certification Journey',checklist:'Document Checklist',labs:'Testing Laboratories',consumerHub:'Consumer hub',verifyProduct:'Verify product',verifyLicence:'Verify licence',verifyHuid:'Verify HUID',complaints:'Complaints',hallmarking:'Hallmarking'},
+  hi:{standards:'मानक',session:'मेरा सत्र',help:'सहायता',search:'मानक खोजें',compare:'मानकों की तुलना करें',finder:'उत्पाद → मानक खोजक',applicability:'लागू होने की जाँच',guide:'प्रमाणन मार्गदर्शिका',journey:'प्रमाणन यात्रा',checklist:'दस्तावेज़ सूची',labs:'परीक्षण प्रयोगशालाएँ',consumerHub:'उपभोक्ता केंद्र',verifyProduct:'उत्पाद सत्यापित करें',verifyLicence:'लाइसेंस सत्यापित करें',verifyHuid:'HUID सत्यापित करें',complaints:'शिकायतें',hallmarking:'हॉलमार्किंग जानकारी'},
+  mr:{standards:'मानके',session:'माझे सत्र',help:'मदत',search:'मानके शोधा',compare:'मानकांची तुलना करा',finder:'उत्पादन → मानक शोधक',applicability:'लागूपणा तपासक',guide:'प्रमाणन मार्गदर्शक',journey:'प्रमाणन प्रवास',checklist:'दस्तऐवज सूची',labs:'चाचणी प्रयोगशाळा',consumerHub:'ग्राहक केंद्र',verifyProduct:'उत्पादन तपासा',verifyLicence:'परवाना तपासा',verifyHuid:'HUID तपासा',complaints:'तक्रारी',hallmarking:'हॉलमार्किंग माहिती'},
+  ta:{standards:'தரநிலைகள்',session:'என் அமர்வு',help:'உதவி',search:'தரநிலைகளைத் தேடுக',compare:'தரநிலைகளை ஒப்பிடுக',finder:'தயாரிப்பு → தரநிலை கண்டறிதல்',applicability:'பொருந்துதல் சரிபார்ப்பு',guide:'சான்றிதழ் வழிகாட்டி',journey:'சான்றிதழ் பயணம்',checklist:'ஆவணப் பட்டியல்',labs:'சோதனை ஆய்வகங்கள்',consumerHub:'நுகர்வோர் மையம்',verifyProduct:'தயாரிப்பைச் சரிபார்க்கவும்',verifyLicence:'உரிமத்தைச் சரிபார்க்கவும்',verifyHuid:'HUID-ஐச் சரிபார்க்கவும்',complaints:'புகார்கள்',hallmarking:'ஹால்மார்க்கிங் தகவல்'},
+  bn:{standards:'মান',session:'আমার সেশন',help:'সহায়তা',search:'মান খুঁজুন',compare:'মান তুলনা করুন',finder:'পণ্য → মান অনুসন্ধান',applicability:'প্রযোজ্যতা পরীক্ষক',guide:'সার্টিফিকেশন নির্দেশিকা',journey:'সার্টিফিকেশন যাত্রা',checklist:'নথির তালিকা',labs:'পরীক্ষা পরীক্ষাগার',consumerHub:'ভোক্তা কেন্দ্র',verifyProduct:'পণ্য যাচাই করুন',verifyLicence:'লাইসেন্স যাচাই করুন',verifyHuid:'HUID যাচাই করুন',complaints:'অভিযোগ',hallmarking:'হলমার্কিং তথ্য'},
 };
 const prototypeCoverage: Record<Language, string> = {
   en: 'Coverage is limited to the documents currently indexed for this prototype. BIS Bandhu does not claim to cover every Indian Standard or BIS service.',
@@ -165,8 +185,10 @@ return <>
   </>;
 }
 function AppContent(){const{t,language}=useLanguage();
-const[view,setView]=useState<View>('home');
+const navCopy=referenceNavigation[language];
+const[view,setView]=useState<View>(viewForRoute);
 const[menu,setMenu]=useState(false);
+const[openGroup,setOpenGroup]=useState<'standards'|'industry'|'consumers'|null>(null);
 const[messages,setMessages]=useState<Message[]>([]);
 const[busy,setBusy]=useState(false);
 const[error,setError]=useState('');
@@ -186,6 +208,9 @@ void getHealth(c.signal).then(x=>!c.signal.aborted&&setStatus(x.status==='ready'
 return()=>c.abort()},[]);
 useEffect(()=>{end.current?.scrollIntoView({behavior:'smooth'})},[messages,busy]);
 useEffect(()=>{document.getElementById('main-content')?.scrollIntoView({behavior:'smooth',block:'start'})},[view]);
+useEffect(()=>{const onHashChange=()=>setView(viewForRoute());
+window.addEventListener('hashchange',onHashChange);
+return()=>window.removeEventListener('hashchange',onHashChange)},[]);
 useEffect(()=>()=>{chatAbort.current?.abort();
 localeAbort.current?.abort()},[]);
 useEffect(()=>{document.documentElement.dataset.theme=theme},[theme]);
@@ -215,7 +240,7 @@ setMessages(all=>all.map(x=>x.id===m.id&&x.role==='assistant'?{...x,text:r.answe
 return()=>c.abort()},[language]);
 const send=async(q:string,supplied?:AssistantContext,display=q,forced?:Audience)=>{if(busy||pendingRequest.current)return;
 setFindingStandard(false);
-setView('assistant');
+go('assistant');
 pendingRequest.current=true;
 const continuing=!!pending&&!independent(q),context=supplied??(continuing?pending??undefined:session&&followup(q)?session:undefined),active=forced??audience;
 if(forced)setAudience(forced);
@@ -253,8 +278,10 @@ const doAction=(a:SuggestedAction,c?:AssistantContext)=>{if(a.kind==='open_compl
 return}const q=questionForSuggestedAction(a);
 if(q)void send(q,c,a.label)};
 const go=(v:View)=>{if(view==='assistant'&&v!=='assistant'){setPending(null);
-setSession(undefined)}setView(v);
-setMenu(false)};
+setSession(undefined)}if(window.location.hash!==`#${routeForView[v]}`)window.location.hash=routeForView[v];
+setView(v);
+setMenu(false);
+setOpenGroup(null)};
 const startAudience=(selectedAudience:Audience)=>{
 if(selectedAudience!==audience){
 setPending(null);
@@ -272,22 +299,21 @@ return <div className="app-shell">
 </a>
 <header className="site-header">
 <button className="brand" onClick={()=>go('home')}>
-<img className="brand-logo" src="/bis-logo-transparent.png" alt="" />
+<img className="brand-logo" src={theme==='dark'?'/bis-logo-dark.png':'/bis-logo-transparent.png'} alt="" />
 <span className="brand-copy"><strong>BIS Bandhu</strong><small>{t('shellTagline')}</small></span>
 </button>
-<nav className={menu?'open':''} aria-label={t('shellNavigation')}>
+<nav className={menu?'open reference-nav-open':''} aria-label={t('shellNavigation')}>
 <button aria-current={view==='home'?'page':undefined} onClick={()=>go('home')}>{t('shellNavHome')}
-</button>
-<button aria-current={view==='services'?'page':undefined} onClick={()=>go('services')}>{servicesNavigationLabel[language]}
 </button>
 <button aria-current={view==='assistant'&&audience==='general'?'page':undefined} onClick={()=>startAudience('general')}>{t('shellNavAssistant')}
 </button>
-<button aria-current={view==='assistant'&&audience==='manufacturer'?'page':undefined} onClick={()=>startAudience('manufacturer')}>{t('shellNavIndustry')}
-</button>
-<button aria-current={view==='assistant'&&audience==='consumer'?'page':undefined} onClick={()=>startAudience('consumer')}>{t('shellNavConsumers')}
-</button>
-<button aria-current={view==='wizard'?'page':undefined} onClick={()=>go('wizard')}>{t('shellNavWizard')}
-</button>
+<div className="nav-group"><button aria-expanded={openGroup==='standards'} aria-current={['standards','standard-detail','compare'].includes(view)?'page':undefined} onClick={()=>setOpenGroup(openGroup==='standards'?null:'standards')}>{navCopy.standards}</button>{openGroup==='standards'&&<div className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('standards')}>{navCopy.search}</button><button role="menuitem" onClick={()=>go('compare')}>{navCopy.compare}</button></div>}</div>
+<div className="nav-group"><button aria-expanded={openGroup==='industry'} aria-current={view==='assistant'&&audience==='manufacturer'?'page':undefined} onClick={()=>{startAudience('manufacturer');setOpenGroup(openGroup==='industry'?null:'industry')}}>{t('shellNavIndustry')}</button>{openGroup==='industry'&&<div className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('finder')}>{navCopy.finder}</button><button role="menuitem" onClick={()=>go('applicability')}>{navCopy.applicability}</button><button role="menuitem" onClick={()=>go('certification-guide')}>{navCopy.guide}</button><button role="menuitem" onClick={()=>go('certification-journey')}>{navCopy.journey}</button><button role="menuitem" onClick={()=>go('checklist')}>{navCopy.checklist}</button><button role="menuitem" onClick={()=>go('labs')}>{navCopy.labs}</button><button role="menuitem" onClick={()=>go('wizard')}>{t('shellNavWizard')}</button></div>}</div>
+<div className="nav-group"><button aria-expanded={openGroup==='consumers'} aria-current={view==='assistant'&&audience==='consumer'?'page':undefined} onClick={()=>{startAudience('consumer');setOpenGroup(openGroup==='consumers'?null:'consumers')}}>{t('shellNavConsumers')}</button>{openGroup==='consumers'&&<div className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('consumers')}>{navCopy.consumerHub}</button><button role="menuitem" onClick={()=>go('verify-product')}>{navCopy.verifyProduct}</button><button role="menuitem" onClick={()=>go('verify-licence')}>{navCopy.verifyLicence}</button><button role="menuitem" onClick={()=>go('verify-huid')}>{navCopy.verifyHuid}</button><button role="menuitem" onClick={()=>go('complaints')}>{navCopy.complaints}</button><button role="menuitem" onClick={()=>go('hallmarking')}>{navCopy.hallmarking}</button></div>}</div>
+<button aria-current={view==='services'?'page':undefined} onClick={()=>go('services')}>{servicesNavigationLabel[language]}</button>
+<button onClick={()=>go('session')}>{navCopy.session}</button>
+<button onClick={()=>go('help')}>{navCopy.help}</button>
+<button aria-current={view==='wizard'?'page':undefined} onClick={()=>go('wizard')}>{t('shellNavWizard')}</button>
 </nav>
 <div className="header-tools">
 <ChatHeader status={status}/>
@@ -315,7 +341,9 @@ go('assistant')}} startAudienceJourney={startAudience}/>} {view==='assistant'&&<
 <ChatInput onSend={send} busy={busy} audience={audience} onAudienceChange={startAudience} autoFocus={findingStandard} inputRef={questionInput}/>{messages.length>0&&<button className="secondary reset-conversation" onClick={reset} disabled={busy}>{t('startOver')}
 </button>}
 </section>}
-{view==='services'&&<ServiceHub onAsk={(q,a)=>void send(q,undefined,q,a)} onWizard={()=>go('wizard')} onAudience={startAudience}/>}
+{!['home','assistant','wizard'].includes(view) && (
+  <ReferencePages page={view as ReferencePage} navigate={(page) => go(page)} ask={(q, a) => void send(q, undefined, q, a)} openWizard={() => go('wizard')} openAudience={startAudience}/>
+)}
 <section className="wizard-view" hidden={view!=='wizard'}>
 <div className="view-intro">
 <p className="eyebrow">{t('shellWizardKicker')}
