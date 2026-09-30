@@ -1256,3 +1256,37 @@ footer b{
 @media (max-width:1150px){.site-header{gap:10px;flex-wrap:wrap}.site-header nav{display:none;order:3;width:100%;margin:0}.site-header nav.open{display:flex;flex-direction:column;align-items:stretch}.site-header nav>button,.site-header nav .nav-group>button:first-child{text-align:left}.site-header nav .nav-group{width:100%}.site-header nav .nav-group>button:first-child{flex:1}.site-header nav .nav-popover{position:static;width:100%;min-width:0;margin:4px 0 8px;box-shadow:none}.menu-toggle{display:block}.header-tools{margin-left:auto}}
 @media (max-width:760px){.site-header nav .nav-group{display:grid;grid-template-columns:minmax(0,1fr) 32px}.site-header nav .nav-group>.nav-chevron{grid-column:2;grid-row:1}.site-header nav .nav-group>button:first-child{grid-column:1;grid-row:1;width:100%}.site-header nav .nav-popover{grid-column:1/-1;grid-row:2}.demo-examples{align-items:stretch}.demo-examples>span{flex-basis:100%}.demo-examples button{max-width:100%;white-space:normal}.certification-journey li{grid-template-columns:34px minmax(0,1fr);gap:11px;padding:15px}.journey-number{width:34px;height:34px;font-size:.76rem}}
 @media (max-width:360px){.brand-copy strong{white-space:nowrap}.brand-copy small{display:none}.bandhu-hero{gap:24px;padding-block:32px}.bandhu-hero h1{font-size:2.15rem;line-height:1.06}.hero-lead{font-size:.97rem;line-height:1.5}.hero-actions{gap:8px;margin-top:18px}.hero-actions button{padding:9px 10px;font-size:.85rem}.prototype-scope{font-size:.8rem;line-height:1.45}}
+
+/* Conversation: messages carry their own surfaces, without a redundant outer card. */
+.assistant-view .chat,
+[data-theme='dark'] .assistant-view .chat{
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  padding:0;
+}
+.assistant-view .message{max-width:min(92%,760px);margin:18px 0;padding:18px 20px;overflow-wrap:anywhere}
+.assistant-view .message.user{max-width:min(82%,620px);border-radius:18px 18px 4px 18px}
+.assistant-view .message.assistant{border-radius:4px 18px 18px 18px;box-shadow:0 8px 22px color-mix(in srgb,var(--color-primary) 5%,transparent)}
+.assistant-view .input-wrap{position:relative;z-index:1}
+.assistant-view .reset-row{width:min(100%,900px);margin:14px auto 0}
+.assistant-view .reset-conversation{margin:0}
+.assistant-view .citation-list{gap:12px}
+.assistant-view .citation-card{min-width:0}
+.assistant-view .answer-update,.assistant-view .loading-message,.assistant-view .error-message{max-width:760px;margin:18px 0}
+
+/* Official-source snapshots and format-only HUID assistance. */
+.lab-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:980px;margin:0 auto}
+.lab-results .reference-card{align-items:stretch}
+.lab-results .reference-card h2{overflow-wrap:anywhere}
+.lab-results .official-service-link{align-self:flex-start;margin-top:auto}
+.lab-facts{display:grid;gap:0;margin:8px 0 18px}
+.lab-facts>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--color-border)}
+.lab-facts dt{color:var(--color-text-muted)}
+.lab-facts dd{margin:0;color:var(--color-heading);font-weight:800;text-align:right}
+.hallmark-page .reference-copy,.lab-page .reference-copy{max-width:820px;margin:14px auto;color:var(--color-text-muted);line-height:1.6}
+.hallmark-page .reference-limit{margin-bottom:24px}
+.huid-format{max-width:820px;margin:0 auto 20px;padding:14px 16px;border-left:4px solid var(--color-saffron);border-radius:8px;background:var(--status-caution-bg);color:var(--status-caution-text);font-weight:700}
+.lab-page .reference-actions,.hallmark-page .reference-actions{max-width:820px;margin-inline:auto}
+@media(max-width:700px){.lab-results{grid-template-columns:1fr}.assistant-view .message{max-width:100%;padding:15px}.assistant-view .message.user{max-width:90%}.lab-facts>div{flex-direction:column;gap:3px}.lab-facts dd{text-align:left}}
