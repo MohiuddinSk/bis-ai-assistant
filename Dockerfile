@@ -39,6 +39,9 @@ COPY data/chroma ./data/chroma
 COPY data/processed/generated_v4 ./data/processed/generated_v4
 COPY data/processed/hallmarking_candidate_v1 ./data/processed/hallmarking_candidate_v1
 COPY data/chroma_v4_01346f7d11f1 ./data/chroma_v4_01346f7d11f1
+COPY data/reference/bis_directories/standards.json.gz ./data/reference/bis_directories/standards.json.gz
+COPY data/reference/bis_directories/laboratories.json.gz ./data/reference/bis_directories/laboratories.json.gz
+COPY data/reference/bis_directories/import_report.json ./data/reference/bis_directories/import_report.json
 
 RUN groupadd --gid 10001 bis \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin bis \

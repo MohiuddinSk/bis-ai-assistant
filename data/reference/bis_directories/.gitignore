@@ -1,0 +1,4 @@
+# Keep source exports and HTML caches locally for provenance/reimport.
+# They are not runtime inputs or default commit candidates.
+raw/
+*.xlsx

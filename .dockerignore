@@ -2,6 +2,8 @@
 .git
 .github
 venv
+.venv
+.venv*/
 venv311
 venv311_broken_*
 **/__pycache__
@@ -21,6 +23,8 @@ data/processed/generated_v2
 data/processed/*.json
 data/processed/*.jsonl
 data/processed/*.md
+data/reference/bis_directories/raw
+data/reference/bis_directories/*.xlsx
 !data/processed/generated_v3/
 !data/processed/generated_v3/**
 !data/processed/generated_v4/

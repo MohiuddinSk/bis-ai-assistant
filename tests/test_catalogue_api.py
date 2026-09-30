@@ -14,9 +14,13 @@ class CatalogueApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["record_count"], 3)
-        self.assertTrue(body["coverage_note"].startswith("Only locally verified"))
-        self.assertEqual(body["results"], [{
+        self.assertGreaterEqual(body["record_count"], 23813)
+        self.assertEqual(body["total_matches"], 1)
+        self.assertIn("metadata", body["coverage_note"])
+        self.assertEqual([{key: value for key, value in row.items() if key in {
+            "identifier", "title", "category", "edition_year", "status", "official_url",
+            "retrieved_at", "provenance", "evidence_filename", "evidence_page",
+        }} for row in body["results"]], [{
             "identifier": "IS 4151:2015",
             "title": "Protective Helmet for Two Wheeler Riders",
             "category": "Helmet",
@@ -49,17 +53,36 @@ class CatalogueApiTests(unittest.TestCase):
             helmet = client.get("/api/catalogue/standards", params={"q": "helmet"})
             unknown = client.get("/api/catalogue/standards", params={"q": "pressure cooker"})
 
-        self.assertEqual([row["identifier"] for row in helmet.json()["results"]], ["IS 4151:2015"])
-        self.assertEqual(unknown.json()["results"], [])
+        self.assertIn("IS 4151:2015", [row["identifier"] for row in helmet.json()["results"]])
+        self.assertGreater(helmet.json()["total_matches"], 1)
+        self.assertGreaterEqual(unknown.json()["total_matches"], 1)
+        self.assertTrue(all("pressure" in row["title"].casefold() or "cooker" in row["title"].casefold()
+                            for row in unknown.json()["results"]))
 
     def test_pagination_and_invalid_page_are_explicit(self):
         with TestClient(create_app()) as client:
             second_page = client.get("/api/catalogue/standards", params={"page": 4, "page_size": 1})
+            far_page = client.get("/api/catalogue/standards", params={"page": 999999, "page_size": 1})
             invalid_page = client.get("/api/catalogue/standards", params={"page": 0})
 
         self.assertEqual(second_page.status_code, 200)
-        self.assertEqual(second_page.json()["results"], [])
+        self.assertEqual(len(second_page.json()["results"]), 1)
+        self.assertEqual(second_page.json()["total_matches"], second_page.json()["record_count"])
+        self.assertEqual(far_page.json()["results"], [])
         self.assertEqual(invalid_page.status_code, 422)
+
+    def test_part_section_year_title_and_source_category_search(self):
+        with TestClient(create_app()) as client:
+            part = client.get("/api/catalogue/standards", params={"q": "IS 302 Part 2 Sec 24:2026"})
+            keyword = client.get("/api/catalogue/standards", params={"q": "Forensic Sciences Vocabulary"})
+            filtered = client.get("/api/catalogue/standards", params={"category": "Terminology", "page_size": 2})
+        self.assertEqual(part.json()["results"][0]["identifier"], "IS 302 (Part 2/Sec 24):2026")
+        self.assertEqual(part.json()["results"][0]["part"], "2")
+        self.assertEqual(part.json()["results"][0]["section"], "24")
+        self.assertEqual(keyword.json()["results"][0]["identifier"], "IS 17742 (Part 1):2026")
+        self.assertEqual(len(filtered.json()["results"]), 2)
+        self.assertGreater(filtered.json()["total_matches"], 2)
+        self.assertTrue(all(row["category"] == "Terminology" for row in filtered.json()["results"]))
 
     def test_detail_is_normalized_and_unknown_is_not_found(self):
         with TestClient(create_app()) as client:

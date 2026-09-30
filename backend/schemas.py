@@ -123,12 +123,74 @@ class CatalogueStandard(BaseModel):
     provenance: str
     evidence_filename: str | None = None
     evidence_page: int | None = None
+    part: str | None = None
+    section: str | None = None
+    source_publication_date: str | None = None
+    official_detail_url: str | None = None
+    source_row: int | None = None
 
 
 class CatalogueSearchResponse(BaseModel):
     query: str
     results: list[CatalogueStandard]
     record_count: int
+    last_updated: str | None = None
+    coverage_note: str
+    total_matches: int = 0
+    page: int = 1
+    page_size: int = 20
+    categories: list[str] = []
+
+
+class Laboratory(BaseModel):
+    id: str
+    code: str | None = None
+    name: str
+    location: str | None = None
+    state: str | None = None
+    official_url: str
+    directory_valid_until: str | None = None
+    recognition_status: str | None = None
+    lab_type: str | None = None
+    retrieved_at: str
+    provenance: str
+
+
+class LaboratoryCapability(BaseModel):
+    id: str
+    laboratory_id: str
+    standard_identifier: str
+    product_title: str | None = None
+    grade_type: str | None = None
+    testing_facility: str | None = None
+    exclusions: str | None = None
+    scope_valid_until: str | None = None
+    search_validity_date: str | None = None
+    charge_amount: str | None = None
+    charge_currency: str | None = None
+    charge_basis: str | None = None
+    tax_treatment: str | None = None
+    charge_note: str | None = None
+    effective_date: str | None = None
+    remarks: str | None = None
+    source_url: str
+    retrieved_at: str
+    provenance: str
+
+
+class LaboratoryResult(BaseModel):
+    laboratory: Laboratory
+    capabilities: list[LaboratoryCapability]
+
+
+class LaboratorySearchResponse(BaseModel):
+    query: str
+    results: list[LaboratoryResult]
+    laboratory_count: int
+    capability_count: int
+    total_matches: int
+    page: int
+    page_size: int
     last_updated: str | None = None
     coverage_note: str
 

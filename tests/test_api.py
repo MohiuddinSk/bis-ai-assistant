@@ -315,7 +315,7 @@ class VersionedApiTests(unittest.TestCase):
     def test_openapi_lists_aliases_with_unique_operation_ids(self):
         with self.client() as client:
             paths = client.get("/openapi.json").json()["paths"]
-        expected = {"/health", "/api/v1/health", "/api/retrieve", "/api/v1/retrieve", "/api/chat", "/api/v1/chat", "/api/compliance/guide", "/api/v1/compliance/guide", "/api/catalogue/standards", "/api/v1/catalogue/standards", "/api/catalogue/standards/{identifier}", "/api/v1/catalogue/standards/{identifier}", "/api/documents/{source_filename}", "/api/v1/documents/{source_filename}"}
+        expected = {"/health", "/api/v1/health", "/api/retrieve", "/api/v1/retrieve", "/api/chat", "/api/v1/chat", "/api/compliance/guide", "/api/v1/compliance/guide", "/api/catalogue/standards", "/api/v1/catalogue/standards", "/api/catalogue/standards/{identifier}", "/api/v1/catalogue/standards/{identifier}", "/api/laboratories", "/api/v1/laboratories", "/api/laboratories/{lab_id}", "/api/v1/laboratories/{lab_id}", "/api/documents/{source_filename}", "/api/v1/documents/{source_filename}"}
         self.assertTrue(expected <= set(paths))
         self.assertFalse({"/api/v1/standards/explain", "/api/v1/sources/{source_id}", "/api/v1/documents/{document_id}"} & set(paths))
         operation_ids = [operation["operationId"] for path in paths.values() for operation in path.values() if isinstance(operation, dict) and "operationId" in operation]

@@ -1,5 +1,7 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { searchLaboratories } from '../services/api';
+import type { LaboratoryResult, LaboratorySearchResponse } from '../types/catalogue';
 import { SpeechInput } from './SpeechInput';
 import type { Audience } from '../types/chat';
 
@@ -9,22 +11,6 @@ const BIS_CARE = 'https://www.bis.gov.in/bis-apps/?lang=en';
 const BIS_JEWELLERS = 'https://www.bis.gov.in/hallmarking-overview/jewellers-registration-scheme/?lang=en';
 const BIS_CENTRES = 'https://www.bis.gov.in/hallmarking-overview/hallmarking-centre/?lang=en';
 const BIS_COMPLAINTS = 'https://www.bis.gov.in/consumer-overview/online-complaint-registration/?lang=en';
-
-/** Small, dated observations from BIS LIMS; this is not a live or complete laboratory feed. */
-export const checkedLabs = [
-  {
-    name: 'PRESTO LABORATORIES PRIVATE LIMITED', location: 'Faridabad, Haryana', code: '8199006',
-    standard: 'IS 4151:2015', product: 'Protective helmets for motorcycle riders',
-    scope: 'All', validUntil: '21 Aug 2029', charge: '₹14,000',
-    source: 'https://lims.bis.gov.in/home/search_is_number/?is_number__doc_no=4151',
-  },
-  {
-    name: 'Testtex India Laboratories Private Limited, Noida', location: 'Noida, Uttar Pradesh', code: '8138306',
-    standard: 'IS 15644:2006', product: 'Safety of electric toys',
-    scope: 'All', validUntil: '31 Dec 2029', charge: '₹13,500',
-    source: 'https://lims.bis.gov.in/home/search_is_number/?is_number__doc_no=15644',
-  },
-] as const;
 
 const copy = {
   en: { labs:'Testing laboratories', labsLead:'Find a starting point, then confirm the current recognition, exact test scope and price in BIS LIMS before contacting a lab.', labSearch:'IS number, product, laboratory or location', labPlaceholder:'Try IS 4151, electric toys, Noida…', search:'Search checked records', snapshot:'Locally checked BIS LIMS snapshot · 30 Sep 2026 · 2 records, not a live or complete BIS directory', matches:'checked local matches', noMatch:'No checked local record matches. This does not mean BIS LIMS has no suitable lab.', scope:'Listed grade / type', validity:'Recognition validity shown by LIMS', fee:'Listed testing charge (excluding taxes)', feeCaution:'Charges and test coverage may vary. Confirm the exact edition, test facilities, exclusions, current recognition and quotation with BIS LIMS and the lab.', source:'Check this record in BIS LIMS ↗', officialSearch:'Search current IS scope and testing charges in BIS LIMS ↗', officialLabs:'Search the current BIS recognised-labs list ↗', priceMissing:'Price not published—check with lab/BIS LIMS', handoff:'The official search supports IS number, lab name and product/title filters. Refine the search there and inspect each result’s scope and charge breakup.', hallmark:'Hallmarking and HUID', hallmarkLead:'A BIS hallmark indicates that a precious-metal article has been marked under the BIS hallmarking system. The HUID is a six-character alphanumeric identifier on a hallmarked article.', huidLabel:'HUID printed on the article', huidPlaceholder:'Six letters or digits', check:'Check input format', invalid:'Enter exactly six letters or digits. This is only an input-format check.', formatOk:'The input has six letters or digits. Its authenticity has NOT been verified by BIS Bandhu.', noVerification:'BIS Bandhu does not verify HUID authenticity, jewellers, articles or hallmark status.', steps:'To check authenticity: open the official BIS Care app, choose “Verify HUID”, enter the code as printed on the article, and review the result in the app.', bisCare:'Open official BIS Care app information ↗', hallmarkSource:'Read official BIS hallmarking information ↗' },
@@ -38,25 +24,54 @@ function OfficialLink({ href, children }: { href: string; children: React.ReactN
   return <a className="official-service-link" href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
 }
 
+const directoryCopy = {
+  en: { snapshot:'Dated BIS LIMS snapshot', labs:'laboratories', capabilities:'sampled IS scopes', matching:'matching laboratories', loading:'Searching the local BIS LIMS snapshot…', error:'The laboratory directory could not be loaded. Try again or search BIS LIMS directly.', retry:'Retry', directoryValidity:'LIMS directory validity date', scopeValidity:'LIMS search validity date', unknown:'Not shown in snapshot', noScope:'No IS scope for this lab was captured in the sampled searches. Inspect the official scope.', noLocation:'Location not shown', labSource:'Open official lab scope ↗', amount:'Listed scope-row amount, excluding taxes', chargeNote:'Charge conditions', remarks:'Scope remarks', previous:'Previous page', next:'Next page', page:'Page', of:'of' },
+  hi: { snapshot:'दिनांकित BIS LIMS स्नैपशॉट', labs:'प्रयोगशालाएँ', capabilities:'नमूना IS दायरे', matching:'मेल खाने वाली प्रयोगशालाएँ', loading:'स्थानीय BIS LIMS स्नैपशॉट खोजा जा रहा है…', error:'प्रयोगशाला निर्देशिका लोड नहीं हुई। फिर कोशिश करें या BIS LIMS में सीधे खोजें।', retry:'फिर कोशिश करें', directoryValidity:'LIMS निर्देशिका की वैधता तिथि', scopeValidity:'LIMS खोज की वैधता तिथि', unknown:'स्नैपशॉट में नहीं दिखाया गया', noScope:'नमूना खोज में इस प्रयोगशाला का IS दायरा दर्ज नहीं हुआ। आधिकारिक दायरा देखें।', noLocation:'स्थान नहीं दिखाया गया', labSource:'आधिकारिक प्रयोगशाला दायरा खोलें ↗', amount:'सूचीबद्ध दायरा-पंक्ति राशि, कर अलग', chargeNote:'शुल्क की शर्तें', remarks:'दायरे की टिप्पणियाँ', previous:'पिछला पृष्ठ', next:'अगला पृष्ठ', page:'पृष्ठ', of:'में से' },
+  mr: { snapshot:'दिनांकित BIS LIMS स्नॅपशॉट', labs:'प्रयोगशाळा', capabilities:'नमुना IS व्याप्ती', matching:'जुळणाऱ्या प्रयोगशाळा', loading:'स्थानिक BIS LIMS स्नॅपशॉट शोधत आहे…', error:'प्रयोगशाळा यादी लोड झाली नाही. पुन्हा प्रयत्न करा किंवा BIS LIMS मध्ये थेट शोधा.', retry:'पुन्हा प्रयत्न करा', directoryValidity:'LIMS यादीची वैधता तारीख', scopeValidity:'LIMS शोधाची वैधता तारीख', unknown:'स्नॅपशॉटमध्ये दिसत नाही', noScope:'नमुना शोधांमध्ये या प्रयोगशाळेची IS व्याप्ती नोंदली नाही. अधिकृत व्याप्ती तपासा.', noLocation:'ठिकाण दाखवलेले नाही', labSource:'अधिकृत प्रयोगशाळा व्याप्ती उघडा ↗', amount:'नोंदवलेली व्याप्ती-पंक्ती रक्कम, कर वगळून', chargeNote:'शुल्क अटी', remarks:'व्याप्ती टिपा', previous:'मागील पान', next:'पुढील पान', page:'पान', of:'पैकी' },
+  ta: { snapshot:'தேதியிட்ட BIS LIMS பதிவு', labs:'ஆய்வகங்கள்', capabilities:'மாதிரி IS சோதனை வரம்புகள்', matching:'பொருந்தும் ஆய்வகங்கள்', loading:'உள்ளூர் BIS LIMS பதிவில் தேடுகிறது…', error:'ஆய்வகப் பட்டியலை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும் அல்லது BIS LIMS-இல் தேடவும்.', retry:'மீண்டும் முயற்சிக்கவும்', directoryValidity:'LIMS பட்டியல் செல்லுபடித் தேதி', scopeValidity:'LIMS தேடல் செல்லுபடித் தேதி', unknown:'பதிவில் காட்டப்படவில்லை', noScope:'மாதிரித் தேடல்களில் இந்த ஆய்வகத்தின் IS வரம்பு பதிவாகவில்லை. அதிகாரப்பூர்வ வரம்பைப் பார்க்கவும்.', noLocation:'இடம் காட்டப்படவில்லை', labSource:'அதிகாரப்பூர்வ ஆய்வக வரம்பைத் திறக்கவும் ↗', amount:'பட்டியலிட்ட வரம்பு-வரி தொகை, வரி தவிர', chargeNote:'கட்டண நிபந்தனைகள்', remarks:'வரம்புக் குறிப்புகள்', previous:'முந்தைய பக்கம்', next:'அடுத்த பக்கம்', page:'பக்கம்', of:'இல்' },
+  bn: { snapshot:'তারিখযুক্ত BIS LIMS স্ন্যাপশট', labs:'পরীক্ষাগার', capabilities:'নমুনা IS পরীক্ষার পরিধি', matching:'মিলে যাওয়া পরীক্ষাগার', loading:'স্থানীয় BIS LIMS স্ন্যাপশটে খোঁজা হচ্ছে…', error:'পরীক্ষাগারের তালিকা লোড হয়নি। আবার চেষ্টা করুন বা BIS LIMS-এ সরাসরি খুঁজুন।', retry:'আবার চেষ্টা করুন', directoryValidity:'LIMS তালিকার বৈধতার তারিখ', scopeValidity:'LIMS অনুসন্ধানের বৈধতার তারিখ', unknown:'স্ন্যাপশটে দেখানো নেই', noScope:'নমুনা অনুসন্ধানে এই পরীক্ষাগারের IS পরিধি ধরা পড়েনি। সরকারি পরিধি দেখুন।', noLocation:'স্থান দেখানো নেই', labSource:'সরকারি পরীক্ষাগার পরিধি খুলুন ↗', amount:'তালিকাভুক্ত পরিধি-সারির মূল্য, কর ছাড়া', chargeNote:'মূল্যের শর্ত', remarks:'পরিধির মন্তব্য', previous:'আগের পৃষ্ঠা', next:'পরের পৃষ্ঠা', page:'পৃষ্ঠা', of:'এর মধ্যে' },
+} as const;
+
 export function TestingLabsPage() {
-  const { language } = useLanguage(); const t = copy[language];
+  const { language } = useLanguage(); const t = copy[language]; const labels = directoryCopy[language];
   const [draft, setDraft] = useState(''); const [searched, setSearched] = useState('');
-  const needle = searched.trim().toLocaleLowerCase();
-  const matches = checkedLabs.filter(lab => !needle || [lab.name, lab.location, lab.code, lab.standard, lab.product].some(field => field.toLocaleLowerCase().includes(needle)));
+  const [response, setResponse] = useState<LaboratorySearchResponse | null>(null);
+  const [loading, setLoading] = useState(false); const [error, setError] = useState(false);
+  const [page, setPage] = useState(1);
+  const request = useRef<AbortController | null>(null);
+  const runSearch = async (value: string, nextPage: number) => {
+    request.current?.abort();
+    const controller = new AbortController(); request.current = controller;
+    setLoading(true); setError(false);
+    try {
+      const result = await searchLaboratories(value, nextPage, controller.signal);
+      if (!Array.isArray(result.results)) throw new Error('Malformed laboratory response');
+      if (!controller.signal.aborted) { setResponse(result); setSearched(value); setPage(nextPage); }
+    } catch { if (!controller.signal.aborted) setError(true); }
+    finally { if (!controller.signal.aborted) setLoading(false); }
+  };
+  useEffect(() => { void runSearch('', 1); return () => request.current?.abort(); }, []);
   const isNumber = searched.match(/\b(?:IS\s*)?(\d{3,6})\b/i)?.[1];
   const officialSearch = isNumber ? `${LIMS_SEARCH}?is_number__doc_no=${encodeURIComponent(isNumber)}` : LIMS_SEARCH;
-  const search = (event: FormEvent) => { event.preventDefault(); setSearched(draft.trim()); };
+  const search = (event: FormEvent) => { event.preventDefault(); void runSearch(draft.trim(), 1); };
+  const matches: LaboratoryResult[] = response?.results ?? [];
+  const pageCount = Math.max(1, Math.ceil((response?.total_matches ?? 0) / (response?.page_size ?? 20)));
   return <section className="reference-page lab-page">
     <header className="reference-intro"><p className="eyebrow">BIS LIMS</p><h1>{t.labs}</h1><p>{t.labsLead}</p></header>
     <div className="lab-content">
       <form className="reference-search" onSubmit={search}><label htmlFor="lab-search">{t.labSearch}</label><div><input id="lab-search" value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.labPlaceholder} maxLength={120}/><button>{t.search}</button></div></form>
-      <p className="evidence-limited">{t.snapshot}</p>
-      <p className="catalogue-meta" role="status">{matches.length} {t.matches}</p>
-      {matches.length ? <div className="lab-results">{matches.map(lab => <article className="reference-card" key={lab.code}>
-        <div className="lab-identity"><p className="eyebrow">{lab.standard} · {lab.code}</p><h2>{lab.name}</h2><p>{lab.location} · {lab.product}</p></div>
-        <dl className="lab-facts"><div><dt>{t.scope}</dt><dd>{lab.scope}</dd></div><div><dt>{t.validity}</dt><dd>{lab.validUntil}</dd></div><div><dt>{t.fee}</dt><dd>{lab.charge || t.priceMissing}</dd></div></dl>
-        <OfficialLink href={lab.source}>{t.source}</OfficialLink>
-      </article>)}</div> : <div className="reference-limit"><p>{t.noMatch}</p></div>}
+      {loading && <p className="catalogue-meta" role="status">{labels.loading}</p>}
+      {error && <div className="reference-limit" role="alert"><p>{labels.error}</p><button type="button" onClick={()=>void runSearch(searched,page)}>{labels.retry}</button></div>}
+      {response && <><p className="evidence-limited">{labels.snapshot} · {response.laboratory_count} {labels.labs} · {response.capability_count} {labels.capabilities} · {response.last_updated?.slice(0,10) ?? labels.unknown}</p>
+      <p className="catalogue-meta" role="status">{response.total_matches} {labels.matching}</p>
+      {matches.length ? <div className="lab-results">{matches.map(({laboratory: lab,capabilities}) => <article className="reference-card" key={lab.id}>
+        <div className="lab-identity"><p className="eyebrow">{lab.code || 'BIS LIMS'}</p><h2>{lab.name}</h2><p>{lab.location || labels.noLocation}</p></div>
+        <div className="lab-metadata"><dl className="lab-facts"><div><dt>{labels.directoryValidity}</dt><dd>{lab.directory_valid_until || labels.unknown}</dd></div></dl>
+          {capabilities.length ? capabilities.map(scope=><section className="lab-scope" key={scope.id}><h3>{scope.standard_identifier}</h3>{scope.product_title&&<p>{scope.product_title}</p>}<dl className="lab-facts">{scope.grade_type&&<div><dt>{t.scope}</dt><dd>{scope.grade_type}</dd></div>}<div><dt>{labels.scopeValidity}</dt><dd>{scope.search_validity_date || labels.unknown}</dd></div><div><dt>{labels.amount}</dt><dd>{scope.charge_amount !== null ? `₹${Number(scope.charge_amount.replaceAll(',', '')).toLocaleString('en-IN')}` : t.priceMissing}</dd></div></dl>{scope.charge_note&&<details><summary>{labels.chargeNote}</summary><p>{scope.charge_note}</p></details>}{scope.remarks&&<details><summary>{labels.remarks}</summary><p>{scope.remarks}</p></details>}<OfficialLink href={scope.source_url}>{t.source}</OfficialLink></section>) : <p>{labels.noScope}</p>}
+        </div>
+        <OfficialLink href={lab.official_url}>{labels.labSource}</OfficialLink>
+      </article>)}</div> : !loading && <div className="reference-limit"><p>{t.noMatch}</p></div>}
+      {response.total_matches > response.page_size && <nav className="directory-pagination" aria-label={labels.page}><button type="button" disabled={loading||page<=1} onClick={()=>void runSearch(searched,page-1)}>{labels.previous}</button><span>{labels.page} {page} {labels.of} {pageCount}</span><button type="button" disabled={loading||page>=pageCount} onClick={()=>void runSearch(searched,page+1)}>{labels.next}</button></nav>}</>}
       <div className="lab-followup"><p className="reference-copy">{t.feeCaution}</p><p className="reference-copy">{t.handoff}</p>
         <div className="reference-actions"><OfficialLink href={officialSearch}>{t.officialSearch}</OfficialLink><OfficialLink href={LIMS_LABS}>{t.officialLabs}</OfficialLink></div>
       </div>

@@ -1,6 +1,6 @@
 import type { AssistantContext, Audience, ChatResponse, HealthResponse, ResponseLanguage } from '../types/chat';
 import type { ComplianceGuideResponse, ComplianceProfile } from '../types/compliance';
-import type { CatalogueSearchResponse, CatalogueStandard } from '../types/catalogue';
+import type { CatalogueSearchResponse, CatalogueStandard, LaboratorySearchResponse } from '../types/catalogue';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const NGROK_SKIP_BROWSER_WARNING = 'ngrok-skip-browser-warning';
@@ -178,8 +178,11 @@ export const getComplianceGuide = (profile: ComplianceProfile, signal?: AbortSig
     method: 'POST', body: JSON.stringify(profile), signal,
   });
 
-export const searchCatalogue = (query: string, signal?: AbortSignal) =>
-  request<CatalogueSearchResponse>(`/api/catalogue/standards?q=${encodeURIComponent(query)}`, HEALTH_TIMEOUT_MS, { signal });
+export const searchCatalogue = (query: string, page = 1, category = '', signal?: AbortSignal) =>
+  request<CatalogueSearchResponse>(`/api/catalogue/standards?q=${encodeURIComponent(query)}&page=${page}&category=${encodeURIComponent(category)}`, HEALTH_TIMEOUT_MS, { signal });
 
 export const getCatalogueStandard = (identifier: string, signal?: AbortSignal) =>
   request<CatalogueStandard>(`/api/catalogue/standards/${encodeURIComponent(identifier)}`, HEALTH_TIMEOUT_MS, { signal });
+
+export const searchLaboratories = (query: string, page = 1, signal?: AbortSignal) =>
+  request<LaboratorySearchResponse>(`/api/laboratories?q=${encodeURIComponent(query)}&page=${page}`, HEALTH_TIMEOUT_MS, { signal });
