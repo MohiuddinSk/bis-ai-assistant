@@ -124,6 +124,44 @@ it('features verified helmet metadata only in the unfiltered view and keeps sear
   expect(document.querySelector('.featured-standard')).toBeNull();
 });
 
+it('requests later standards result pages without losing the search and opens the returned source detail', async () => {
+  const makeRecord = (identifier: string, title: string) => ({
+    identifier, title, category: 'Product Specification', edition_year: '2026', status: null,
+    official_url: 'https://standards.bis.gov.in/website/published-standards/published-standards-list?selectedType=7&totalRow=1',
+    retrieved_at: '2026-09-30', provenance: 'BIS Published Standards Excel export',
+    evidence_filename: null, evidence_page: null,
+  });
+  const first = makeRecord('IS 111:2026', 'First helmet product record');
+  const second = makeRecord('IS 222:2026', 'Second helmet product record');
+  vi.stubGlobal('fetch', vi.fn((url: string) => {
+    if (url.includes('health')) return Promise.resolve(response({ status: 'ready' }));
+    if (url.includes('/api/catalogue/standards')) {
+      const page = new URL(url, 'http://localhost').searchParams.get('page');
+      return Promise.resolve(response({ query: 'helmet', record_count: 23813, total_matches: 21,
+        page: Number(page), page_size: 20, categories: ['Product Specification'], last_updated: '2026-09-30',
+        results: [page === '2' ? second : first] }));
+    }
+    return Promise.resolve(response(answer));
+  }));
+  window.location.hash = '#/standards';
+  render(<App />);
+  const user = userEvent.setup();
+  expect(await screen.findByText(first.title)).toBeInTheDocument();
+  await user.type(screen.getByLabelText('IS number, product, or keyword'), 'helmet');
+  await user.click(screen.getByRole('button', { name: 'Search' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: 'Next page' }));
+  expect(await screen.findByText(second.title)).toBeInTheDocument();
+  expect(screen.queryByText(first.title)).toBeNull();
+  const catalogueCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+    .filter(([url]) => String(url).includes('/api/catalogue/standards'));
+  expect(catalogueCalls.some(([url]) => String(url).includes('q=helmet&page=2'))).toBe(true);
+  await user.click(screen.getByRole('button', { name: 'View verified detail →' }));
+  expect(window.location.hash).toBe('#/standards/detail?is=IS%20222%3A2026');
+  expect(screen.getByRole('link', { name: 'Open BIS published-standards listing ↗' }))
+    .toHaveAttribute('href', second.official_url);
+});
+
 it('loads a non-featured verified detail from its direct URL without inventing technical guidance', async () => {
   const electric={identifier:'IS 15644:2006',title:'Safety of Electric Toys',category:'Toys',edition_year:'2006',status:'Identifier and title listed by BIS; this metadata is not an applicability decision',official_url:'https://www.bis.gov.in/product-certification/products-under-compulsory-certification/scheme-1/?lang=en',retrieved_at:'2026-09-29',provenance:'BIS Scheme-I page',evidence_filename:null,evidence_page:null};
   vi.stubGlobal('fetch',vi.fn((url:string)=>Promise.resolve(response(url.includes('health')?{status:'ready'}:url.includes('/api/catalogue/')?electric:answer))));
@@ -131,7 +169,7 @@ it('loads a non-featured verified detail from its direct URL without inventing t
   render(<App />);
   expect(await screen.findByText('Safety of Electric Toys')).toBeInTheDocument();
   expect(screen.getByText(/does not replace the official standard or make an applicability decision/)).toBeInTheDocument();
-  expect(screen.getByRole('link',{name:'Open official source ↗'})).toHaveAttribute('href',electric.official_url);
+  expect(screen.getByRole('link',{name:'Open BIS published-standards listing ↗'})).toHaveAttribute('href',electric.official_url);
   expect(window.location.hash).toBe('#/standards/detail?is=IS%2015644%3A2006');
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url])=>String(url).includes('/api/chat'))).toHaveLength(0);
 });

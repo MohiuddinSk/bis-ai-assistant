@@ -14,7 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from backend.chat_service import ChatRetrievalError, ChatService, ComplianceRoutingContext
-from backend.catalogue import catalogue_metadata, load_catalogue, normalize_is_number, record_as_dict, search_catalogue
+from backend.catalogue import catalogue_metadata, load_catalogue, record_as_dict, search_catalogue, standard_identity
+from backend.laboratories import laboratory_metadata, load_laboratories, search_laboratories
 from backend.documents import SourceDocumentRegistry
 from backend.question_understanding import QuestionUnderstanding, understand_question
 from backend.generation import (
@@ -32,6 +33,8 @@ from backend.schemas import (
     ChatResponse,
     CatalogueSearchResponse,
     CatalogueStandard,
+    LaboratoryResult,
+    LaboratorySearchResponse,
     ComplianceGuideResponse,
     ComplianceProfile,
     HealthResponse,
@@ -469,28 +472,54 @@ def create_app(
 
     @application.get("/api/catalogue/standards", response_model=CatalogueSearchResponse)
     @application.get("/api/v1/catalogue/standards", response_model=CatalogueSearchResponse)
-    def catalogue_search(q: str = "", page: int = 1, page_size: int = 20) -> CatalogueSearchResponse:
+    def catalogue_search(q: str = "", category: str = "", page: int = 1, page_size: int = 20) -> CatalogueSearchResponse:
         """Search only locally verified, provenance-bearing catalogue metadata."""
         if page < 1 or not 1 <= page_size <= 100:
             raise HTTPException(status_code=422, detail="Invalid pagination.")
         all_records = load_catalogue()
-        matches = search_catalogue(q)
+        matches = search_catalogue(q, category, all_records)
         start = (page - 1) * page_size
         metadata = catalogue_metadata(all_records)
         return CatalogueSearchResponse(
             query=q,
             results=[CatalogueStandard(**record_as_dict(record)) for record in matches[start:start + page_size]],
+            total_matches=len(matches), page=page, page_size=page_size,
+            categories=sorted({record.category for record in all_records if record.category}),
             **metadata,
         )
 
     @application.get("/api/catalogue/standards/{identifier}", response_model=CatalogueStandard)
     @application.get("/api/v1/catalogue/standards/{identifier}", response_model=CatalogueStandard)
     def catalogue_detail(identifier: str) -> CatalogueStandard:
-        normalized = normalize_is_number(identifier)
+        normalized = standard_identity(identifier)
         for record in load_catalogue():
-            if record.identifier == normalized:
+            if standard_identity(record.identifier) == normalized:
                 return CatalogueStandard(**record_as_dict(record))
         raise HTTPException(status_code=404, detail="No locally verified catalogue record was found.")
+
+    @application.get("/api/laboratories", response_model=LaboratorySearchResponse)
+    @application.get("/api/v1/laboratories", response_model=LaboratorySearchResponse)
+    def laboratories_search(q: str = "", page: int = 1, page_size: int = 20) -> LaboratorySearchResponse:
+        if page < 1 or not 1 <= page_size <= 100:
+            raise HTTPException(status_code=422, detail="Invalid pagination.")
+        labs, capabilities = load_laboratories()
+        matches = search_laboratories(q, labs, capabilities)
+        start = (page - 1) * page_size
+        return LaboratorySearchResponse(
+            query=q,
+            results=[LaboratoryResult(**item) for item in matches[start:start + page_size]],
+            total_matches=len(matches), page=page, page_size=page_size,
+            **laboratory_metadata(labs, capabilities),
+        )
+
+    @application.get("/api/laboratories/{lab_id}", response_model=LaboratoryResult)
+    @application.get("/api/v1/laboratories/{lab_id}", response_model=LaboratoryResult)
+    def laboratory_detail(lab_id: str) -> LaboratoryResult:
+        labs, capabilities = load_laboratories()
+        for lab in labs:
+            if lab["id"] == lab_id:
+                return LaboratoryResult(laboratory=lab, capabilities=[scope for scope in capabilities if scope["laboratory_id"] == lab_id])
+        raise HTTPException(status_code=404, detail="No laboratory appears in this dated local snapshot.")
 
     @application.post(
         "/api/compliance/guide",
