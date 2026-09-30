@@ -858,6 +858,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 }
 footer{
   display:flex;
+  flex-wrap:wrap;
+  align-items:center;
   gap:15px;
   padding:30px max(24px,calc((100vw - 1120px)/2));
   background:var(--color-surface-raised);
@@ -865,6 +867,7 @@ footer{
   color:var(--muted);
   font-size:.8rem
 }
+footer>span{flex:1 1 320px;min-width:0;overflow-wrap:anywhere}
 footer b{
   color:var(--foreground-accent)
 }
@@ -1287,6 +1290,32 @@ footer b{
 .lab-facts dd{margin:0;color:var(--color-heading);font-weight:800;text-align:right}
 .hallmark-page .reference-copy,.lab-page .reference-copy{max-width:820px;margin:14px auto;color:var(--color-text-muted);line-height:1.6}
 .hallmark-page .reference-limit{margin-bottom:24px}
+.hallmark-ask{width:min(100%,820px);margin:0 auto;padding:24px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface-raised);box-shadow:0 12px 30px color-mix(in srgb,var(--color-primary) 7%,transparent)}
+.hallmark-ask>label{display:block;margin:18px 0 8px;color:var(--color-heading);font-weight:800}
+.hallmark-ask textarea{display:block;width:100%;min-height:112px;resize:vertical;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-inset);color:var(--color-text);padding:13px 15px;font:inherit;line-height:1.5}
+.hallmark-ask textarea::placeholder{color:var(--color-muted)}
+.hallmark-audience{display:flex;flex-wrap:wrap;gap:10px}
+.hallmark-audience label{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 13px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-text);cursor:pointer}
+.hallmark-audience label:has(input:checked){border-color:var(--color-primary);background:var(--color-surface-inset);font-weight:800}
+.hallmark-audience input{accent-color:var(--color-primary)}
+.hallmark-compose-actions{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-top:16px}
+.hallmark-compose-actions>button{min-height:44px;border:1px solid var(--color-primary);border-radius:9px;background:var(--color-primary);color:var(--color-primary-text);padding:10px 20px;font:inherit;font-weight:800}
+.hallmark-compose-actions>button:disabled{opacity:.55;cursor:not-allowed}
+.hallmark-examples,.hallmark-services,.hallmark-format{width:min(100%,820px);margin:22px auto 0}
+.hallmark-examples>p{margin:0 0 10px;color:var(--color-muted);font-size:.84rem;font-weight:800}
+.hallmark-examples>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.hallmark-examples button{min-height:76px;border:1px solid var(--color-border);border-radius:11px;background:var(--color-surface-raised);color:var(--color-text);padding:13px;text-align:left;font:inherit;font-weight:700;line-height:1.35}
+.hallmark-examples button:hover{border-color:var(--color-link);color:var(--color-link)}
+.hallmark-services{border-top:1px solid var(--color-border);padding-top:18px}
+.hallmark-services h2{margin:0;color:var(--color-heading);font-size:1rem}
+.hallmark-services .reference-actions{margin:12px 0 0}
+.hallmark-format{border-top:1px solid var(--color-border);padding-top:16px;color:var(--color-muted)}
+.hallmark-format summary{cursor:pointer;font-weight:700}
+.hallmark-format .reference-search{margin:14px 0}
+.citation-card .page-pill{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.citation-provenance{margin:2px 0 8px;color:var(--color-muted);font-size:.76rem;line-height:1.4}
+.answer-official-action{display:inline-block;margin:.65rem 0 0}
+@media(max-width:700px){.hallmark-ask{padding:16px}.hallmark-examples>div{grid-template-columns:1fr}.hallmark-examples button{min-height:54px}.hallmark-compose-actions{flex-wrap:wrap}.hallmark-compose-actions>button{width:100%}}
 .huid-format{max-width:820px;margin:0 auto 20px;padding:14px 16px;border-left:4px solid var(--color-saffron);border-radius:8px;background:var(--status-caution-bg);color:var(--status-caution-text);font-weight:700}
 .lab-page .reference-actions,.hallmark-page .reference-actions{max-width:820px;margin-inline:auto}
 @media(max-width:700px){.lab-results{grid-template-columns:1fr}.assistant-view .message{max-width:100%;padding:15px}.assistant-view .message.user{max-width:90%}.lab-facts>div{flex-direction:column;gap:3px}.lab-facts dd{text-align:left}}

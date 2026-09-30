@@ -38,6 +38,7 @@ from backend.conversation import (
     is_social_route,
 )
 from backend.grounded_claims import claim_answers_question, claim_sections, extract_grounded_claims
+from backend.hallmarking_guidance import hallmarking_response, is_hallmarking_question
 from backend.question_understanding import QuestionUnderstanding, extract_standard_references, understand_question
 from backend.response_localization import (
     localized_abstention,
@@ -200,6 +201,8 @@ class ChatService:
         routing_context: ComplianceRoutingContext | None = None,
         understanding: QuestionUnderstanding | None = None,
     ) -> ChatResponse:
+        if routing_context is None and is_hallmarking_question(request.question):
+            return hallmarking_response(request)
         if routing_context is None:
             route = classify_conversation(request.question, request.response_language, request.assistant_context)
             if is_social_route(route):

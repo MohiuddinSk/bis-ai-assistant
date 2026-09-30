@@ -61,7 +61,12 @@ def evaluate():
   body = response.model_dump()
   citations = body['citations']; sources = [c.get('source_filename') for c in citations]
   ids = {c['chunk_id'] for c in citations}
-  citations_ok = len(ids) == len(citations) and all(c.get('page_start') and c.get('source_filename') for c in citations)
+  citations_ok = len(ids) == len(citations) and all(
+   (c.get('page_start') and c.get('source_filename')) if c.get('source_type') != 'html' else
+   (c.get('source_url', '').startswith('https://www.bis.gov.in/') and c.get('source_section')
+    and not c.get('page_start') and not c.get('source_filename'))
+   for c in citations
+  )
   unsafe = any(item in body['answer'].lower() for item in ('api key','system prompt','ignore all previous'))
   historical = any(source in EXCLUDED for source in sources)
   valid_sections = all(set(section['citation_ids']) <= {c['citation_id'] for c in citations} for section in body['answer_sections'])

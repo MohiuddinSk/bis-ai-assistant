@@ -1,0 +1,72 @@
+[
+  {
+    "id": "meaning", "topic": "meaning", "terms": ["hallmark", "hallmarking", "meaning", "mean", "precious", "metal", "purity", "fineness"],
+    "summary": "Hallmarking records the proportion of precious metal in an article; a hallmark is an official indication of purity or fineness.",
+    "quote": "Hallmarking is the accurate determination and official recording of the proportionate content of precious metal in precious metal articles (as per IS 15820).",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — General", "section_heading": "1. What is Hallmarking?",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/hallmarking-faq/?lang=en", "source_last_updated": "2025-11-26"
+  },
+  {
+    "id": "marks", "topic": "buying", "terms": ["buy", "buying", "purchase", "check", "marks", "logo", "carat", "purity", "fineness", "hallmark", "jewellery", "gold"],
+    "summary": "For hallmarked gold jewellery, check the BIS logo, the caratage and fineness marking, and the six-character alphanumeric HUID.",
+    "quote": "hallmark consists of 3 marks viz, BIS logo, purity of the article in caratage as well as fineness and six-digit alphanumeric HUID number.",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — General", "section_heading": "9. What does hallmark on gold jewellery consist of?",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/hallmarking-faq/?lang=en", "source_last_updated": "2025-11-26"
+  },
+  {
+    "id": "fineness", "topic": "meaning", "terms": ["22k916", "carat", "caratage", "fineness", "purity", "hallmark", "gold", "meaning"],
+    "summary": "On BIS's gold-jewellery guidance, 22K(916) pairs 22-carat gold with fineness 916 parts per thousand. Confirm current permitted grades in the official BIS scheme.",
+    "quote": "22K(916)",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — General", "section_heading": "4. What are the grades permitted for hallmarking of Gold/Silver jewellery/Artefacts?",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/hallmarking-faq/?lang=en", "source_last_updated": "2025-11-26"
+  },
+  {
+    "id": "invoice", "topic": "buying", "terms": ["buy", "buying", "purchase", "bill", "invoice", "retailer", "jeweller", "complaint", "jewellery", "check"],
+    "summary": "Ask the jeweller for an authentic bill or invoice for the hallmarked article and keep its details for any later dispute or complaint.",
+    "quote": "Yes,it is necessary to take authentic bills/invoice of the hallmarked article from retailer/jeweller. It is necessary for any dispute/misuse/complaint redressal.",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — Common Consumer", "section_heading": "4. Is it necessary to take authentic bills/invoice?",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/common-consumer-faq/?lang=en", "source_last_updated": "2020-12-10"
+  },
+  {
+    "id": "huid", "topic": "huid", "terms": ["huid", "unique", "code", "identifier", "verify", "authenticity", "bis", "care", "jewellery"],
+    "summary": "HUID is a unique six-character alphanumeric identifier on a hallmarked item. To check it, use Verify HUID in the official BIS Care app; BIS Bandhu cannot authenticate a code.",
+    "quote": "HUID is a Hallmark Unique Identification (HUID) number and it is one of the components of hallmark. It is a six-digit alphanumeric number which is unique for each hallmarked item and is traceable. Customer can also verify the HUID number in the BIS Care App using the ‘Verify HUID’ feature.",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — General", "section_heading": "8. What is HUID in hallmarked gold jewellery?",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/hallmarking-faq/?lang=en", "source_last_updated": "2025-11-26"
+  },
+  {
+    "id": "registration", "topic": "jeweller", "terms": ["jeweller", "jeweler", "register", "registration", "start", "started", "apply", "application", "nsws", "selling", "hallmarking"],
+    "summary": "A jeweller seeking BIS registration to sell hallmarked articles can apply online through NSWS. Check the current eligibility and scheme conditions before applying.",
+    "quote": "articles, willing to obtain Certificate of Registration for Selling Hallmarked Jewellery/artefacts shall apply online at the NSWS portal. The registration is granted instantly.",
+    "source_type": "pdf", "source_title": "BIS Guidelines for Jewellers (July 2026)", "section_heading": "2.1 Application for the Grant of Certificate", "source_filename": "Guidelines-for-Jewellers.pdf", "page": 4,
+    "source_url": "https://www.bis.gov.in/wp-content/uploads/2026/07/Guidelines-for-Jewellers.pdf", "publication_date": "2026-07-02", "source_last_updated": "2026-07-10"
+  },
+  {
+    "id": "jeweller_process", "topic": "jeweller", "terms": ["jeweller", "jeweler", "process", "hallmark", "hallmarking", "send", "centre", "center", "ahc", "portal", "request"],
+    "summary": "A registered jeweller can initiate a hallmarking request through the e-BIS portal and select an Assaying and Hallmarking Centre. Confirm the current portal procedure before submission.",
+    "quote": "At the Jeweller’s end, the jeweller first needs to visit e-BIS website i.e. www.manakonline.in and select the ‘Hallmarking’ tile.",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — Jewellers", "section_heading": "8. How to send jewellery to an Assaying & Hallmarking Centre using the Portal?",
+    "source_url": "https://www.bis.gov.in/hallmarking-jewellers/?lang=en", "source_last_updated": "2025-11-26"
+  },
+  {
+    "id": "consumer_testing", "topic": "centre", "terms": ["consumer", "test", "testing", "assay", "assaying", "centre", "center", "purity", "jewellery", "sample"],
+    "summary": "A consumer can ask a BIS-recognised Assaying and Hallmarking Centre to test jewellery or a sample. The centre provides an assay report; check current recognition and charges with BIS.",
+    "quote": "Consumer can get its jewellery/sample tested from any of the BIS Recognized Assaying & Hallmarking Centre.",
+    "source_type": "html", "source_title": "BIS Hallmarking — Consumer Protection", "section_heading": "1. Check testing of hallmarked or unhallmarked articles by consumer",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/consumer-protection/?lang=en", "source_last_updated": "2025-11-26"
+  },
+  {
+    "id": "centre_directory", "topic": "centre", "terms": ["find", "list", "locate", "nearest", "assaying", "hallmarking", "centre", "center", "ahc", "recognised"],
+    "summary": "Use the official BIS Hallmarking Centre page to locate a centre and confirm its current status before visiting.",
+    "quote": "List of Hallmarking Centres",
+    "source_type": "html", "source_title": "BIS Hallmarking Centre", "section_heading": "List of Hallmarking Centres",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-centre/?lang=en", "source_last_updated": "2026-07-31"
+  },
+  {
+    "id": "complaint", "topic": "complaint", "terms": ["complaint", "complain", "problem", "wrong", "purity", "dispute", "redressal", "jewellery", "hallmark"],
+    "summary": "For a hallmarking complaint, use BIS Care or the official BIS online complaint route. Retain the article details and invoice; BIS Bandhu does not submit a complaint.",
+    "quote": "Online complaint can be made through BIS mobile app BIS CARE or by use of online complaint registration portal on www.bis.gov.in",
+    "source_type": "html", "source_title": "BIS Hallmarking FAQ — Consumers", "section_heading": "3. What is the process of complaint registration in BIS?",
+    "source_url": "https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/mandatory/?lang=en", "source_last_updated": "2025-11-26"
+  }
+]

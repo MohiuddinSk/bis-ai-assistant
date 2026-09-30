@@ -9,3 +9,21 @@ it('connects the evidence toggle to the expanded source region without exposing 
 it('opens a named source without an invalid page fragment when its page is absent',()=>{render(<CitationCard citation={{...citation,page_start:null,page_end:null}}/>);expect(screen.getByRole('link',{name:/product manual.pdf/i})).toHaveAttribute('href','#open-source-pdf')});
 it('closes failed PDF opening behind a safe visible error',async()=>{const open=vi.spyOn(window,'open').mockReturnValue(null);render(<CitationCard citation={citation}/>);await userEvent.setup().click(screen.getByRole('link',{name:/open source pdf/i}));expect(await screen.findByRole('alert')).toHaveTextContent('Unable to open the source PDF. Please try again.');expect(screen.getByRole('alert')).not.toHaveTextContent('product manual.pdf');open.mockRestore()});
 it('omits PDF action without filename and keeps raw evidence harmless text',async()=>{render(<CitationCard citation={{...citation,source_filename:null,page_start:null,page_end:null,excerpt:'<b>raw</b>'}}/>);expect(screen.queryByRole('link',{name:/open source pdf/i})).toBeNull();await userEvent.setup().click(screen.getByRole('button',{name:/view evidence/i}));expect(screen.getByText((_,node)=>node?.textContent==='<b>raw</b>')).toBeInTheDocument()});
+
+it('links HTML evidence to its official section without inventing a PDF or page', async () => {
+  render(<CitationCard citation={{ ...citation, source_type: 'html', source_filename: null,
+    page_start: null, page_end: null, source_title: 'Hallmarking FAQs',
+    source_section: 'What is HUID?', source_last_updated: '2025-11-26', retrieved_at: '2026-09-30',
+    source_url: 'https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/hallmarking-faq/?lang=en' }} />);
+  expect(screen.getByText('Section: What is HUID?')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /open source pdf/i })).toBeNull();
+  expect(screen.getByRole('link', { name: /official/i })).toHaveAttribute('href', 'https://www.bis.gov.in/hallmarking-overview/hallmarking-faqs/hallmarking-faq/?lang=en');
+  await userEvent.setup().click(screen.getByRole('button', { name: /view evidence/i }));
+  expect(screen.getByText(citation.excerpt)).toBeInTheDocument();
+});
+
+it('does not create an external action for an untrusted HTML evidence URL', () => {
+  render(<CitationCard citation={{ ...citation, source_type: 'html', source_filename: null,
+    source_url: 'https://example.com/fake-bis-record' }} />);
+  expect(screen.queryByRole('link')).toBeNull();
+});

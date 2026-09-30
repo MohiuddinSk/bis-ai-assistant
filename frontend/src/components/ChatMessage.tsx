@@ -2,6 +2,7 @@ import type { AnswerSection, ChatResponse, Citation } from '../types/chat';
 import { CitationCard } from './CitationCard';
 import type { SuggestedAction } from '../suggestedActions';
 import { useLanguage } from '../i18n/LanguageContext';
+import { officialNextStepLabel } from '../i18n/translations';
 import { journeyCategoryFor, journeyCategoryHeadingKey, sectionHeadingKey, type JourneyCategory } from '../i18n/answerSectionLabels';
 
 type Presentation = 'chat' | 'compliance-journey';
@@ -58,14 +59,23 @@ function JourneySources({ citations }: { citations: Citation[] }) {
 }
 
 export function ChatMessage({ role, text, response, suggestedActions, onSuggestedAction, busy = false, presentation = 'chat', sourceHeading }: { role: 'user' | 'assistant'; text: string; response?: ChatResponse; suggestedActions?: SuggestedAction[]; onSuggestedAction?: (action: SuggestedAction) => void; busy?: boolean; presentation?: Presentation; sourceHeading?: string }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const citations = Array.from(new Map((response?.citations ?? []).map((citation) => [citation.chunk_id, citation])).values());
   const sections = response?.answer_sections ?? [];
   const journey = presentation === 'compliance-journey';
   const displayedSourceHeading = sourceHeading ?? t('sourcesHeading');
+  const officialUrl = (() => {
+    if (!response?.official_next_step_url) return null;
+    try {
+      const url = new URL(response.official_next_step_url);
+      return url.protocol === 'https:' && url.hostname === 'www.bis.gov.in'
+        && !url.username && !url.password && !url.port ? url.toString() : null;
+    } catch { return null; }
+  })();
   return <article className={`message ${role}`}>
     {role === 'assistant' && response && <span className={`answer-status ${response.response_kind === 'conversation' || response.generation_mode === 'conversation' ? 'conversation' : response.response_kind === 'clarification' || response.needs_clarification ? 'clarification-needed' : response.response_kind === 'limitation' || response.insufficient_evidence ? 'insufficient' : 'grounded'}`}>{response.response_kind === 'conversation' || response.generation_mode === 'conversation' ? t('conversationGuide') : response.response_kind === 'clarification' || response.needs_clarification ? t('evidenceNeedDetails') : response.response_kind === 'limitation' || response.insufficient_evidence ? t('evidenceInsufficient') : t('evidenceGrounded')}</span>}
     {sections.length > 0 ? journey ? <JourneyGuidance sections={sections} /> : <div className="guided-answer">{sections.map((section, index) => <section key={`${section.type}-${index}`} className={`guided-section ${section.type}`}><h3>{t(sectionHeadingKey(section))}</h3>{section.content && <p>{section.content}</p>}{section.items.length > 0 && <ol>{section.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ol>}</section>)}</div> : <p className="answer-text">{text}</p>}
+    {officialUrl && <a className="official-service-link answer-official-action" href={officialUrl} target="_blank" rel="noopener noreferrer">{officialNextStepLabel[language]} ↗</a>}
     {(suggestedActions?.length ?? 0) > 0 && onSuggestedAction && <div className="suggested-replies" role="group" aria-label={t('suggestedReplies')}>{suggestedActions!.map(action => <button type="button" key={action.label} disabled={busy} onClick={() => onSuggestedAction(action)}>{action.label}</button>)}</div>}
     {citations.length > 0 && (journey ? <JourneySources citations={citations} /> : <section className="sources" aria-label={`${displayedSourceHeading} (${citations.length})`}><h3>{displayedSourceHeading} <span>{citations.length}</span></h3><div className="citation-list">{citations.map(c => <CitationCard key={`${c.citation_id}-${c.chunk_id}`} citation={c} />)}</div></section>)}
   </article>;

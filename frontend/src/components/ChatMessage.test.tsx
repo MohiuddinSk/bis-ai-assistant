@@ -152,3 +152,20 @@ it('renders typed accessible suggested actions and submits one once', async () =
   expect(action).toHaveBeenCalledTimes(1);
   expect(action).toHaveBeenCalledWith({ kind: 'chat_question', label: 'Non-electric', question: 'Non-electric' });
 });
+
+it('shows a safe official handoff for an evidence limitation without inventing a citation', () => {
+  render(<ChatMessage role="assistant" text="BIS Bandhu cannot authenticate this HUID." response={{
+    ...response, answer: 'BIS Bandhu cannot authenticate this HUID.', grounded: false,
+    insufficient_evidence: true, evidence_count: 0, citations: [], response_kind: 'limitation',
+    official_next_step_url: 'https://www.bis.gov.in/bis-apps/?lang=en',
+  }} />);
+  expect(screen.getByText('Evidence insufficient')).toBeInTheDocument();
+  expect(screen.queryByText(/Source S/)).toBeNull();
+  expect(screen.getByRole('link', { name: 'Continue on the official BIS website ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/bis-apps/?lang=en');
+  cleanup();
+  render(<ChatMessage role="assistant" text="No evidence" response={{
+    ...response, grounded: false, insufficient_evidence: true, evidence_count: 0,
+    citations: [], response_kind: 'limitation', official_next_step_url: 'https://example.com/phishing',
+  }} />);
+  expect(screen.queryByRole('link')).toBeNull();
+});
