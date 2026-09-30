@@ -1280,15 +1280,23 @@ footer b{
 .assistant-view .answer-update,.assistant-view .loading-message,.assistant-view .error-message{max-width:760px;margin:18px 0}
 
 /* Official-source snapshots and format-only HUID assistance. */
-.lab-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:980px;margin:0 auto}
-.lab-results .reference-card{align-items:stretch}
+.lab-content{display:grid;width:min(100%,980px);min-width:0;gap:16px;margin-inline:auto}
+.lab-content>*{min-width:0}
+.lab-content .reference-search,.lab-content .catalogue-meta,.lab-content .reference-limit{width:100%;max-width:none;margin:0}
+.lab-content .evidence-limited{margin:0}
+.lab-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0}
+.lab-results .reference-card{display:grid;grid-template-rows:minmax(max-content,1fr) auto auto;align-items:start;gap:16px}
 .lab-results .reference-card h2{overflow-wrap:anywhere}
-.lab-results .official-service-link{align-self:flex-start;margin-top:auto}
-.lab-facts{display:grid;gap:0;margin:8px 0 18px}
+.lab-results .official-service-link{align-self:start;margin-top:0}
+.lab-facts{display:grid;gap:0;margin:0}
 .lab-facts>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--color-border)}
 .lab-facts dt{color:var(--color-text-muted)}
 .lab-facts dd{margin:0;color:var(--color-heading);font-weight:800;text-align:right}
-.hallmark-page .reference-copy,.lab-page .reference-copy{max-width:820px;margin:14px auto;color:var(--color-text-muted);line-height:1.6}
+.hallmark-page .reference-copy{max-width:820px;margin:14px auto;color:var(--color-text-muted);line-height:1.6}
+.lab-followup{margin-top:4px}
+.lab-followup .reference-copy{margin:0 0 8px;color:var(--color-text-muted);line-height:1.6}
+.lab-followup .reference-actions{max-width:none;margin:16px 0 0}
+.lab-content .official-service-link{overflow-wrap:anywhere}
 .hallmark-page .reference-limit{margin-bottom:24px}
 .hallmark-ask{width:min(100%,820px);margin:0 auto;padding:24px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface-raised);box-shadow:0 12px 30px color-mix(in srgb,var(--color-primary) 7%,transparent)}
 .hallmark-ask>label{display:block;margin:18px 0 8px;color:var(--color-heading);font-weight:800}
@@ -1317,5 +1325,6 @@ footer b{
 .answer-official-action{display:inline-block;margin:.65rem 0 0}
 @media(max-width:700px){.hallmark-ask{padding:16px}.hallmark-examples>div{grid-template-columns:1fr}.hallmark-examples button{min-height:54px}.hallmark-compose-actions{flex-wrap:wrap}.hallmark-compose-actions>button{width:100%}}
 .huid-format{max-width:820px;margin:0 auto 20px;padding:14px 16px;border-left:4px solid var(--color-saffron);border-radius:8px;background:var(--status-caution-bg);color:var(--status-caution-text);font-weight:700}
-.lab-page .reference-actions,.hallmark-page .reference-actions{max-width:820px;margin-inline:auto}
-@media(max-width:700px){.lab-results{grid-template-columns:1fr}.assistant-view .message{max-width:100%;padding:15px}.assistant-view .message.user{max-width:90%}.lab-facts>div{flex-direction:column;gap:3px}.lab-facts dd{text-align:left}}
+.hallmark-page .reference-actions{max-width:820px;margin-inline:auto}
+@media(max-width:800px){.lab-results{grid-template-columns:1fr}.lab-results .reference-card{grid-template-rows:auto}.lab-facts>div{flex-direction:column;gap:3px}.lab-facts dd{text-align:left}}
+@media(max-width:700px){.assistant-view .message{max-width:100%;padding:15px}.assistant-view .message.user{max-width:90%}}

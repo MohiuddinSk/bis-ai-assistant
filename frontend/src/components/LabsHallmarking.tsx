@@ -48,16 +48,19 @@ export function TestingLabsPage() {
   const search = (event: FormEvent) => { event.preventDefault(); setSearched(draft.trim()); };
   return <section className="reference-page lab-page">
     <header className="reference-intro"><p className="eyebrow">BIS LIMS</p><h1>{t.labs}</h1><p>{t.labsLead}</p></header>
-    <form className="reference-search" onSubmit={search}><label htmlFor="lab-search">{t.labSearch}</label><div><input id="lab-search" value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.labPlaceholder} maxLength={120}/><button>{t.search}</button></div></form>
-    <p className="evidence-limited">{t.snapshot}</p>
-    <p className="catalogue-meta" role="status">{matches.length} {t.matches}</p>
-    {matches.length ? <div className="lab-results">{matches.map(lab => <article className="reference-card" key={lab.code}>
-      <p className="eyebrow">{lab.standard} · {lab.code}</p><h2>{lab.name}</h2><p>{lab.location} · {lab.product}</p>
-      <dl className="lab-facts"><div><dt>{t.scope}</dt><dd>{lab.scope}</dd></div><div><dt>{t.validity}</dt><dd>{lab.validUntil}</dd></div><div><dt>{t.fee}</dt><dd>{lab.charge || t.priceMissing}</dd></div></dl>
-      <OfficialLink href={lab.source}>{t.source}</OfficialLink>
-    </article>)}</div> : <div className="reference-limit"><p>{t.noMatch}</p></div>}
-    <p className="reference-copy">{t.feeCaution}</p><p className="reference-copy">{t.handoff}</p>
-    <div className="reference-actions"><OfficialLink href={officialSearch}>{t.officialSearch}</OfficialLink><OfficialLink href={LIMS_LABS}>{t.officialLabs}</OfficialLink></div>
+    <div className="lab-content">
+      <form className="reference-search" onSubmit={search}><label htmlFor="lab-search">{t.labSearch}</label><div><input id="lab-search" value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.labPlaceholder} maxLength={120}/><button>{t.search}</button></div></form>
+      <p className="evidence-limited">{t.snapshot}</p>
+      <p className="catalogue-meta" role="status">{matches.length} {t.matches}</p>
+      {matches.length ? <div className="lab-results">{matches.map(lab => <article className="reference-card" key={lab.code}>
+        <div className="lab-identity"><p className="eyebrow">{lab.standard} · {lab.code}</p><h2>{lab.name}</h2><p>{lab.location} · {lab.product}</p></div>
+        <dl className="lab-facts"><div><dt>{t.scope}</dt><dd>{lab.scope}</dd></div><div><dt>{t.validity}</dt><dd>{lab.validUntil}</dd></div><div><dt>{t.fee}</dt><dd>{lab.charge || t.priceMissing}</dd></div></dl>
+        <OfficialLink href={lab.source}>{t.source}</OfficialLink>
+      </article>)}</div> : <div className="reference-limit"><p>{t.noMatch}</p></div>}
+      <div className="lab-followup"><p className="reference-copy">{t.feeCaution}</p><p className="reference-copy">{t.handoff}</p>
+        <div className="reference-actions"><OfficialLink href={officialSearch}>{t.officialSearch}</OfficialLink><OfficialLink href={LIMS_LABS}>{t.officialLabs}</OfficialLink></div>
+      </div>
+    </div>
   </section>;
 }
 
