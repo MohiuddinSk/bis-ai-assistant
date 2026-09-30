@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import { HallmarkingPage, TestingLabsPage } from './LabsHallmarking';
 
@@ -41,8 +41,25 @@ it('checks six-character alphanumeric HUID format without an authenticity verdic
   await user.click(screen.getByRole('button', { name: 'Check input format' }));
   expect(huid).toHaveValue('AB12CD');
   expect(screen.getByText(/authenticity has NOT been verified/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Open official BIS Care app information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/bis-apps/?lang=en');
+  expect(screen.getByRole('link', { name: 'Verify HUID in BIS Care ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/bis-apps/?lang=en');
   expect(screen.queryByText(/^HUID verified$/i)).toBeNull();
+});
+
+it('keeps suggested hallmarking questions editable until explicit submission, with the chosen audience', async () => {
+  const onAsk = vi.fn();
+  render(<LanguageProvider><HallmarkingPage onAsk={onAsk} /></LanguageProvider>);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'What is HUID, and how can I verify it?' }));
+  const question = screen.getByLabelText('Your hallmarking question');
+  expect(question).toHaveValue('What is HUID, and how can I verify it?');
+  expect(onAsk).not.toHaveBeenCalled();
+  await user.type(question, ' Please explain.');
+  await user.click(screen.getByRole('button', { name: 'Ask Bandhu' }));
+  expect(onAsk).toHaveBeenCalledWith('What is HUID, and how can I verify it? Please explain.', 'consumer');
+  await user.click(screen.getByRole('button', { name: 'How can a jeweller get started with BIS hallmarking?' }));
+  expect(onAsk).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole('button', { name: 'Ask Bandhu' }));
+  expect(onAsk).toHaveBeenLastCalledWith('How can a jeweller get started with BIS hallmarking?', 'manufacturer');
 });
 
 it('localizes detailed lab and HUID guidance in all five languages', () => {

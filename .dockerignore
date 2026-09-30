@@ -25,6 +25,8 @@ data/processed/*.md
 !data/processed/generated_v3/**
 !data/processed/generated_v4/
 !data/processed/generated_v4/**
+!data/processed/hallmarking_candidate_v1/
+!data/processed/hallmarking_candidate_v1/**
 .cache
 .huggingface
 **/huggingface

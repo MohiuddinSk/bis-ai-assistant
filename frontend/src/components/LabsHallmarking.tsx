@@ -1,10 +1,14 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { SpeechInput } from './SpeechInput';
+import type { Audience } from '../types/chat';
 
 const LIMS_SEARCH = 'https://lims.bis.gov.in/home/search_is_number/';
 const LIMS_LABS = 'https://lims.bis.gov.in/home/labs/';
 const BIS_CARE = 'https://www.bis.gov.in/bis-apps/?lang=en';
-const BIS_HALLMARKING = 'https://www.bis.gov.in/hallmarking-overview/?lang=en';
+const BIS_JEWELLERS = 'https://www.bis.gov.in/hallmarking-overview/jewellers-registration-scheme/?lang=en';
+const BIS_CENTRES = 'https://www.bis.gov.in/hallmarking-overview/hallmarking-centre/?lang=en';
+const BIS_COMPLAINTS = 'https://www.bis.gov.in/consumer-overview/online-complaint-registration/?lang=en';
 
 /** Small, dated observations from BIS LIMS; this is not a live or complete laboratory feed. */
 export const checkedLabs = [
@@ -57,16 +61,41 @@ export function TestingLabsPage() {
   </section>;
 }
 
-export function HallmarkingPage() {
-  const { language } = useLanguage(); const t = copy[language];
-  const [huid, setHuid] = useState(''); const [checked, setChecked] = useState(false);
+const hallmarkEntryCopy = {
+  en: { heading: 'Hallmarking guidance', intro: 'Ask about jewellery marks, HUID, buying checks or the jeweller process. Answers use reviewed BIS sources.', question: 'Your hallmarking question', audience: 'I am a', placeholder: 'Ask what you need to know about BIS hallmarking…', consumer: 'Consumer', jeweller: 'Jeweller', examples: 'Try a question', ask: 'Ask Bandhu', services: 'Official BIS services', care: 'Verify HUID in BIS Care ↗', registration: 'Jeweller registration ↗', centres: 'Assaying and Hallmarking Centres ↗', complaints: 'Consumer complaints ↗', format: 'Optional HUID format check', samples: ['What should I check before buying hallmarked gold jewellery?', 'What is HUID, and how can I verify it?', 'How can a jeweller get started with BIS hallmarking?'] },
+  hi: { heading: 'हॉलमार्किंग मार्गदर्शन', intro: 'आभूषण के चिह्न, HUID, खरीदते समय जाँच या जौहरी की प्रक्रिया के बारे में पूछें। उत्तर समीक्षित BIS स्रोतों पर आधारित हैं।', question: 'आपका हॉलमार्किंग प्रश्न', audience: 'मैं हूँ', placeholder: 'BIS हॉलमार्किंग के बारे में अपना प्रश्न लिखें…', consumer: 'ग्राहक', jeweller: 'जौहरी', examples: 'एक प्रश्न आज़माएँ', ask: 'Bandhu से पूछें', services: 'आधिकारिक BIS सेवाएँ', care: 'BIS Care में HUID जाँचें ↗', registration: 'जौहरी पंजीकरण ↗', centres: 'परख और हॉलमार्किंग केंद्र ↗', complaints: 'उपभोक्ता शिकायतें ↗', format: 'वैकल्पिक HUID प्रारूप जाँच', samples: ['हॉलमार्क वाले सोने के आभूषण खरीदने से पहले क्या जाँचूँ?', 'HUID क्या है और इसे कैसे जाँच सकता हूँ?', 'जौहरी BIS हॉलमार्किंग कैसे शुरू कर सकता है?'] },
+  mr: { heading: 'हॉलमार्किंग मार्गदर्शन', intro: 'दागिन्यांवरील चिन्हे, HUID, खरेदीची तपासणी किंवा सराफाची प्रक्रिया याबद्दल विचारा. उत्तरे तपासलेल्या BIS स्रोतांवर आधारित आहेत.', question: 'तुमचा हॉलमार्किंग प्रश्न', audience: 'मी आहे', placeholder: 'BIS हॉलमार्किंगबद्दल प्रश्न लिहा…', consumer: 'ग्राहक', jeweller: 'सराफ', examples: 'प्रश्न वापरून पहा', ask: 'Bandhu ला विचारा', services: 'अधिकृत BIS सेवा', care: 'BIS Care मध्ये HUID तपासा ↗', registration: 'सराफ नोंदणी ↗', centres: 'परख व हॉलमार्किंग केंद्रे ↗', complaints: 'ग्राहक तक्रारी ↗', format: 'पर्यायी HUID नमुना तपासणी', samples: ['हॉलमार्क असलेले सोन्याचे दागिने खरेदीपूर्वी काय तपासावे?', 'HUID म्हणजे काय आणि ते कसे तपासावे?', 'सराफ BIS हॉलमार्किंगची सुरुवात कशी करू शकतो?'] },
+  ta: { heading: 'ஹால்மார்க்கிங் வழிகாட்டல்', intro: 'நகை குறிகள், HUID, வாங்கும் முன் சோதனை அல்லது நகைக்கடைக்காரர் நடைமுறை பற்றி கேளுங்கள். பதில்கள் பரிசீலித்த BIS ஆதாரங்களைப் பயன்படுத்துகின்றன.', question: 'உங்கள் ஹால்மார்க்கிங் கேள்வி', audience: 'நான்', placeholder: 'BIS ஹால்மார்க்கிங் பற்றி கேளுங்கள்…', consumer: 'நுகர்வோர்', jeweller: 'நகைக்கடைக்காரர்', examples: 'ஒரு கேள்வியை முயற்சிக்கவும்', ask: 'Bandhu-விடம் கேளுங்கள்', services: 'அதிகாரப்பூர்வ BIS சேவைகள்', care: 'BIS Care-இல் HUID சரிபார்க்கவும் ↗', registration: 'நகைக்கடைக்காரர் பதிவு ↗', centres: 'சோதனை மற்றும் ஹால்மார்க்கிங் மையங்கள் ↗', complaints: 'நுகர்வோர் புகார்கள் ↗', format: 'விருப்ப HUID வடிவச் சரிபார்ப்பு', samples: ['ஹால்மார்க் தங்க நகை வாங்குவதற்கு முன் என்ன பார்க்க வேண்டும்?', 'HUID என்றால் என்ன, அதை எப்படிச் சரிபார்ப்பது?', 'நகைக்கடைக்காரர் BIS ஹால்மார்க்கிங்கை எப்படித் தொடங்கலாம்?'] },
+  bn: { heading: 'হলমার্কিং নির্দেশনা', intro: 'গয়নার চিহ্ন, HUID, কেনার আগে পরীক্ষা বা জুয়েলারির প্রক্রিয়া নিয়ে প্রশ্ন করুন। উত্তর পর্যালোচিত BIS উৎসভিত্তিক।', question: 'আপনার হলমার্কিং প্রশ্ন', audience: 'আমি', placeholder: 'BIS হলমার্কিং নিয়ে প্রশ্ন লিখুন…', consumer: 'ভোক্তা', jeweller: 'জুয়েলারি বিক্রেতা', examples: 'একটি প্রশ্ন চেষ্টা করুন', ask: 'Bandhu-কে জিজ্ঞাসা করুন', services: 'সরকারি BIS পরিষেবা', care: 'BIS Care-এ HUID যাচাই করুন ↗', registration: 'জুয়েলারি বিক্রেতার নিবন্ধন ↗', centres: 'অ্যাসেয়িং ও হলমার্কিং কেন্দ্র ↗', complaints: 'ভোক্তার অভিযোগ ↗', format: 'ঐচ্ছিক HUID বিন্যাস পরীক্ষা', samples: ['হলমার্কযুক্ত সোনার গয়না কেনার আগে কী পরীক্ষা করব?', 'HUID কী এবং কীভাবে তা যাচাই করব?', 'জুয়েলারি বিক্রেতা কীভাবে BIS হলমার্কিং শুরু করবেন?'] },
+} as const;
+
+export function HallmarkingPage({ onAsk }: { onAsk?: (question: string, audience: Audience) => void }) {
+  const { language } = useLanguage();
+  const t = copy[language];
+  const entry = hallmarkEntryCopy[language];
+  const [draft, setDraft] = useState('');
+  const [audience, setAudience] = useState<Audience>('consumer');
+  const [huid, setHuid] = useState('');
+  const [checked, setChecked] = useState(false);
+  const questionInput = useRef<HTMLTextAreaElement>(null);
   const formatOk = /^[A-Za-z0-9]{6}$/.test(huid.trim());
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (draft.trim()) onAsk?.(draft.trim(), audience);
+  };
   return <section className="reference-page hallmark-page">
-    <header className="reference-intro"><p className="eyebrow">BIS Care</p><h1>{t.hallmark}</h1><p>{t.hallmarkLead}</p></header>
-    <div className="reference-limit"><p>{t.noVerification}</p></div>
-    <form className="reference-search" onSubmit={event => { event.preventDefault(); setChecked(true); }}><label htmlFor="huid-input">{t.huidLabel}</label><div><input id="huid-input" value={huid} onChange={event => { setHuid(event.target.value.toUpperCase()); setChecked(false); }} placeholder={t.huidPlaceholder} autoComplete="off" spellCheck={false}/><button>{t.check}</button></div></form>
-    {checked && <p className="huid-format" role="status">{formatOk ? t.formatOk : t.invalid}</p>}
-    <p className="reference-copy">{t.steps}</p>
-    <div className="reference-actions"><OfficialLink href={BIS_CARE}>{t.bisCare}</OfficialLink><OfficialLink href={BIS_HALLMARKING}>{t.hallmarkSource}</OfficialLink></div>
+    <header className="reference-intro"><p className="eyebrow">BIS Bandhu</p><h1>{entry.heading}</h1><p>{entry.intro}</p></header>
+    <form className="hallmark-ask" onSubmit={submit}>
+      <div className="hallmark-audience" role="group" aria-label={entry.audience}>
+        <label><input type="radio" name="hallmark-audience" checked={audience === 'consumer'} onChange={() => setAudience('consumer')} />{entry.consumer}</label>
+        <label><input type="radio" name="hallmark-audience" checked={audience === 'manufacturer'} onChange={() => setAudience('manufacturer')} />{entry.jeweller}</label>
+      </div>
+      <label htmlFor="hallmark-question">{entry.question}</label>
+      <textarea ref={questionInput} id="hallmark-question" value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} placeholder={entry.placeholder} />
+      <div className="hallmark-compose-actions"><SpeechInput value={draft} onTranscript={setDraft} /><button type="submit" disabled={!draft.trim()}>{entry.ask}</button></div>
+    </form>
+    <div className="hallmark-examples"><p>{entry.examples}</p><div>{entry.samples.map((sample, index) => <button type="button" key={sample} onClick={() => { setDraft(sample); setAudience(index === 2 ? 'manufacturer' : 'consumer'); questionInput.current?.focus(); }}>{sample}</button>)}</div></div>
+    <section className="hallmark-services" aria-label={entry.services}><h2>{entry.services}</h2><div className="reference-actions"><OfficialLink href={BIS_CARE}>{entry.care}</OfficialLink><OfficialLink href={BIS_JEWELLERS}>{entry.registration}</OfficialLink><OfficialLink href={BIS_CENTRES}>{entry.centres}</OfficialLink><OfficialLink href={BIS_COMPLAINTS}>{entry.complaints}</OfficialLink></div></section>
+    <details className="hallmark-format"><summary>{entry.format}</summary><p>{t.noVerification}</p><form className="reference-search" onSubmit={event => { event.preventDefault(); setChecked(true); }}><label htmlFor="huid-input">{t.huidLabel}</label><div><input id="huid-input" value={huid} onChange={event => { setHuid(event.target.value.toUpperCase()); setChecked(false); }} placeholder={t.huidPlaceholder} autoComplete="off" spellCheck={false}/><button>{t.check}</button></div></form>{checked && <p className="huid-format" role="status">{formatOk ? t.formatOk : t.invalid}</p>}</details>
   </section>;
 }

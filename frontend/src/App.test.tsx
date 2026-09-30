@@ -41,8 +41,51 @@ it('opens Testing Labs and Hallmarking as distinct, refreshable routes without c
   expect(within(nav).queryAllByRole('button', { current: 'page' })).toHaveLength(1);
   await userEvent.setup().click(within(nav).getByRole('button', { name: 'Hallmarking' }));
   expect(window.location.hash).toBe('#/consumers/hallmarking');
-  expect(screen.getByRole('heading', { name: 'Hallmarking and HUID' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Hallmarking guidance' })).toBeInTheDocument();
   expect(within(nav).getByRole('button', { name: 'Hallmarking' })).toHaveAttribute('aria-current', 'page');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+});
+
+it('hands an edited hallmarking question to the shared Assistant with the selected audience', async () => {
+  window.location.hash = '#/consumers/hallmarking';
+  render(<App />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'How can a jeweller get started with BIS hallmarking?' }));
+  const question = screen.getByRole('textbox', { name: 'Your hallmarking question' });
+  expect(question).toHaveValue('How can a jeweller get started with BIS hallmarking?');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+  await user.type(question, ' Please include registration.');
+  await user.click(screen.getByRole('button', { name: 'Ask Bandhu' }));
+  await screen.findByText('IS 15644 is the primary standard.');
+  expect(window.location.hash).toBe('#/assistant');
+  const chatCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => String(url).includes('/api/chat'));
+  expect(chatCall).toBeDefined();
+  expect(JSON.parse(chatCall![1].body)).toMatchObject({
+    question: 'How can a jeweller get started with BIS hallmarking? Please include registration.',
+    audience: 'manufacturer',
+  });
+});
+
+it('updates hallmarking guidance in all five languages without losing the draft or route', async () => {
+  window.location.hash = '#/consumers/hallmarking';
+  render(<App />);
+  const user = userEvent.setup();
+  const question = document.getElementById('hallmark-question') as HTMLTextAreaElement;
+  await user.type(question, 'HUID ABC123');
+  const headings = [
+    ['hi', 'हॉलमार्किंग मार्गदर्शन', 'BIS Care में HUID जाँचें ↗'],
+    ['mr', 'हॉलमार्किंग मार्गदर्शन', 'BIS Care मध्ये HUID तपासा ↗'],
+    ['ta', 'ஹால்மார்க்கிங் வழிகாட்டல்', 'BIS Care-இல் HUID சரிபார்க்கவும் ↗'],
+    ['bn', 'হলমার্কিং নির্দেশনা', 'BIS Care-এ HUID যাচাই করুন ↗'],
+    ['en', 'Hallmarking guidance', 'Verify HUID in BIS Care ↗'],
+  ] as const;
+  for (const [language, heading, service] of headings) {
+    await user.selectOptions(document.getElementById('language') as HTMLSelectElement, language);
+    expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: service })).toBeInTheDocument();
+    expect(question).toHaveValue('HUID ABC123');
+    expect(window.location.hash).toBe('#/consumers/hallmarking');
+  }
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
 });
 
@@ -56,7 +99,7 @@ it('keeps concise navigation keyboard-operable and reaches guidance and hallmark
   expect(window.location.hash).toBe('#/consumers/hallmarking');
   expect(hallmarking).toHaveAttribute('aria-current', 'page');
   expect(screen.getByText(/does not verify HUID authenticity/i)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Read official BIS hallmarking information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/hallmarking-overview/?lang=en');
+  expect(screen.getByRole('link', { name: 'Verify HUID in BIS Care ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/bis-apps/?lang=en');
   await user.click(screen.getByRole('contentinfo').querySelector('button:last-child') as HTMLButtonElement);
   await user.click(screen.getByRole('button', { name: 'Certification guidance →' }));
   expect(window.location.hash).toBe('#/industry/certification-guide');

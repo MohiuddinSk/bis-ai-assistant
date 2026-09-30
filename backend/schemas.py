@@ -186,6 +186,13 @@ class ChatCitation(BaseModel):
     page_end: int | None = None
     chunk_id: str
     excerpt: str
+    supporting_quote: str | None = None
+    source_type: Literal["pdf", "html"] | None = None
+    source_url: str | None = None
+    source_title: str | None = None
+    source_section: str | None = None
+    source_last_updated: str | None = None
+    retrieved_at: str | None = None
 
 
 class AnswerSection(BaseModel):
@@ -216,6 +223,7 @@ class ChatResponse(BaseModel):
     needs_clarification: bool = False
     suggested_replies: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]] = Field(default_factory=list, max_length=8)
     assistant_context: AssistantContext | None = None
+    official_next_step_url: str | None = None
 
 
 class ComplianceGuideResponse(BaseModel):

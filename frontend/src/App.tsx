@@ -14,7 +14,7 @@ import type { ReferencePage } from './components/ReferencePages';
 import { builtInSuggestedActions, normalizeSuggestedActions, questionForSuggestedAction } from './suggestedActions';
 import type { SuggestedAction } from './suggestedActions';
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
-import type { Language, TranslationKey } from './i18n/translations';
+import { consumerAssistantLead, type Language, type TranslationKey } from './i18n/translations';
 type View = 'home' | 'assistant' | 'wizard' | ReferencePage;
 const routeForView: Record<View, string> = {
   home: '/', assistant: '/assistant', wizard: '/industry/compliance-wizard', services: '/services',
@@ -333,7 +333,7 @@ go('assistant')}} startAudienceJourney={startAudience}/>} {view==='assistant'&&<
 </p>
 <h1>{audience==='manufacturer'?t('shellIndustryTitle'):audience==='consumer'?t('shellConsumerTitle'):t('shellAssistantTitle')}
 </h1>
-<p>{audience==='manufacturer'?t('manufacturerCard'):audience==='consumer'?t('consumerCard'):t('shellAssistantLead')}
+<p>{audience==='manufacturer'?t('manufacturerCard'):audience==='consumer'?consumerAssistantLead[language]:t('shellAssistantLead')}
 </p>
 {audience==='consumer'&&<a className="official-service-link" href="https://www.bis.gov.in/consumer-overview/" target="_blank" rel="noopener noreferrer">{consumerServiceLabel[language]}</a>}
 </div>{messages.length===0&&<SuggestedQuestions actions={builtInSuggestedActions.map((a,i)=>({...a,label:t(suggestionKeys[i])}))} busy={busy} onSelect={a=>doAction(a)}/>}
