@@ -20,7 +20,7 @@ const routeForView: Record<View, string> = {
   home: '/', assistant: '/assistant', wizard: '/industry/compliance-wizard', services: '/services',
   standards: '/standards', 'standard-detail': '/standards/detail',
   finder: '/industry/finder', 'certification-guide': '/industry/certification-guide',
-  consumers: '/consumers', hallmarking: '/consumers/hallmarking', help: '/help', 'how-it-works': '/help/how-it-works',
+  consumers: '/consumers', hallmarking: '/consumers/hallmarking', labs: '/testing-labs', help: '/help', 'how-it-works': '/help/how-it-works',
 };
 const viewForRoute = (): View => {
   const route = (window.location.hash.replace(/^#/, '') || '/').split('?')[0];
@@ -44,12 +44,12 @@ const consumerServiceLabel: Record<Language, string> = {
   ta: 'அதிகாரப்பூர்வ BIS நுகர்வோர் தகவல் ↗',
   bn: 'সরকারি BIS ভোক্তা তথ্য ↗',
 };
-const referenceNavigation: Record<Language, Record<'standards'|'services'|'help'|'finder'|'guide'|'consumerHub'|'hallmarking'|'industryMenu'|'consumerMenu', string>> = {
-  en:{standards:'Standards',services:'BIS Services',help:'Help',finder:'Product → Standard Finder',guide:'Certification guidance',consumerHub:'Consumer guidance',hallmarking:'Hallmarking',industryMenu:'Open industry menu',consumerMenu:'Open consumers menu'},
-  hi:{standards:'मानक',services:'BIS सेवाएँ',help:'सहायता',finder:'उत्पाद → मानक खोजक',guide:'प्रमाणन मार्गदर्शन',consumerHub:'उपभोक्ता मार्गदर्शन',hallmarking:'हॉलमार्किंग',industryMenu:'उद्योग मेनू खोलें',consumerMenu:'उपभोक्ता मेनू खोलें'},
-  mr:{standards:'मानके',services:'BIS सेवा',help:'मदत',finder:'उत्पादन → मानक शोधक',guide:'प्रमाणन मार्गदर्शन',consumerHub:'ग्राहक मार्गदर्शन',hallmarking:'हॉलमार्किंग',industryMenu:'उद्योग मेनू उघडा',consumerMenu:'ग्राहक मेनू उघडा'},
-  ta:{standards:'தரநிலைகள்',services:'BIS சேவைகள்',help:'உதவி',finder:'தயாரிப்பு → தரநிலை கண்டறிதல்',guide:'சான்றிதழ் வழிகாட்டல்',consumerHub:'நுகர்வோர் வழிகாட்டல்',hallmarking:'ஹால்மார்க்கிங்',industryMenu:'தொழில் பட்டியைத் திறக்கவும்',consumerMenu:'நுகர்வோர் பட்டியைத் திறக்கவும்'},
-  bn:{standards:'মান',services:'BIS পরিষেবা',help:'সহায়তা',finder:'পণ্য → মান অনুসন্ধান',guide:'সার্টিফিকেশন নির্দেশনা',consumerHub:'ভোক্তা নির্দেশনা',hallmarking:'হলমার্কিং',industryMenu:'শিল্প মেনু খুলুন',consumerMenu:'ভোক্তা মেনু খুলুন'},
+const referenceNavigation: Record<Language, Record<'standards'|'services'|'help'|'hallmarking'|'labs', string>> = {
+  en:{standards:'Standards',services:'BIS Services',help:'Help',hallmarking:'Hallmarking',labs:'Testing Labs'},
+  hi:{standards:'मानक',services:'BIS सेवाएँ',help:'सहायता',hallmarking:'हॉलमार्किंग',labs:'परीक्षण प्रयोगशालाएँ'},
+  mr:{standards:'मानके',services:'BIS सेवा',help:'मदत',hallmarking:'हॉलमार्किंग',labs:'चाचणी प्रयोगशाळा'},
+  ta:{standards:'தரநிலைகள்',services:'BIS சேவைகள்',help:'உதவி',hallmarking:'ஹால்மார்க்கிங்',labs:'சோதனை ஆய்வகங்கள்'},
+  bn:{standards:'মান',services:'BIS পরিষেবা',help:'সহায়তা',hallmarking:'হলমার্কিং',labs:'পরীক্ষাগার'},
 };
 const demoExamples: Record<Language, { heading:string; first:string; second:string; selected:string }> = {
   en:{heading:'Try an example · edit before asking',first:'Battery-operated toy standard',second:'New toy series documents',selected:'Manufacturer example — review or edit the question, then Ask Bandhu.'},
@@ -196,7 +196,6 @@ function AppContent(){const{t,language}=useLanguage();
 const navCopy=referenceNavigation[language];
 const[view,setView]=useState<View>(viewForRoute);
 const[menu,setMenu]=useState(false);
-const[openGroup,setOpenGroup]=useState<'industry'|'consumers'|null>(null);
 const[messages,setMessages]=useState<Message[]>([]);
 const[busy,setBusy]=useState(false);
 const[error,setError]=useState('');
@@ -211,14 +210,6 @@ const[status,setStatus]=useState<'ready'|'degraded'|'unavailable'>('unavailable'
 const[updating,setUpdating]=useState(false);
 const[theme,setTheme]=useState<'light'|'dark'>('light');
 const end=useRef<HTMLDivElement>(null),questionInput=useRef<HTMLTextAreaElement>(null),chatAbort=useRef<AbortController|null>(null),localeAbort=useRef<AbortController|null>(null),localeVersion=useRef(0),id=useRef(0),variants=useRef(new Map<number,Map<Language,ChatResponse>>()),pendingRequest=useRef(false);
-const navRef=useRef<HTMLElement>(null);
-useEffect(()=>{
-  const closeOutside=(event:PointerEvent)=>{if(!navRef.current?.contains(event.target as Node))setOpenGroup(null)};
-  const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpenGroup(null)};
-  document.addEventListener('pointerdown',closeOutside);
-  document.addEventListener('keydown',closeOnEscape);
-  return()=>{document.removeEventListener('pointerdown',closeOutside);document.removeEventListener('keydown',closeOnEscape)};
-},[]);
 useEffect(()=>{const c=new AbortController();
 void getHealth(c.signal).then(x=>!c.signal.aborted&&setStatus(x.status==='ready'?'ready':'degraded')).catch(()=>!c.signal.aborted&&setStatus('unavailable'));
 return()=>c.abort()},[]);
@@ -297,7 +288,7 @@ const go=(v:View)=>{if(view==='assistant'&&v!=='assistant'){setPending(null);
 setSession(undefined)}if(window.location.hash!==`#${routeForView[v]}`)window.location.hash=routeForView[v];
 setView(v);
 setMenu(false);
-setOpenGroup(null)};
+};
 const startAudience=(selectedAudience:Audience)=>{
 if(selectedAudience!==audience){
 setPending(null);
@@ -318,15 +309,14 @@ return <div className="app-shell">
 <img className="brand-logo" src={theme==='dark'?'/bis-logo-dark.png':'/bis-logo-transparent.png'} alt="" />
 <span className="brand-copy"><strong>BIS Bandhu</strong><small>{t('shellTagline')}</small></span>
 </button>
-<nav ref={navRef} className={menu?'open reference-nav-open':''} aria-label={t('shellNavigation')}>
+<nav className={menu?'open reference-nav-open':''} aria-label={t('shellNavigation')}>
 <button aria-current={view==='home'?'page':undefined} onClick={()=>go('home')}>{t('shellNavHome')}
 </button>
-<button aria-current={view==='assistant'&&audience==='general'?'page':undefined} onClick={()=>startAudience('general')}>{t('shellNavAssistant')}
+<button aria-current={['assistant','finder','certification-guide','consumers'].includes(view)?'page':undefined} onClick={()=>startAudience('general')}>{t('shellNavAssistant')}
 </button>
 <button aria-current={['standards','standard-detail'].includes(view)?'page':undefined} onClick={()=>go('standards')}>{navCopy.standards}</button>
-<div className="nav-group"><button aria-current={view==='assistant'&&audience==='manufacturer'||['finder','certification-guide'].includes(view)?'page':undefined} onClick={()=>startAudience('manufacturer')}>{t('shellNavIndustry')}</button><button className="nav-chevron" aria-label={navCopy.industryMenu} aria-expanded={openGroup==='industry'} aria-controls="industry-menu" onClick={()=>setOpenGroup(openGroup==='industry'?null:'industry')}><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>{openGroup==='industry'&&<div id="industry-menu" className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('finder')}>{navCopy.finder}</button><button role="menuitem" onClick={()=>go('certification-guide')}>{navCopy.guide}</button><button role="menuitem" onClick={()=>go('wizard')}>{t('shellNavWizard')}</button></div>}</div>
-<div className="nav-group"><button aria-current={view==='assistant'&&audience==='consumer'||['consumers','hallmarking'].includes(view)?'page':undefined} onClick={()=>startAudience('consumer')}>{t('shellNavConsumers')}</button><button className="nav-chevron" aria-label={navCopy.consumerMenu} aria-expanded={openGroup==='consumers'} aria-controls="consumers-menu" onClick={()=>setOpenGroup(openGroup==='consumers'?null:'consumers')}><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>{openGroup==='consumers'&&<div id="consumers-menu" className="nav-popover" role="menu"><button role="menuitem" onClick={()=>go('consumers')}>{navCopy.consumerHub}</button><button role="menuitem" onClick={()=>go('hallmarking')}>{navCopy.hallmarking}</button></div>}</div>
-<button aria-current={view==='services'?'page':undefined} onClick={()=>go('services')}>{navCopy.services}</button>
+<button aria-current={view==='labs'?'page':undefined} onClick={()=>go('labs')}>{navCopy.labs}</button>
+<button aria-current={view==='hallmarking'?'page':undefined} onClick={()=>go('hallmarking')}>{navCopy.hallmarking}</button>
 <button aria-current={view==='wizard'?'page':undefined} onClick={()=>go('wizard')}>{t('shellNavWizard')}</button>
 </nav>
 <div className="header-tools">
@@ -352,8 +342,8 @@ go('assistant')}} startAudienceJourney={startAudience}/>} {view==='assistant'&&<
 </p>}{error&&<ErrorMessage message={error} onRetry={()=>void send(last,lastContext,lastDisplay)}/>}
 <div ref={end}/>
 </section>}
-<ChatInput onSend={send} busy={busy} audience={audience} onAudienceChange={startAudience} autoFocus={findingStandard} inputRef={questionInput}/>{messages.length>0&&<button className="secondary reset-conversation" onClick={reset} disabled={busy}>{t('startOver')}
-</button>}
+<ChatInput onSend={send} busy={busy} audience={audience} onAudienceChange={startAudience} autoFocus={findingStandard} inputRef={questionInput}/>{messages.length>0&&<div className="reset-row"><button className="secondary reset-conversation" onClick={reset} disabled={busy}>{t('startOver')}
+</button></div>}
 </section>}
 {!['home','assistant','wizard'].includes(view) && (
   <ReferencePages page={view as ReferencePage} navigate={(page) => go(page)} ask={(q, a) => void send(q, undefined, q, a)} openWizard={() => go('wizard')} openAudience={startAudience}/>
@@ -375,6 +365,7 @@ go('assistant')}} startAudienceJourney={startAudience}/>} {view==='assistant'&&<
 <span>{t('footer')}
 </span>
 <button className="footer-help" onClick={()=>go('help')}>{navCopy.help}</button>
+<button className="footer-help" onClick={()=>go('services')}>{navCopy.services}</button>
 </footer>
 </div>}
 export default function App(){return <LanguageProvider>

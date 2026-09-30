@@ -19,7 +19,7 @@ it('opens a stable standards URL directly and keeps catalogue errors honest when
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Search verified standard metadata' })).toBeInTheDocument();
   expect(await screen.findByText('The verified catalogue could not be loaded. Please try again or use the official BIS search.')).toBeInTheDocument();
-  await userEvent.setup().click(screen.getByRole('button', { name: 'BIS Services' }));
+  await userEvent.setup().click(screen.getByRole('contentinfo').querySelector('button:last-child') as HTMLButtonElement);
   expect(window.location.hash).toBe('#/services');
   expect(screen.getByRole('heading', { name: 'BIS Bandhu services' })).toBeInTheDocument();
 });
@@ -32,26 +32,35 @@ it('opens Standards directly without creating a chat request', async () => {
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
 });
 
-it('opens grouped navigation by keyboard, closes on Escape, and reaches certification and hallmarking', async () => {
+it('opens Testing Labs and Hallmarking as distinct, refreshable routes without chat requests', async () => {
+  window.location.hash = '#/testing-labs';
+  render(<App />);
+  await screen.findByRole('heading', { name: 'Testing laboratories' });
+  const nav = screen.getByRole('navigation');
+  expect(within(nav).getByRole('button', { name: 'Testing Labs' })).toHaveAttribute('aria-current', 'page');
+  expect(within(nav).queryAllByRole('button', { current: 'page' })).toHaveLength(1);
+  await userEvent.setup().click(within(nav).getByRole('button', { name: 'Hallmarking' }));
+  expect(window.location.hash).toBe('#/consumers/hallmarking');
+  expect(screen.getByRole('heading', { name: 'Hallmarking and HUID' })).toBeInTheDocument();
+  expect(within(nav).getByRole('button', { name: 'Hallmarking' })).toHaveAttribute('aria-current', 'page');
+  expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
+});
+
+it('keeps concise navigation keyboard-operable and reaches guidance and hallmarking without a chat request', async () => {
   render(<App />); await screen.findByRole('status');
   const user = userEvent.setup();
-  const industry = screen.getByRole('button', { name: 'Open industry menu' });
-  industry.focus();
+  expect(within(screen.getByRole('navigation')).queryByRole('button', { name: 'Industry' })).toBeNull();
+  const hallmarking = within(screen.getByRole('navigation')).getByRole('button', { name: 'Hallmarking' });
+  hallmarking.focus();
   await user.keyboard('{Enter}');
-  expect(industry).toHaveAttribute('aria-expanded', 'true');
-  expect(screen.getByRole('menuitem', { name: 'Certification guidance' })).toBeInTheDocument();
-  await user.keyboard('{Escape}');
-  expect(industry).toHaveAttribute('aria-expanded', 'false');
-  await user.click(industry);
-  await user.click(screen.getByRole('menuitem', { name: 'Certification guidance' }));
+  expect(window.location.hash).toBe('#/consumers/hallmarking');
+  expect(hallmarking).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByText(/does not verify HUID authenticity/i)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Read official BIS hallmarking information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/hallmarking-overview/?lang=en');
+  await user.click(screen.getByRole('contentinfo').querySelector('button:last-child') as HTMLButtonElement);
+  await user.click(screen.getByRole('button', { name: 'Certification guidance →' }));
   expect(window.location.hash).toBe('#/industry/certification-guide');
   expect(screen.getByText('Track the official process')).toBeInTheDocument();
-  const consumers = screen.getByRole('button', { name: 'Open consumers menu' });
-  await user.click(consumers);
-  await user.click(screen.getByRole('menuitem', { name: 'Hallmarking' }));
-  expect(window.location.hash).toBe('#/consumers/hallmarking');
-  expect(screen.getByText(/does not verify a HUID/i)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Open official BIS hallmarking information ↗' })).toHaveAttribute('href', 'https://www.bis.gov.in/hallmarking-overview/?lang=en');
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
 });
 
@@ -394,7 +403,7 @@ it('opens Services without inventing a standard or making an automatic request',
   await screen.findByRole('status');
   const user = userEvent.setup();
 
-  await user.click(screen.getByRole('button', { name: 'BIS Services' }));
+  await user.click(screen.getByRole('contentinfo').querySelector('button:last-child') as HTMLButtonElement);
   expect(screen.getByRole('heading', { name: 'BIS Bandhu services' })).toBeInTheDocument();
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
   expect(screen.queryByText(/Illustrative cooking appliance|Demo data/i)).toBeNull();
@@ -475,21 +484,20 @@ it('always initializes light despite stored and system dark preferences', async 
   expect(localStorage.getItem('bis-bandhu-theme')).toBe('dark');
 });
 
-it('focuses the existing draft on audience navigation, exposes one active item, and makes no automatic request', async () => {
+it('keeps one Assistant nav item active across audience changes without losing a typed draft', async () => {
   render(<App />);
   await openAssistant();
   const user = userEvent.setup();
   const question = screen.getByLabelText('Ask about a product, standard or BIS process');
 
   await user.type(question, 'My unfinished product question');
-  await user.click(screen.getByRole('button', { name: 'Industry' }));
+  await user.selectOptions(screen.getByLabelText('I am a:'), 'manufacturer');
 
   expect(question).toHaveFocus();
   expect(question).toHaveValue('My unfinished product question');
   expect(screen.getByLabelText('I am a:')).toHaveValue('manufacturer');
-  expect(screen.getByRole('button', { name: 'Industry' })).toHaveAttribute('aria-current', 'page');
-  expect(screen.getByRole('button', { name: 'Assistant' })).not.toHaveAttribute('aria-current');
-  expect(screen.getByRole('button', { name: 'Consumers' })).not.toHaveAttribute('aria-current');
+  expect(screen.getByRole('button', { name: 'Assistant' })).toHaveAttribute('aria-current', 'page');
+  expect(within(screen.getByRole('navigation')).queryAllByRole('button', { current: 'page' })).toHaveLength(1);
   expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => String(url).includes('/api/chat'))).toHaveLength(0);
 
   await user.type(question, '{Enter}');
@@ -536,7 +544,8 @@ it('localizes consumer service and theme controls in every supported shell langu
     await screen.findByRole('status');
     const user = userEvent.setup();
     await user.selectOptions(document.getElementById('language') as HTMLSelectElement, language);
-    await user.click(within(screen.getByRole('navigation')).getByRole('button', { name: language === 'en' ? 'Consumers' : /^(उपभोक्ता|ग्राहक|நுகர்வோர்|ভোক্তা)$/ }));
+    await user.click(within(screen.getByRole('navigation')).getByRole('button', { name: language === 'en' ? 'Assistant' : /^(सहायक|सहाय्यक|உதவியாளர்|সহায়ক)$/ }));
+    await user.selectOptions(document.getElementById('audience') as HTMLSelectElement, 'consumer');
 
     expect(screen.getByRole('link', { name: linkLabel })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: themeLabel })).toBeInTheDocument();
